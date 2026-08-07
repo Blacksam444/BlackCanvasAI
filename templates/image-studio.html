@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Studio · Black Canvas AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/image-studio.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><div class="brand-mark">BC</div><div><strong>Black Canvas</strong><span>AI Studio</span></div></div>
+    <nav class="nav-list"><a class="nav-item" href="/"><span>⌂</span>Home</a><a class="nav-item active" href="/image-studio"><span>✦</span>Image Studio</a><a class="nav-item" href="/chat"><span>◌</span>Chat</a><a class="nav-item" href="/prompts"><span>▤</span>Prompt Library</a><a class="nav-item" href="/style-bible"><span>◇</span>Style Bible</a></nav>
+    <div class="sidebar-footer"><button class="nav-item" data-coming="Settings"><span>⚙</span>Settings</button><div class="profile"><div class="avatar">J</div><div><strong>Jeffrey</strong><span>Creator workspace</span></div></div></div>
+  </aside>
+  <main class="main-content studio-main">
+    <header class="studio-topbar"><button class="menu-button" id="menuButton">☰</button><div><span>Studio</span><b>/</b><strong>Artwork catalog</strong></div><button class="upload-button" id="uploadButton">＋ Add artwork</button></header>
+    <section class="studio">
+      <div class="studio-hero"><div><p class="eyebrow">YOUR VISUAL ARCHIVE</p><h1>Image Studio</h1><p>Collect the work, capture the story, and keep every creative direction close.</p></div><div class="art-count"><strong id="artCount">0</strong><span>artworks</span></div></div>
+      <div class="studio-tools"><label class="studio-search"><span>⌕</span><input id="artSearch" placeholder="Search artwork, notes, or tags..."></label><div class="studio-filters" id="artFilters"><button class="active" data-filter="All">All work</button><button data-filter="Favorites">★ Favorites</button><button data-filter="AfroNova">AfroNova</button><button data-filter="Quiet Nova">Quiet Nova</button><button data-filter="GraffitiX">GraffitiX</button><button data-filter="Unsorted">Unsorted</button></div></div>
+      <div class="drop-zone" id="dropZone"><div>＋</div><strong>Add your first artwork</strong><p>Choose an image from your computer or drag it here.</p><button id="dropButton">Choose image</button></div>
+      <div class="art-grid" id="artGrid"></div>
+      <div class="art-empty" id="artEmpty" hidden><span>⌕</span><h2>No artwork found</h2><p>Try a different filter or search.</p></div>
+    </section>
+  </main>
+</div>
+<input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
+<dialog id="artDialog"><form id="artForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">CATALOG ARTWORK</p><h2>Add the details</h2></div><button class="close" value="cancel">×</button></div><div class="form-layout"><img id="artPreview" alt="Selected artwork preview"><div><label>Artwork title<input id="artTitle" required placeholder="Untitled artwork"></label><label>Collection<select id="artCollection"><option>Unsorted</option><option>AfroNova</option><option>Quiet Nova</option><option>GraffitiX</option></select></label><label>Tags<input id="artTags" placeholder="portrait, cosmic, gold"></label><label>Notes<textarea id="artNotes" rows="4" placeholder="What inspired this piece?"></textarea></label></div></div><div class="dialog-actions"><button class="cancel" value="cancel">Cancel</button><button class="save-art" id="saveArtwork" value="default">Save artwork</button></div></form></dialog>
+<dialog id="detailDialog"><div class="detail-layout"><img id="detailImage" alt="Artwork"><div class="detail-info"><button class="detail-close" id="detailClose">×</button><span id="detailCollection"></span><h2 id="detailTitle"></h2><p id="detailNotes"></p><div id="detailTags"></div><button class="remove-art" id="removeArtwork">Remove from catalog</button></div></div></dialog>
+<div class="toast" id="toast"></div><script src="/static/image-studio.js"></script>
+</body>
+</html>

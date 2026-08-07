@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prompt Library · Black Canvas AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/prompts.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><div class="brand-mark">BC</div><div><strong>Black Canvas</strong><span>AI Studio</span></div></div>
+    <nav class="nav-list"><a class="nav-item" href="/"><span>⌂</span>Home</a><a class="nav-item" href="/image-studio"><span>✦</span>Image Studio</a><a class="nav-item" href="/chat"><span>◌</span>Chat</a><a class="nav-item active" href="/prompts"><span>▤</span>Prompt Library</a><a class="nav-item" href="/style-bible"><span>◇</span>Style Bible</a></nav>
+    <div class="sidebar-footer"><button class="nav-item" data-coming="Settings"><span>⚙</span>Settings</button><div class="profile"><div class="avatar">J</div><div><strong>Jeffrey</strong><span>Creator workspace</span></div></div></div>
+  </aside>
+  <main class="main-content library-main">
+    <header class="library-topbar"><button class="menu-button" id="menuButton">☰</button><div class="crumb"><span>Library</span><b>/</b><strong>All prompts</strong></div><button class="add-prompt" id="addPrompt">＋ Add prompt</button></header>
+    <section class="library">
+      <div class="library-hero"><div><p class="eyebrow">YOUR CREATIVE RECIPES</p><h1>Prompt Library</h1><p>Keep your best ideas organized, searchable, and ready to create.</p></div><div class="count"><strong id="promptCount">6</strong><span>saved prompts</span></div></div>
+      <div class="library-tools"><label class="search"><span>⌕</span><input id="searchInput" placeholder="Search titles, prompts, or tags..."></label><div class="filters" id="filters"><button class="active" data-filter="All">All</button><button data-filter="Favorites">★ Favorites</button><button data-filter="AfroNova">AfroNova</button><button data-filter="Quiet Nova">Quiet Nova</button><button data-filter="GraffitiX">GraffitiX</button><button data-filter="Content">Content</button><button data-filter="Business">Business</button></div></div>
+      <div class="prompt-grid" id="promptGrid"></div>
+      <div class="empty" id="empty" hidden><span>⌕</span><h2>No prompts found</h2><p>Try another search or add a new prompt.</p></div>
+    </section>
+  </main>
+</div>
+
+<dialog id="promptDialog"><form method="dialog" id="promptForm"><div class="dialog-head"><div><p class="eyebrow">NEW CREATIVE RECIPE</p><h2>Add a prompt</h2></div><button value="cancel" class="close">×</button></div><label>Title<input id="promptTitle" required placeholder="Example: Cosmic portrait"></label><label>Collection<select id="promptCategory"><option>AfroNova</option><option>Quiet Nova</option><option>GraffitiX</option><option>Content</option><option>Business</option></select></label><label>Prompt<textarea id="promptText" required rows="7" placeholder="Paste or write your full prompt..."></textarea></label><div class="dialog-actions"><button value="cancel" class="cancel">Cancel</button><button value="default" id="savePrompt" class="save">Save prompt</button></div></form></dialog>
+<div class="toast" id="toast"></div><script src="/static/prompts.js"></script>
+</body>
+</html>
