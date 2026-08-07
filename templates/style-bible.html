@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Style Bible · Black Canvas AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/style-bible.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><div class="brand-mark">BC</div><div><strong>Black Canvas</strong><span>AI Studio</span></div></div>
+    <nav class="nav-list"><a class="nav-item" href="/"><span>⌂</span>Home</a><a class="nav-item" href="/image-studio"><span>✦</span>Image Studio</a><a class="nav-item" href="/chat"><span>◌</span>Chat</a><a class="nav-item" href="/prompts"><span>▤</span>Prompt Library</a><a class="nav-item active" href="/style-bible"><span>◇</span>Style Bible</a></nav>
+    <div class="sidebar-footer"><button class="nav-item" data-coming="Settings"><span>⚙</span>Settings</button><div class="profile"><div class="avatar">J</div><div><strong>Jeffrey</strong><span>Creator workspace</span></div></div></div>
+  </aside>
+  <main class="main-content bible-main">
+    <header class="bible-topbar"><button class="menu-button" id="menuButton">☰</button><div><span>Brand system</span><b>/</b><strong>Style Bible</strong></div><button id="editStyle">✎ Edit this style</button></header>
+    <section class="bible">
+      <div class="bible-heading"><p class="eyebrow">THE VISUAL DNA OF BLACK CANVAS</p><h1>Style Bible</h1><p>Your creative north star—so every image feels unmistakably yours.</p></div>
+      <div class="style-tabs" id="styleTabs"><button class="active" data-style="AfroNova"><i class="afro"></i><span><strong>AfroNova</strong><small>Cosmic · Regal · Futuristic</small></span></button><button data-style="Quiet Nova"><i class="quiet"></i><span><strong>Quiet Nova</strong><small>Intimate · Calm · Soulful</small></span></button><button data-style="GraffitiX"><i class="graffiti"></i><span><strong>GraffitiX</strong><small>Raw · Electric · Unfiltered</small></span></button></div>
+      <article class="style-sheet" id="styleSheet">
+        <div class="style-banner"><div><span id="styleNumber">01 / 03</span><h2 id="styleName">AfroNova</h2><p id="styleTagline"></p></div><div class="orbit">✦</div></div>
+        <div class="style-content">
+          <section class="statement"><p class="eyebrow">CORE IDEA</p><blockquote id="styleStatement"></blockquote></section>
+          <div class="rule-grid">
+            <section><p class="eyebrow">MOOD & ENERGY</p><div class="chip-list" id="moodList"></div></section>
+            <section><p class="eyebrow">COLOR PALETTE</p><div class="palette" id="palette"></div></section>
+            <section><p class="eyebrow">VISUAL INGREDIENTS</p><ul id="ingredients"></ul></section>
+            <section><p class="eyebrow">PROMPT LANGUAGE</p><div class="language" id="language"></div></section>
+          </div>
+          <div class="dos-donts"><section class="dos"><h3>✓ Always include</h3><ul id="dos"></ul></section><section class="donts"><h3>× Avoid</h3><ul id="donts"></ul></section></div>
+        </div>
+      </article>
+    </section>
+  </main>
+</div>
+<dialog id="styleDialog"><form id="styleForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">REFINE THE RULEBOOK</p><h2>Edit <span id="editName"></span></h2></div><button class="close" value="cancel">×</button></div><label>Tagline<input id="editTagline"></label><label>Core idea<textarea id="editStatement" rows="4"></textarea></label><label>Mood words <small>Separate with commas</small><input id="editMood"></label><label>Visual ingredients <small>Separate with commas</small><textarea id="editIngredients" rows="3"></textarea></label><label>Prompt language <small>Separate with commas</small><textarea id="editLanguage" rows="3"></textarea></label><label>Always include <small>Separate with commas</small><textarea id="editDos" rows="3"></textarea></label><label>Avoid <small>Separate with commas</small><textarea id="editDonts" rows="3"></textarea></label><div class="dialog-actions"><button class="cancel" value="cancel">Cancel</button><button class="save-style" id="saveStyle" value="default">Save changes</button></div></form></dialog>
+<div class="toast" id="toast"></div><script src="/static/style-bible.js"></script>
+</body>
+</html>
