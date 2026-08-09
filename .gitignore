@@ -3,5 +3,7 @@ __pycache__/
 .venv/
 .env
 data/
+credentials.json
+token.json
 .idea/
 .vscode/
