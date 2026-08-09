@@ -4,6 +4,10 @@ const panel = document.querySelector("#setupPanel");
 const toast = document.querySelector("#toast");
 const importPrompts = document.querySelector("#importPrompts");
 const importArtwork = document.querySelector("#importArtwork");
+const restoreLibrary = document.querySelector("#restoreLibrary");
+const backupBrowser = document.querySelector("#backupBrowser");
+const backupList = document.querySelector("#backupList");
+const backupSummary = document.querySelector("#backupSummary");
 const driveBrowser = document.querySelector("#driveBrowser");
 const driveFiles = document.querySelector("#driveFiles");
 const artworkBrowser = document.querySelector("#artworkBrowser");
@@ -53,18 +57,21 @@ async function loadStatus() {
     action.textContent = "Back up now";
     importPrompts.hidden = false;
     importArtwork.hidden = false;
+    restoreLibrary.hidden = false;
     panel.hidden = true;
   } else if (status.configured) {
     statusLabel.textContent = "One permission update needed";
     action.textContent = "Update Google access";
     importPrompts.hidden = true;
     importArtwork.hidden = true;
+    restoreLibrary.hidden = true;
     panel.hidden = true;
   } else {
     statusLabel.textContent = "Not connected";
     action.textContent = "Set up";
     importPrompts.hidden = true;
     importArtwork.hidden = true;
+    restoreLibrary.hidden = true;
   }
 }
 
@@ -76,7 +83,8 @@ action.onclick = async () => {
       const response = await fetch("/api/google/backup", { method: "POST" });
       const result = await response.json();
       if (!response.ok) throw Error(result.detail || "Backup failed");
-      notify("Backup saved to Google Drive.");
+      notify(`Complete backup saved: ${result.prompts} prompts and ${result.artwork_files} artwork file${result.artwork_files === 1 ? "" : "s"}.`);
+      backupSummary.textContent = `Latest backup: just now · ${result.artwork_files} artwork file${result.artwork_files === 1 ? "" : "s"}`;
       action.textContent = "Backed up ✓";
       setTimeout(() => {
         action.textContent = "Back up now";
@@ -95,6 +103,64 @@ action.onclick = async () => {
     panel.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 };
+
+async function loadBackups() {
+  backupList.innerHTML = '<p class="loading-files">Loading your backups...</p>';
+  try {
+    const response = await fetch("/api/google/backups");
+    const result = await response.json();
+    if (!response.ok) throw Error(result.detail || "Could not load backups");
+    if (!result.backups.length) {
+      backupList.innerHTML = '<p class="backup-empty">No complete folder backups yet. Click Back up now to create the first one.</p>';
+      backupSummary.textContent = "No complete folder backup yet";
+      return;
+    }
+    const latest = result.backups[0];
+    backupSummary.textContent = `Latest backup: ${new Date(latest.createdTime).toLocaleString()} · ${(latest.appProperties || {}).artwork_count || 0} artwork files`;
+    backupList.replaceChildren(...result.backups.map(backup => {
+      const row = document.createElement("div");
+      row.className = "backup-item";
+      const copy = document.createElement("div");
+      const name = document.createElement("strong");
+      name.textContent = backup.name;
+      const details = document.createElement("small");
+      details.textContent = `${new Date(backup.createdTime).toLocaleString()} · ${(backup.appProperties || {}).artwork_count || 0} artwork files`;
+      copy.append(name, details);
+      const button = document.createElement("button");
+      button.textContent = "Restore safely";
+      button.onclick = async () => {
+        if (!window.confirm("Restore this backup into the current library? Existing work will be kept, and a local safety snapshot will be created first.")) return;
+        button.disabled = true;
+        button.textContent = "Restoring...";
+        try {
+          const restoreResponse = await fetch(`/api/google/restore/${encodeURIComponent(backup.id)}`, {method:"POST"});
+          const restored = await restoreResponse.json();
+          if (!restoreResponse.ok) throw Error(restored.detail || "Restore failed");
+          button.textContent = "Restored ✓";
+          notify(`Restore complete: ${restored.prompts} prompts, ${restored.artworks} catalog entries, and ${restored.images} image files added.`);
+        } catch (error) {
+          button.disabled = false;
+          button.textContent = "Try restore again";
+          notify(error.message);
+        }
+      };
+      row.append(copy, button);
+      return row;
+    }));
+  } catch (error) {
+    const message = document.createElement("p");
+    message.className = "backup-empty";
+    message.textContent = error.message;
+    backupList.replaceChildren(message);
+  }
+}
+
+restoreLibrary.onclick = async () => {
+  backupBrowser.hidden = false;
+  backupBrowser.scrollIntoView({behavior:"smooth", block:"start"});
+  await loadBackups();
+};
+document.querySelector("#closeBackupBrowser").onclick = () => { backupBrowser.hidden = true; };
 
 importPrompts.onclick = async () => {
   driveBrowser.hidden = false;
