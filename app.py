@@ -1,6 +1,7 @@
 import base64
 import json
 import re
+import shutil
 import sqlite3
 import uuid
 import zipfile
@@ -386,11 +387,10 @@ def google_status() -> dict:
     email = None
     if GOOGLE_TOKEN.exists():
         try:
-            from google.oauth2.credentials import Credentials
             from googleapiclient.discovery import build
 
-            credentials = Credentials.from_authorized_user_file(GOOGLE_TOKEN)
-            if credentials.valid and credentials.has_scopes(GOOGLE_SCOPES):
+            credentials = google_credentials()
+            if credentials.has_scopes(GOOGLE_SCOPES):
                 about = build("drive", "v3", credentials=credentials).about().get(fields="user(displayName,emailAddress)").execute()
                 email = about.get("user", {}).get("emailAddress")
                 connected = True
@@ -408,30 +408,172 @@ def google_status() -> dict:
 
 
 @app.post("/api/google/backup")
-def backup_to_google_drive() -> dict[str, str]:
+def backup_to_google_drive() -> dict:
     from googleapiclient.discovery import build
-    from googleapiclient.http import MediaInMemoryUpload
+    from googleapiclient.http import MediaFileUpload, MediaInMemoryUpload
 
-    credentials = google_credentials()
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S_UTC")
-    filename = f"BlackCanvasAI-backup-{timestamp}.json"
-    contents = json.dumps(backup_data(), indent=2).encode("utf-8")
-    media = MediaInMemoryUpload(contents, mimetype="application/json", resumable=False)
-    uploaded = (
-        build("drive", "v3", credentials=credentials)
-        .files()
-        .create(
-            body={
-                "name": filename,
-                "description": "BlackCanvasAI prompt, style, and artwork catalog backup",
-                "appProperties": {"blackcanvas_backup": "true"},
-            },
-            media_body=media,
-            fields="id,name,webViewLink",
+    service = build("drive", "v3", credentials=google_credentials())
+    root_id = ensure_google_backup_root(service)
+    created_at = datetime.now(timezone.utc)
+    timestamp = created_at.strftime("%Y-%m-%d_%H-%M-%S_UTC")
+    folder = service.files().create(
+        body={
+            "name": f"Backup {timestamp}",
+            "mimeType": "application/vnd.google-apps.folder",
+            "parents": [root_id],
+            "appProperties": {"blackcanvas_backup_set": "true", "backup_state": "creating"},
+        },
+        fields="id,name,webViewLink",
+    ).execute()
+    manifest = backup_data()
+    manifest.update({"backup_format": 2, "created_at": created_at.isoformat(), "artwork_file_count": 0})
+    uploaded_images = 0
+    mime_types = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif"}
+    for artwork in manifest.get("artworks", []):
+        image_path = UPLOAD_DIR / artwork["filename"]
+        if not image_path.is_file():
+            continue
+        media = MediaFileUpload(
+            str(image_path),
+            mimetype=mime_types.get(image_path.suffix.lower(), "application/octet-stream"),
+            resumable=True,
         )
-        .execute()
-    )
-    return {"status": "backed_up", "name": uploaded["name"], "url": uploaded.get("webViewLink", "")}
+        service.files().create(
+            body={"name": artwork["filename"], "parents": [folder["id"]], "appProperties": {"blackcanvas_artwork": "true"}},
+            media_body=media,
+            fields="id",
+        ).execute()
+        uploaded_images += 1
+    manifest["artwork_file_count"] = uploaded_images
+    contents = json.dumps(manifest, indent=2).encode("utf-8")
+    service.files().create(
+        body={"name": "blackcanvas-backup.json", "parents": [folder["id"]], "appProperties": {"blackcanvas_manifest": "true"}},
+        media_body=MediaInMemoryUpload(contents, mimetype="application/json", resumable=False),
+        fields="id",
+    ).execute()
+    service.files().update(
+        fileId=folder["id"],
+        body={"appProperties": {"blackcanvas_backup_set": "true", "backup_state": "complete", "artwork_count": str(uploaded_images)}},
+        fields="id",
+    ).execute()
+    return {
+        "status": "backed_up",
+        "name": folder["name"],
+        "url": folder.get("webViewLink", ""),
+        "artwork_files": uploaded_images,
+        "prompts": len(manifest.get("prompts", [])),
+    }
+
+
+def ensure_google_backup_root(service) -> str:
+    result = service.files().list(
+        q="trashed=false and mimeType='application/vnd.google-apps.folder' and appProperties has { key='blackcanvas_backup_root' and value='true' }",
+        pageSize=1,
+        fields="files(id,name)",
+    ).execute()
+    if result.get("files"):
+        return result["files"][0]["id"]
+    folder = service.files().create(
+        body={
+            "name": "BlackCanvasAI Backups",
+            "mimeType": "application/vnd.google-apps.folder",
+            "appProperties": {"blackcanvas_backup_root": "true"},
+        },
+        fields="id",
+    ).execute()
+    return folder["id"]
+
+
+@app.get("/api/google/backups")
+def list_google_backups() -> dict[str, list[dict]]:
+    from googleapiclient.discovery import build
+
+    service = build("drive", "v3", credentials=google_credentials())
+    root_id = ensure_google_backup_root(service)
+    result = service.files().list(
+        q=f"'{root_id}' in parents and trashed=false and mimeType='application/vnd.google-apps.folder' and appProperties has {{ key='blackcanvas_backup_set' and value='true' }}",
+        orderBy="createdTime desc",
+        pageSize=25,
+        fields="files(id,name,createdTime,webViewLink,appProperties)",
+    ).execute()
+    backups = [item for item in result.get("files", []) if (item.get("appProperties") or {}).get("backup_state") == "complete"]
+    return {"backups": backups}
+
+
+@app.post("/api/google/restore/{backup_id}")
+def restore_google_backup(backup_id: str) -> dict[str, int | str]:
+    from googleapiclient.discovery import build
+
+    service = build("drive", "v3", credentials=google_credentials())
+    folder = service.files().get(fileId=backup_id, fields="id,name,mimeType,appProperties").execute()
+    properties = folder.get("appProperties") or {}
+    if folder.get("mimeType") != "application/vnd.google-apps.folder" or properties.get("blackcanvas_backup_set") != "true" or properties.get("backup_state") != "complete":
+        raise HTTPException(status_code=400, detail="That is not a complete BlackCanvasAI backup")
+    children = service.files().list(
+        q=f"'{backup_id}' in parents and trashed=false",
+        pageSize=1000,
+        fields="files(id,name,mimeType,appProperties)",
+    ).execute().get("files", [])
+    manifest_file = next((item for item in children if item["name"] == "blackcanvas-backup.json"), None)
+    if not manifest_file:
+        raise HTTPException(status_code=400, detail="The backup manifest is missing")
+    try:
+        manifest = json.loads(service.files().get_media(fileId=manifest_file["id"]).execute())
+    except (ValueError, json.JSONDecodeError) as error:
+        raise HTTPException(status_code=400, detail="The backup manifest is invalid") from error
+
+    snapshot_root = UPLOAD_DIR.parent / "restore-snapshots"
+    snapshot_dir = snapshot_root / datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S-%f_UTC")
+    snapshot_dir.mkdir(parents=True, exist_ok=False)
+    with connect() as source_db, sqlite3.connect(snapshot_dir / "blackcanvas.db") as snapshot_db:
+        source_db.backup(snapshot_db)
+    if UPLOAD_DIR.exists():
+        shutil.copytree(UPLOAD_DIR, snapshot_dir / "uploads")
+
+    restored_prompts = 0
+    restored_artworks = 0
+    restored_images = 0
+    remote_by_name = {item["name"]: item for item in children}
+    with connect() as db:
+        for prompt in manifest.get("prompts", []):
+            cursor = db.execute(
+                "INSERT OR IGNORE INTO prompts(title, category, text, favorite, source, reviewed) VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    prompt.get("title", "Restored prompt"), prompt.get("category", "Unsorted"), prompt.get("text", ""),
+                    int(bool(prompt.get("favorite"))), prompt.get("source", "backup"), int(bool(prompt.get("reviewed", True))),
+                ),
+            )
+            restored_prompts += max(cursor.rowcount, 0)
+        for name, content in (manifest.get("styles") or {}).items():
+            db.execute("INSERT OR REPLACE INTO styles(name, content) VALUES (?, ?)", (name, json.dumps(content)))
+        for artwork in manifest.get("artworks", []):
+            filename = Path(str(artwork.get("filename", ""))).name
+            if not filename:
+                continue
+            image_path = UPLOAD_DIR / filename
+            remote_image = remote_by_name.get(filename)
+            if not image_path.exists() and remote_image:
+                image_path.write_bytes(service.files().get_media(fileId=remote_image["id"]).execute())
+                restored_images += 1
+            existing = db.execute("SELECT id FROM artworks WHERE filename = ?", (filename,)).fetchone()
+            if existing or not image_path.exists():
+                continue
+            db.execute(
+                "INSERT INTO artworks(title, collection, tags, notes, favorite, filename, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    artwork.get("title", "Restored artwork"), artwork.get("collection", "Unsorted"), artwork.get("tags", ""),
+                    artwork.get("notes", ""), int(bool(artwork.get("favorite"))), filename,
+                    artwork.get("created_at") or datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+            restored_artworks += 1
+    return {
+        "status": "restored",
+        "prompts": restored_prompts,
+        "artworks": restored_artworks,
+        "images": restored_images,
+        "safety_snapshot": snapshot_dir.name,
+    }
 
 
 @app.get("/api/google/prompt-files")
