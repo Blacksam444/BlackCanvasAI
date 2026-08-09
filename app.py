@@ -5,7 +5,6 @@ import sqlite3
 import uuid
 import zipfile
 from datetime import datetime, timezone
-from io import BytesIO
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -242,20 +241,29 @@ def chatgpt_candidates(conversations: list[dict]) -> list[dict[str, str | float]
 
 @app.post("/api/chatgpt/import-preview")
 async def preview_chatgpt_export(export_file: UploadFile = File(...)) -> dict:
-    raw = await export_file.read()
-    if len(raw) > 150 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="That export is too large to scan")
     try:
         if (export_file.filename or "").lower().endswith(".zip"):
-            with zipfile.ZipFile(BytesIO(raw)) as archive:
-                conversation_name = next(
-                    (name for name in archive.namelist() if name.lower().endswith("conversations.json")),
-                    None,
+            await export_file.seek(0)
+            with zipfile.ZipFile(export_file.file) as archive:
+                conversation_names = sorted(
+                    name for name in archive.namelist()
+                    if re.fullmatch(r"conversations(?:-\d+)?\.json", Path(name).name, flags=re.IGNORECASE)
                 )
-                if not conversation_name:
-                    raise ValueError("conversations.json was not found in that ZIP")
-                conversations = json.loads(archive.read(conversation_name))
+                if not conversation_names:
+                    raise ValueError("Conversation history files were not found in that ZIP")
+                history_size = sum(archive.getinfo(name).file_size for name in conversation_names)
+                if history_size > 500 * 1024 * 1024:
+                    raise ValueError("The conversation history is too large to scan safely")
+                conversations = []
+                for conversation_name in conversation_names:
+                    history_part = json.loads(archive.read(conversation_name))
+                    if not isinstance(history_part, list):
+                        raise ValueError(f"{conversation_name} does not contain a conversation list")
+                    conversations.extend(history_part)
         else:
+            raw = await export_file.read(200 * 1024 * 1024 + 1)
+            if len(raw) > 200 * 1024 * 1024:
+                raise ValueError("That JSON export is too large to scan safely")
             conversations = json.loads(raw)
         if not isinstance(conversations, list):
             raise ValueError("The conversation export is not a list")
@@ -263,7 +271,15 @@ async def preview_chatgpt_export(export_file: UploadFile = File(...)) -> dict:
         raise HTTPException(status_code=400, detail=f"Could not read that ChatGPT export: {error}") from error
     candidates = chatgpt_candidates(conversations)
     CHATGPT_IMPORT_CACHE.write_text(json.dumps(candidates), encoding="utf-8")
-    return {"count": len(candidates), "candidates": candidates[:500]}
+    return {"count": len(candidates), "candidates": candidates}
+
+
+@app.get("/api/chatgpt/import-candidates")
+def saved_chatgpt_candidates() -> dict:
+    if not CHATGPT_IMPORT_CACHE.exists():
+        return {"count": 0, "candidates": []}
+    candidates = json.loads(CHATGPT_IMPORT_CACHE.read_text(encoding="utf-8"))
+    return {"count": len(candidates), "candidates": candidates}
 
 
 @app.post("/api/chatgpt/import-selected")
