@@ -35,6 +35,8 @@ def initialize() -> None:
                 category TEXT NOT NULL,
                 text TEXT NOT NULL,
                 favorite INTEGER NOT NULL DEFAULT 0,
+                source TEXT NOT NULL DEFAULT 'manual',
+                reviewed INTEGER NOT NULL DEFAULT 1,
                 UNIQUE(title, text)
             );
             CREATE TABLE IF NOT EXISTS styles (
@@ -52,6 +54,13 @@ def initialize() -> None:
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
         """)
+        prompt_columns = {row[1] for row in db.execute("PRAGMA table_info(prompts)")}
+        if "source" not in prompt_columns:
+            db.execute("ALTER TABLE prompts ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'")
+        if "reviewed" not in prompt_columns:
+            db.execute("ALTER TABLE prompts ADD COLUMN reviewed INTEGER NOT NULL DEFAULT 1")
+        db.execute("UPDATE prompts SET source = 'chatgpt', reviewed = 0 WHERE category = 'ChatGPT Import' AND source = 'manual'")
+        db.execute("UPDATE prompts SET source = 'drive', reviewed = 0 WHERE category = 'Imported' AND source = 'manual'")
         if db.execute("SELECT COUNT(*) FROM prompts").fetchone()[0] == 0:
             db.executemany("INSERT INTO prompts(title, category, text, favorite) VALUES (?, ?, ?, ?)", DEFAULT_PROMPTS)
 
@@ -71,7 +80,7 @@ def backup_data() -> dict[str, Any]:
     styles = rows("SELECT name, content FROM styles ORDER BY name")
     return {
         "version": 1,
-        "prompts": rows("SELECT id, title, category, text, favorite FROM prompts ORDER BY id"),
+        "prompts": rows("SELECT id, title, category, text, favorite, source, reviewed FROM prompts ORDER BY id"),
         "styles": {item["name"]: json.loads(item["content"]) for item in styles},
         "artworks": rows("SELECT id, title, collection, tags, notes, favorite, filename, created_at FROM artworks ORDER BY id"),
     }

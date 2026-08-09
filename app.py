@@ -37,6 +37,12 @@ class PromptPayload(BaseModel):
     favorite: bool = False
 
 
+class PromptBulkPayload(BaseModel):
+    prompt_ids: list[int]
+    category: str | None = None
+    reviewed: bool | None = None
+
+
 class StylePayload(BaseModel):
     content: dict
 
@@ -126,19 +132,67 @@ def chat_reply(payload: ChatMessage) -> dict[str, str]:
 
 @app.get("/api/prompts")
 def list_prompts() -> list[dict]:
-    return rows("SELECT id, title, category, text, favorite FROM prompts ORDER BY id DESC")
+    return rows("SELECT id, title, category, text, favorite, source, reviewed FROM prompts ORDER BY id DESC")
 
 
 @app.post("/api/prompts")
 def create_prompt(payload: PromptPayload) -> dict:
     try:
         prompt_id = execute(
-            "INSERT INTO prompts(title, category, text, favorite) VALUES (?, ?, ?, ?)",
+            "INSERT INTO prompts(title, category, text, favorite, source, reviewed) VALUES (?, ?, ?, ?, 'manual', 1)",
             (payload.title.strip(), payload.category, payload.text.strip(), int(payload.favorite)),
         )
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=409, detail="Prompt already exists")
     return {"id": prompt_id, **payload.model_dump()}
+
+
+@app.put("/api/prompts/{prompt_id}")
+def update_prompt(prompt_id: int, payload: PromptPayload) -> dict:
+    try:
+        with connect() as db:
+            cursor = db.execute(
+                "UPDATE prompts SET title = ?, category = ?, text = ?, favorite = ?, reviewed = 1 WHERE id = ?",
+                (payload.title.strip(), payload.category, payload.text.strip(), int(payload.favorite), prompt_id),
+            )
+            if cursor.rowcount == 0:
+                raise HTTPException(status_code=404, detail="Prompt not found")
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=409, detail="That prompt is already saved")
+    return {"id": prompt_id, **payload.model_dump(), "reviewed": True}
+
+
+@app.post("/api/prompts/bulk-update")
+def bulk_update_prompts(payload: PromptBulkPayload) -> dict[str, int]:
+    prompt_ids = list(dict.fromkeys(payload.prompt_ids))[:500]
+    if not prompt_ids:
+        raise HTTPException(status_code=400, detail="Select at least one prompt")
+    updates: list[str] = []
+    values: list[str | int] = []
+    if payload.category is not None:
+        updates.append("category = ?")
+        values.append(payload.category)
+    if payload.reviewed is not None:
+        updates.append("reviewed = ?")
+        values.append(int(payload.reviewed))
+    if not updates:
+        raise HTTPException(status_code=400, detail="No changes were requested")
+    placeholders = ",".join("?" for _ in prompt_ids)
+    with connect() as db:
+        cursor = db.execute(
+            f"UPDATE prompts SET {', '.join(updates)} WHERE id IN ({placeholders})",
+            (*values, *prompt_ids),
+        )
+    return {"updated": cursor.rowcount}
+
+
+@app.delete("/api/prompts/{prompt_id}")
+def delete_prompt(prompt_id: int) -> dict[str, str]:
+    with connect() as db:
+        cursor = db.execute("DELETE FROM prompts WHERE id = ?", (prompt_id,))
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Prompt not found")
+    return {"status": "removed"}
 
 
 @app.patch("/api/prompts/{prompt_id}/favorite")
@@ -295,7 +349,7 @@ def import_chatgpt_prompts(payload: ChatGPTImportPayload) -> dict[str, int]:
                 continue
             title = str(candidate["conversation"])[:120]
             cursor = db.execute(
-                "INSERT OR IGNORE INTO prompts(title, category, text, favorite) VALUES (?, ?, ?, 0)",
+                "INSERT OR IGNORE INTO prompts(title, category, text, favorite, source, reviewed) VALUES (?, ?, ?, 0, 'chatgpt', 0)",
                 (title, "ChatGPT Import", candidate["text"]),
             )
             imported += max(cursor.rowcount, 0)
@@ -417,7 +471,7 @@ def import_google_prompt(file_id: str) -> dict[str, str | bool]:
     title = re.sub(r"\.(txt|md)$", "", metadata["name"], flags=re.IGNORECASE).strip()
     with connect() as db:
         cursor = db.execute(
-            "INSERT OR IGNORE INTO prompts(title, category, text, favorite) VALUES (?, ?, ?, 0)",
+            "INSERT OR IGNORE INTO prompts(title, category, text, favorite, source, reviewed) VALUES (?, ?, ?, 0, 'drive', 0)",
             (title or "Imported prompt", "Imported", prompt_text),
         )
         imported = cursor.rowcount > 0
