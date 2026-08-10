@@ -26,12 +26,11 @@ document.querySelector("#askForm").addEventListener("submit", (event) => {
   event.preventDefault();
   const input = document.querySelector("#askInput");
   if (!input.value.trim()) return input.focus();
-  showToast("Message saved. Live AI chat is coming next.");
-  input.value = "";
+  window.location.href = `/chat?q=${encodeURIComponent(input.value.trim())}`;
 });
 
 document.querySelector("#copyPrompt").addEventListener("click", async () => {
-  const prompt = document.querySelector("blockquote").textContent.replace(/[“”]/g, "");
+  const prompt = document.querySelector("#dailyPrompt").textContent.replace(/[“”]/g, "");
   await navigator.clipboard.writeText(prompt);
   showToast("Prompt copied.");
 });
@@ -39,3 +38,41 @@ document.querySelector("#copyPrompt").addEventListener("click", async () => {
 document.querySelector("#menuButton").addEventListener("click", () => {
   document.querySelector("#sidebar").classList.toggle("open");
 });
+
+const escapeDashboardHtml = (value = "") => String(value).replace(/[&<>"']/g, (character) => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;",
+}[character]));
+
+async function loadDashboard() {
+  try {
+    const response = await fetch("/api/dashboard");
+    if (!response.ok) throw new Error();
+    const data = await response.json();
+    document.querySelector("#promptCount").textContent = data.counts.prompts;
+    document.querySelector("#artworkCount").textContent = data.counts.artworks;
+    document.querySelector("#favoriteCount").textContent = data.counts.favorites;
+    document.querySelector("#reviewCount").textContent = data.counts.to_review ? `${data.counts.to_review} to review` : "All organized";
+    if (data.prompt_of_day) {
+      document.querySelector("#dailyPrompt").textContent = data.prompt_of_day.text;
+      document.querySelector("#dailyCategory").textContent = data.prompt_of_day.category;
+    } else {
+      document.querySelector("#dailyPrompt").textContent = "Save your first prompt to see it featured here.";
+      document.querySelector("#copyPrompt").disabled = true;
+    }
+    const activity = document.querySelector("#recentActivity");
+    if (!data.recent.length) {
+      activity.innerHTML = '<p class="activity-loading">Your newest prompts and artwork will appear here.</p>';
+      return;
+    }
+    activity.innerHTML = data.recent.map((item) => {
+      const href = item.kind === "artwork" ? "/image-studio" : "/prompts";
+      const icon = item.kind === "artwork" ? "✦" : "▤";
+      const description = item.description || item.detail;
+      return `<a href="${href}"><span class="conversation-icon ${item.kind === "artwork" ? "purple" : "amber"}">${icon}</span><span><strong>${escapeDashboardHtml(item.title)}</strong><small>${escapeDashboardHtml(description).slice(0, 100)}</small></span><time>${escapeDashboardHtml(item.detail)}</time><b>›</b></a>`;
+    }).join("");
+  } catch {
+    document.querySelector("#recentActivity").innerHTML = '<p class="activity-loading">Could not load the library just now.</p>';
+  }
+}
+
+loadDashboard();

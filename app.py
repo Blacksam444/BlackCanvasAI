@@ -77,6 +77,94 @@ class DriveArtworkPayload(BaseModel):
     notes: str = ""
 
 
+def clean_image_idea(message: str) -> str:
+    idea = message.strip().rstrip(".?!")
+    patterns = [
+        r"^(?:can|could|will|would)\s+(?:we|you)\s+(?:write|create|make|generate)\s+(?:me\s+)?(?:an?\s+)?(?:image\s+)?prompt\s+(?:for|of|about)\s+",
+        r"^(?:please\s+)?(?:write|create|make|generate)\s+(?:me\s+)?(?:an?\s+)?(?:image\s+)?prompt\s+(?:for|of|about)?\s*",
+        r"^(?:i\s+(?:want|need)\s+)(?:an?\s+)?(?:image\s+)?prompt\s+(?:for|of|about)?\s*",
+    ]
+    for pattern in patterns:
+        cleaned = re.sub(pattern, "", idea, flags=re.IGNORECASE).strip()
+        if cleaned != idea:
+            idea = cleaned
+            break
+    idea = re.sub(r"\b(a)\s+(african)\b", r"an \2", idea, flags=re.IGNORECASE)
+    simple_style = re.sub(r"[^a-z]", "", idea.lower())
+    if simple_style in ("afronova", "afronovastyle"):
+        idea = "a regal Black visionary in the AfroNova style"
+    elif simple_style in ("quietnova", "quietnovastyle"):
+        idea = "a contemplative Black figure in the Quiet Nova style"
+    elif simple_style in ("graffitix", "graffitixstyle"):
+        idea = "an expressive Black urban creator in the GraffitiX style"
+    return idea or message.strip()
+
+
+def prompt_collection(idea: str) -> tuple[str, str, str, str]:
+    lowered = idea.lower()
+    if "afro nova" in lowered or "afronova" in lowered:
+        return ("AfroNova", "deep violet, midnight blue, luminous gold, and rich earth tones",
+                "Afrofuturist elegance, celestial symbolism, intricate textile detail, and regal visual language",
+                "powerful, visionary, dignified")
+    if "quiet nova" in lowered:
+        return ("Quiet Nova", "warm earth tones, soft cream, muted blue, and restrained gold",
+                "subtle tactile texture, generous negative space, and softly rendered details",
+                "intimate, grounded, contemplative")
+    if "graffitix" in lowered or "graffiti x" in lowered:
+        return ("GraffitiX", "electric magenta, cyan, black, and flashes of gold",
+                "layered spray-paint marks, torn-paper textures, and expressive urban energy",
+                "bold, rebellious, kinetic")
+    if any(word in lowered for word in ("graffiti", "street", "urban", "neon", "city", "hip-hop")):
+        return ("GraffitiX", "electric magenta, cyan, black, and flashes of gold",
+                "layered spray-paint marks, torn-paper textures, and expressive urban energy",
+                "bold, rebellious, kinetic")
+    if any(word in lowered for word in ("quiet", "calm", "peaceful", "soft", "gentle", "reflective", "morning")):
+        return ("Quiet Nova", "warm earth tones, soft cream, muted blue, and restrained gold",
+                "subtle tactile texture, generous negative space, and softly rendered details",
+                "intimate, grounded, contemplative")
+    return ("AfroNova", "deep violet, midnight blue, luminous gold, and rich earth tones",
+            "Afrofuturist elegance, celestial symbolism, intricate textile detail, and regal visual language",
+            "powerful, visionary, dignified")
+
+
+def create_image_prompt(message: str) -> tuple[str, str]:
+    idea = clean_image_idea(message)
+    collection, palette, style, mood = prompt_collection(idea)
+    lowered = idea.lower()
+    subject = re.split(r"\s+in\s+the\s+(?:AfroNova|Quiet Nova|GraffitiX)\s+style", idea, maxsplit=1, flags=re.IGNORECASE)[0]
+    requested_mood = re.search(r"with\s+(?:an?\s+)?(.+?)\s+mood", idea, flags=re.IGNORECASE)
+    requested_colors = re.search(r"using\s+(.+?),\s+as\s+", idea, flags=re.IGNORECASE)
+    if requested_mood:
+        mood = requested_mood.group(1).strip()
+    if requested_colors and "collection color palette" not in requested_colors.group(1).lower():
+        palette = requested_colors.group(1).strip()
+    if "photorealistic" in lowered or "photograph" in lowered:
+        medium = "cinematic photorealistic portrait photography"
+    elif "acrylic" in lowered:
+        medium = "museum-quality acrylic painting on textured canvas"
+    elif "editorial fashion" in lowered:
+        medium = "high-fashion editorial portrait photography"
+    elif "graphic poster" in lowered:
+        medium = "bold contemporary graphic poster art"
+    else:
+        medium = "museum-quality fine-art digital painting with painterly realism"
+    safety = " age-appropriate styling and a dignified, authentic expression," if any(
+        word in subject.lower() for word in ("child", "boy", "girl", "kid", "baby")
+    ) else ""
+    prompt = (
+        f"Create {medium} of {subject},{safety} presented as the unmistakable focal subject. "
+        f"Use a balanced three-quarter composition at eye level, with confident posture, expressive eyes, "
+        f"and carefully observed facial features. Build the visual direction around {style}. "
+        f"Illuminate the subject with soft directional key light and a subtle luminous rim light, creating "
+        f"dimensional skin tones, controlled highlights, and rich shadow detail. Use a refined palette of "
+        f"{palette}. Place the subject against an atmospheric, story-rich background that supports the idea "
+        f"without competing with the face. The mood is {mood}. Include believable materials, finely rendered "
+        f"fabric and accessories, natural depth of field, sophisticated color grading, crisp focal detail, "
+        f"gallery-ready composition, ultra-detailed, cohesive, emotionally resonant, no text, no watermark."
+    )
+    return collection, prompt
+
+
 @app.get("/")
 def home() -> FileResponse:
     return dashboard_file()
@@ -118,6 +206,22 @@ def connections() -> FileResponse:
 @app.post("/api/chat")
 def chat_reply(payload: ChatMessage) -> dict[str, str]:
     topic = payload.message.strip()
+    creative_triggers = ("prompt", "image", "portrait", "painting", "photo", "artwork", "style",
+                         "afronova", "afro nova", "quiet nova", "graffitix", "graffiti x")
+    if any(word in topic.lower() for word in creative_triggers):
+        collection, prompt = create_image_prompt(topic)
+        idea = clean_image_idea(topic)
+        title = re.sub(r"\s+", " ", idea).strip().title()[:70] or "Generated Image Prompt"
+        return {
+            "reply": (
+                f"**Your {collection} image prompt**\n\n{prompt}\n\n"
+                "You can copy this prompt into your image generator. This version was created locally, "
+                "so it did not use a paid AI key."
+            ),
+            "generated_prompt": prompt,
+            "prompt_title": title,
+            "prompt_category": collection,
+        }
     return {
         "reply": (
             f"I’m ready to help you develop **{topic}**.\n\n"
@@ -134,6 +238,46 @@ def chat_reply(payload: ChatMessage) -> dict[str, str]:
 @app.get("/api/prompts")
 def list_prompts() -> list[dict]:
     return rows("SELECT id, title, category, text, favorite, source, reviewed FROM prompts ORDER BY id DESC")
+
+
+@app.get("/api/dashboard")
+def dashboard_summary() -> dict:
+    with connect() as db:
+        prompt_count = db.execute("SELECT COUNT(*) FROM prompts").fetchone()[0]
+        artwork_count = db.execute("SELECT COUNT(*) FROM artworks").fetchone()[0]
+        favorite_count = db.execute(
+            "SELECT (SELECT COUNT(*) FROM prompts WHERE favorite = 1) + "
+            "(SELECT COUNT(*) FROM artworks WHERE favorite = 1)"
+        ).fetchone()[0]
+        review_count = db.execute("SELECT COUNT(*) FROM prompts WHERE reviewed = 0").fetchone()[0]
+        prompt_rows = [dict(item) for item in db.execute(
+            "SELECT id, title, category, text FROM prompts ORDER BY id DESC LIMIT 3"
+        ).fetchall()]
+        artwork_rows = [dict(item) for item in db.execute(
+            "SELECT id, title, collection, notes FROM artworks ORDER BY id DESC LIMIT 3"
+        ).fetchall()]
+        prompt_of_day = db.execute(
+            "SELECT id, title, category, text FROM prompts "
+            "ORDER BY favorite DESC, id DESC LIMIT 1 OFFSET ?",
+            ((datetime.now().timetuple().tm_yday - 1) % max(prompt_count, 1),),
+        ).fetchone() if prompt_count else None
+
+    activity = [
+        {"kind": "prompt", "id": item["id"], "title": item["title"],
+         "detail": item["category"], "description": item["text"]}
+        for item in prompt_rows
+    ] + [
+        {"kind": "artwork", "id": item["id"], "title": item["title"],
+         "detail": item["collection"], "description": item["notes"] or "Saved artwork"}
+        for item in artwork_rows
+    ]
+    activity.sort(key=lambda item: item["id"], reverse=True)
+    return {
+        "counts": {"prompts": prompt_count, "artworks": artwork_count,
+                   "favorites": favorite_count, "to_review": review_count},
+        "prompt_of_day": dict(prompt_of_day) if prompt_of_day else None,
+        "recent": activity[:3],
+    }
 
 
 @app.post("/api/prompts")
