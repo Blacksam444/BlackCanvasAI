@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/dashboard-live.css?v=1">
 </head>
 <body>
     <div class="app-shell">
@@ -61,23 +62,23 @@
                 </div>
 
                 <div class="content-grid">
-                    <section class="panel focus-panel">
-                        <div class="panel-title"><div><p class="eyebrow">TODAY</p><h2>Your focus</h2></div><button>•••</button></div>
-                        <label><input type="checkbox"><span>Continue current artwork</span><em>AfroNova</em></label>
-                        <label><input type="checkbox"><span>Check Etsy orders</span><em>Business</em></label>
-                        <label><input type="checkbox"><span>Create TikTok video</span><em>Content</em></label>
+                    <section class="panel focus-panel library-snapshot">
+                        <div class="panel-title"><div><p class="eyebrow">YOUR COLLECTION</p><h2>Library snapshot</h2></div></div>
+                        <a href="/prompts"><strong id="promptCount">—</strong><span>Saved prompts</span><em id="reviewCount">Loading</em></a>
+                        <a href="/image-studio"><strong id="artworkCount">—</strong><span>Cataloged artwork</span><em>Open studio</em></a>
+                        <a href="/prompts"><strong id="favoriteCount">—</strong><span>Favorites</span><em>View library</em></a>
                     </section>
 
                     <section class="panel prompt-panel">
                         <div class="prompt-top"><span>✦</span><p class="eyebrow">PROMPT OF THE DAY</p></div>
-                        <blockquote>“Create a bold portrait where cosmic elegance meets street-art energy...”</blockquote>
-                        <div><span class="tag">AfroNova</span><button id="copyPrompt">Copy prompt</button></div>
+                        <blockquote id="dailyPrompt">Loading a prompt from your library...</blockquote>
+                        <div><span class="tag" id="dailyCategory">Your library</span><button id="copyPrompt">Copy prompt</button></div>
                     </section>
                 </div>
 
                 <section class="recent">
-                    <div class="section-heading"><div><p class="eyebrow">PICK UP WHERE YOU LEFT OFF</p><h2>Recent conversations</h2></div><button>View all</button></div>
-                    <div class="conversation-list">
+                    <div class="section-heading"><div><p class="eyebrow">PICK UP WHERE YOU LEFT OFF</p><h2>Recent library activity</h2></div><a href="/prompts">View all</a></div>
+                    <div class="conversation-list" id="recentActivity">
                         <button><span class="conversation-icon purple">✦</span><span><strong>AfroNova Collection</strong><small>Refining the visual direction for the next drop</small></span><time>Yesterday</time><b>›</b></button>
                         <button><span class="conversation-icon blue">◌</span><span><strong>TikTok Content Ideas</strong><small>Short-form concepts for the studio process</small></span><time>2 days ago</time><b>›</b></button>
                         <button><span class="conversation-icon amber">◇</span><span><strong>Business Planning</strong><small>Pricing and launch strategy</small></span><time>Aug 3</time><b>›</b></button>
