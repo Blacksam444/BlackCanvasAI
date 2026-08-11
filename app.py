@@ -57,6 +57,13 @@ class ArtworkPayload(BaseModel):
     data_url: str
 
 
+class ArtworkDetailsPayload(BaseModel):
+    title: str
+    collection: str
+    tags: str = ""
+    notes: str = ""
+
+
 class GoogleCredentialsPayload(BaseModel):
     credentials: dict
 
@@ -387,6 +394,22 @@ def create_artwork(payload: ArtworkPayload) -> dict:
 def favorite_artwork(artwork_id: int, favorite: bool) -> dict[str, bool]:
     execute("UPDATE artworks SET favorite = ? WHERE id = ?", (int(favorite), artwork_id))
     return {"favorite": favorite}
+
+
+@app.put("/api/artworks/{artwork_id}")
+def update_artwork(artwork_id: int, payload: ArtworkDetailsPayload) -> dict:
+    title = payload.title.strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="Artwork title is required")
+    with connect() as db:
+        cursor = db.execute(
+            "UPDATE artworks SET title = ?, collection = ?, tags = ?, notes = ? WHERE id = ?",
+            (title, payload.collection, payload.tags.strip(), payload.notes.strip(), artwork_id),
+        )
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Artwork not found")
+    return {"id": artwork_id, "title": title, "collection": payload.collection,
+            "tags": payload.tags.strip(), "notes": payload.notes.strip()}
 
 
 @app.delete("/api/artworks/{artwork_id}")
