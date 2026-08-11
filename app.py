@@ -119,11 +119,11 @@ def prompt_collection(idea: str) -> tuple[str, str, str, str]:
                 "intimate, grounded, contemplative")
     if "graffitix" in lowered or "graffiti x" in lowered:
         return ("GraffitiX", "electric magenta, cyan, black, and flashes of gold",
-                "layered spray-paint marks, torn-paper textures, and expressive urban energy",
+                "layered spray-paint marks, torn-paper textures, expressive urban energy, and a restrained symbolic vocabulary of hand-drawn 444 numerals, crowns, skulls, X-eyes, crude diamonds, primitive pyramids, cryptic writing, crossed-out phrases, ledger marks, and loose scribbles; organize the composition around one main subject, one hero symbol, one or two supporting symbols, then secondary background writing",
                 "bold, rebellious, kinetic")
     if any(word in lowered for word in ("graffiti", "street", "urban", "neon", "city", "hip-hop")):
         return ("GraffitiX", "electric magenta, cyan, black, and flashes of gold",
-                "layered spray-paint marks, torn-paper textures, and expressive urban energy",
+                "layered spray-paint marks, torn-paper textures, expressive urban energy, and a restrained symbolic vocabulary of hand-drawn 444 numerals, crowns, skulls, X-eyes, crude diamonds, primitive pyramids, cryptic writing, crossed-out phrases, ledger marks, and loose scribbles; organize the composition around one main subject, one hero symbol, one or two supporting symbols, then secondary background writing",
                 "bold, rebellious, kinetic")
     if any(word in lowered for word in ("quiet", "calm", "peaceful", "soft", "gentle", "reflective", "morning")):
         return ("Quiet Nova", "warm earth tones, soft cream, muted blue, and restrained gold",
