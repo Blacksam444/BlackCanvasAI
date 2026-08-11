@@ -5,7 +5,7 @@
   <title>Image Studio · Black Canvas AI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/image-studio.css">
+  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/image-studio.css"><link rel="stylesheet" href="/static/artwork-edit.css?v=1"><link rel="stylesheet" href="/static/artwork-prompt.css?v=1">
 </head>
 <body>
 <div class="app-shell">
@@ -27,7 +27,8 @@
 </div>
 <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
 <dialog id="artDialog"><form id="artForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">CATALOG ARTWORK</p><h2>Add the details</h2></div><button class="close" value="cancel">×</button></div><div class="form-layout"><img id="artPreview" alt="Selected artwork preview"><div><label>Artwork title<input id="artTitle" required placeholder="Untitled artwork"></label><label>Collection<select id="artCollection"><option>Unsorted</option><option>AfroNova</option><option>Quiet Nova</option><option>GraffitiX</option></select></label><label>Tags<input id="artTags" placeholder="portrait, cosmic, gold"></label><label>Notes<textarea id="artNotes" rows="4" placeholder="What inspired this piece?"></textarea></label></div></div><div class="dialog-actions"><button class="cancel" value="cancel">Cancel</button><button class="save-art" id="saveArtwork" value="default">Save artwork</button></div></form></dialog>
-<dialog id="detailDialog"><div class="detail-layout"><img id="detailImage" alt="Artwork"><div class="detail-info"><button class="detail-close" id="detailClose">×</button><span id="detailCollection"></span><h2 id="detailTitle"></h2><p id="detailNotes"></p><div id="detailTags"></div><button class="remove-art" id="removeArtwork">Remove from catalog</button></div></div></dialog>
+<dialog id="detailDialog"><div class="detail-layout"><img id="detailImage" alt="Artwork"><div class="detail-info"><button class="detail-close" id="detailClose">×</button><span id="detailCollection"></span><h2 id="detailTitle"></h2><p id="detailNotes"></p><div id="detailTags"></div><button class="create-art-prompt" id="createArtworkPrompt">✦ Create prompt from artwork</button><div class="detail-actions"><button class="edit-art" id="editArtwork">Edit details</button><button class="remove-art" id="removeArtwork">Remove from catalog</button></div></div></div></dialog>
+<dialog id="editDialog"><form id="editForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">EDIT ARTWORK</p><h2>Update the details</h2></div><button class="close" value="cancel">×</button></div><div class="edit-fields"><label>Artwork title<input id="editTitle" required></label><label>Collection<select id="editCollection"><option>Unsorted</option><option>AfroNova</option><option>Quiet Nova</option><option>GraffitiX</option></select></label><label>Tags<input id="editTags" placeholder="portrait, cosmic, gold"></label><label>Description & notes<textarea id="editNotes" rows="5"></textarea></label></div><p class="autofill-hint">Choose a collection to fill suggested tags and a starter description.</p><div class="dialog-actions"><button class="cancel" value="cancel">Cancel</button><button class="save-art" id="saveArtworkDetails" value="default">Save changes</button></div></form></dialog>
 <div class="toast" id="toast"></div><script src="/static/image-studio.js"></script>
 </body>
 </html>
