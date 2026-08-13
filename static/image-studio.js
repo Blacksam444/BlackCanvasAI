@@ -144,6 +144,68 @@ document.querySelector("#createArtworkPrompt").onclick = () => {
   const request = `Create an image prompt for ${artwork.title} in the ${artwork.collection} style${details ? `. Use this creative direction: ${details}` : ""}.`;
   window.location.href = `/chat?q=${encodeURIComponent(request)}`;
 };
+document.querySelector("#createContentKit").onclick = async () => {
+  if (!selectedId) return;
+  const button = document.querySelector("#createContentKit");
+  button.disabled = true;
+  button.textContent = "Creating content kit...";
+  try {
+    const response = await fetch(`/api/artworks/${selectedId}/content-kit`);
+    if (!response.ok) throw new Error();
+    const kit = await response.json();
+    document.querySelector("#contentKitTitle").textContent = `${kit.artwork_title} Content Kit`;
+    document.querySelector("#kitInstagram").value = kit.instagram;
+    document.querySelector("#kitTikTokHook").value = kit.tiktok_hook;
+    document.querySelector("#kitTikTokCaption").value = kit.tiktok_caption;
+    document.querySelector("#kitListingTitle").value = kit.listing_title;
+    document.querySelector("#kitListingDescription").value = kit.listing_description;
+    document.querySelector("#kitListingTags").value = kit.listing_tags.join(", ");
+    document.querySelector("#detailDialog").close();
+    document.querySelector("#contentKitDialog").showModal();
+  } catch {
+    notify("Could not create the content kit just now.");
+  } finally {
+    button.disabled = false;
+    button.textContent = "◇ Create marketing content kit";
+  }
+};
+document.querySelector("#closeContentKit").onclick = () => document.querySelector("#contentKitDialog").close();
+document.querySelectorAll("[data-copy]").forEach((button) => {
+  button.onclick = async () => {
+    await navigator.clipboard.writeText(document.querySelector(`#${button.dataset.copy}`).value);
+    notify("Content copied.");
+  };
+});
+const pricingInputs = ["priceMaterials", "priceHours", "priceHourly", "priceOverhead", "priceFees", "priceProfit"];
+let pricingSummary = "";
+const money = (value) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
+function calculatePrice() {
+  const values = Object.fromEntries(pricingInputs.map((id) => [id, Math.max(0, Number(document.querySelector(`#${id}`).value) || 0)]));
+  const feeRate = Math.min(values.priceFees, 90) / 100;
+  const creativeCost = values.priceMaterials + (values.priceHours * values.priceHourly) + values.priceOverhead;
+  const minimum = creativeCost / (1 - feeRate);
+  const target = (creativeCost * (1 + values.priceProfit / 100)) / (1 - feeRate);
+  const recommended = Math.ceil(target / 5) * 5;
+  document.querySelector("#priceCreativeCost").textContent = money(creativeCost);
+  document.querySelector("#priceMinimum").textContent = money(Math.ceil(minimum));
+  document.querySelector("#priceRecommended").textContent = money(recommended);
+  document.querySelector("#priceExplanation").textContent = `Includes ${money(values.priceHours * values.priceHourly)} for your time, a ${values.priceProfit}% profit goal, and ${values.priceFees}% estimated selling fees.`;
+  const artwork = artworks.find((item) => item.id === selectedId);
+  pricingSummary = `${artwork?.title || "Artwork"} pricing estimate\nCreative cost: ${money(creativeCost)}\nMinimum no-loss price: ${money(Math.ceil(minimum))}\nRecommended retail price: ${money(recommended)}\n${document.querySelector("#priceExplanation").textContent}`;
+}
+document.querySelector("#openPricing").onclick = () => {
+  const artwork = artworks.find((item) => item.id === selectedId);
+  document.querySelector("#pricingTitle").textContent = `${artwork?.title || "Artwork"} Pricing`;
+  document.querySelector("#detailDialog").close();
+  calculatePrice();
+  document.querySelector("#pricingDialog").showModal();
+};
+pricingInputs.forEach((id) => { document.querySelector(`#${id}`).oninput = calculatePrice; });
+document.querySelector("#closePricing").onclick = () => document.querySelector("#pricingDialog").close();
+document.querySelector("#copyPricing").onclick = async () => {
+  await navigator.clipboard.writeText(pricingSummary);
+  notify("Pricing summary copied.");
+};
 document.querySelector("#saveArtworkDetails").onclick = async (event) => {
   event.preventDefault();
   if (!selectedId) return;

@@ -53,6 +53,29 @@ def initialize() -> None:
                 filename TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+            CREATE TABLE IF NOT EXISTS style_updates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                style_name TEXT NOT NULL,
+                source_text TEXT NOT NULL,
+                suggestions TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS conversations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL DEFAULT 'New conversation',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                conversation_id INTEGER NOT NULL,
+                role TEXT NOT NULL,
+                text TEXT NOT NULL,
+                metadata TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+            );
         """)
         prompt_columns = {row[1] for row in db.execute("PRAGMA table_info(prompts)")}
         if "source" not in prompt_columns:
@@ -83,4 +106,7 @@ def backup_data() -> dict[str, Any]:
         "prompts": rows("SELECT id, title, category, text, favorite, source, reviewed FROM prompts ORDER BY id"),
         "styles": {item["name"]: json.loads(item["content"]) for item in styles},
         "artworks": rows("SELECT id, title, collection, tags, notes, favorite, filename, created_at FROM artworks ORDER BY id"),
+        "style_updates": rows("SELECT id, style_name, source_text, suggestions, status, created_at FROM style_updates ORDER BY id"),
+        "conversations": rows("SELECT id, title, created_at, updated_at FROM conversations ORDER BY id"),
+        "chat_messages": rows("SELECT id, conversation_id, role, text, metadata, created_at FROM chat_messages ORDER BY id"),
     }

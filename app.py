@@ -13,6 +13,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from pydantic import BaseModel
+from spellchecker import SpellChecker
 
 from storage import UPLOAD_DIR, backup_data, connect, execute, initialize, rows
 
@@ -31,6 +32,20 @@ class ChatMessage(BaseModel):
     message: str
 
 
+class ConversationPayload(BaseModel):
+    title: str = "New conversation"
+
+
+class ConversationRenamePayload(BaseModel):
+    title: str
+
+
+class ConversationMessagePayload(BaseModel):
+    role: str
+    text: str
+    metadata: dict = {}
+
+
 class PromptPayload(BaseModel):
     title: str
     category: str
@@ -46,6 +61,25 @@ class PromptBulkPayload(BaseModel):
 
 class StylePayload(BaseModel):
     content: dict
+
+
+class StyleUpdatePayload(BaseModel):
+    style_name: str
+    text: str
+
+
+class StyleUpdateDecision(BaseModel):
+    suggestions: dict[str, list[str]]
+
+
+class SpellCheckPayload(BaseModel):
+    text: str
+
+
+class PromptRefinePayload(BaseModel):
+    prompt: str
+    category: str
+    mode: str
 
 
 class ArtworkPayload(BaseModel):
@@ -89,6 +123,7 @@ def clean_image_idea(message: str) -> str:
     patterns = [
         r"^(?:can|could|will|would)\s+(?:we|you)\s+(?:write|create|make|generate)\s+(?:me\s+)?(?:an?\s+)?(?:image\s+)?prompt\s+(?:for|of|about)\s+",
         r"^(?:please\s+)?(?:write|create|make|generate)\s+(?:me\s+)?(?:an?\s+)?(?:image\s+)?prompt\s+(?:for|of|about)?\s*",
+        r"^(?:please\s+)?(?:create|make|generate)\s+(?:me\s+)?(?:an?\s+)?(?:portrait|painting|photograph|photo|artwork|image)\s+(?:for|of|about)\s+",
         r"^(?:i\s+(?:want|need)\s+)(?:an?\s+)?(?:image\s+)?prompt\s+(?:for|of|about)?\s*",
     ]
     for pattern in patterns:
@@ -134,9 +169,39 @@ def prompt_collection(idea: str) -> tuple[str, str, str, str]:
             "powerful, visionary, dignified")
 
 
+def saved_style_direction(collection: str, palette: str, style: str, mood: str) -> tuple[str, str, str, str]:
+    """Blend the creator's current Style Bible into locally generated prompts."""
+    with connect() as db:
+        row = db.execute("SELECT content FROM styles WHERE name = ?", (collection,)).fetchone()
+    if not row:
+        return palette, style, mood, ""
+    try:
+        content = json.loads(row[0])
+    except (TypeError, json.JSONDecodeError):
+        return palette, style, mood, ""
+
+    colors = [str(value).strip() for value in content.get("colors", []) if str(value).strip()]
+    ingredients = [str(value).strip() for value in content.get("ingredients", []) if str(value).strip()]
+    language = [str(value).strip() for value in content.get("language", []) if str(value).strip()]
+    moods = [str(value).strip() for value in content.get("mood", []) if str(value).strip()]
+    dos = [str(value).strip() for value in content.get("dos", []) if str(value).strip()]
+    donts = [str(value).strip() for value in content.get("donts", []) if str(value).strip()]
+
+    if colors:
+        palette = ", ".join(colors)
+    if moods:
+        mood = ", ".join(moods)
+    direction_parts = ingredients + language + dos
+    if direction_parts:
+        style = "; ".join(direction_parts)
+    avoid = "; avoid " + ", ".join(donts) if donts else ""
+    return palette, style, mood, avoid
+
+
 def create_image_prompt(message: str) -> tuple[str, str]:
     idea = clean_image_idea(message)
     collection, palette, style, mood = prompt_collection(idea)
+    palette, style, mood, avoid = saved_style_direction(collection, palette, style, mood)
     lowered = idea.lower()
     subject = re.split(r"\s+in\s+the\s+(?:AfroNova|Quiet Nova|GraffitiX)\s+style", idea, maxsplit=1, flags=re.IGNORECASE)[0]
     requested_mood = re.search(r"with\s+(?:an?\s+)?(.+?)\s+mood", idea, flags=re.IGNORECASE)
@@ -167,7 +232,7 @@ def create_image_prompt(message: str) -> tuple[str, str]:
         f"{palette}. Place the subject against an atmospheric, story-rich background that supports the idea "
         f"without competing with the face. The mood is {mood}. Include believable materials, finely rendered "
         f"fabric and accessories, natural depth of field, sophisticated color grading, crisp focal detail, "
-        f"gallery-ready composition, ultra-detailed, cohesive, emotionally resonant, no text, no watermark."
+        f"gallery-ready composition, ultra-detailed, cohesive, emotionally resonant{avoid}, no text, no watermark."
     )
     return collection, prompt
 
@@ -222,8 +287,8 @@ def chat_reply(payload: ChatMessage) -> dict[str, str]:
         return {
             "reply": (
                 f"**Your {collection} image prompt**\n\n{prompt}\n\n"
-                "You can copy this prompt into your image generator. This version was created locally, "
-                "so it did not use a paid AI key."
+                f"This uses your current {collection} Style Bible rules. You can copy it into your image "
+                "generator. It was created locally, so it did not use a paid AI key."
             ),
             "generated_prompt": prompt,
             "prompt_title": title,
@@ -239,6 +304,119 @@ def chat_reply(payload: ChatMessage) -> dict[str, str]:
             "The chat workspace is working. The next connection will replace this preview "
             "response with live AI reasoning."
         )
+    }
+
+
+@app.get("/api/conversations")
+def list_conversations() -> list[dict]:
+    return rows(
+        "SELECT c.id, c.title, c.created_at, c.updated_at, COUNT(m.id) AS message_count "
+        "FROM conversations c LEFT JOIN chat_messages m ON m.conversation_id = c.id "
+        "GROUP BY c.id ORDER BY c.updated_at DESC, c.id DESC"
+    )
+
+
+@app.post("/api/conversations")
+def create_conversation(payload: ConversationPayload) -> dict:
+    title = re.sub(r"\s+", " ", payload.title).strip()[:60] or "New conversation"
+    conversation_id = execute("INSERT INTO conversations(title) VALUES (?)", (title,))
+    return {"id": conversation_id, "title": title}
+
+
+@app.get("/api/conversations/{conversation_id}/messages")
+def conversation_messages(conversation_id: int) -> list[dict]:
+    if not rows("SELECT id FROM conversations WHERE id = ?", (conversation_id,)):
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    messages = rows(
+        "SELECT id, role, text, metadata, created_at FROM chat_messages "
+        "WHERE conversation_id = ? ORDER BY id", (conversation_id,)
+    )
+    for message in messages:
+        try:
+            message["metadata"] = json.loads(message["metadata"] or "{}")
+        except json.JSONDecodeError:
+            message["metadata"] = {}
+    return messages
+
+
+@app.patch("/api/conversations/{conversation_id}")
+def rename_conversation(conversation_id: int, payload: ConversationRenamePayload) -> dict:
+    title = re.sub(r"\s+", " ", payload.title).strip()[:60]
+    if not title:
+        raise HTTPException(status_code=400, detail="A title is required")
+    if not rows("SELECT id FROM conversations WHERE id = ?", (conversation_id,)):
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    execute("UPDATE conversations SET title = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (title, conversation_id))
+    return {"id": conversation_id, "title": title}
+
+
+@app.post("/api/conversations/{conversation_id}/messages")
+def save_conversation_message(conversation_id: int, payload: ConversationMessagePayload) -> dict:
+    if payload.role not in ("user", "assistant"):
+        raise HTTPException(status_code=400, detail="Unknown message role")
+    if not rows("SELECT id FROM conversations WHERE id = ?", (conversation_id,)):
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    message_id = execute(
+        "INSERT INTO chat_messages(conversation_id, role, text, metadata) VALUES (?, ?, ?, ?)",
+        (conversation_id, payload.role, payload.text.strip(), json.dumps(payload.metadata)),
+    )
+    execute("UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", (conversation_id,))
+    return {"id": message_id, "status": "saved"}
+
+
+@app.delete("/api/conversations/{conversation_id}")
+def delete_conversation(conversation_id: int) -> dict[str, str]:
+    with connect() as db:
+        db.execute("DELETE FROM chat_messages WHERE conversation_id = ?", (conversation_id,))
+        db.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))
+    return {"status": "deleted"}
+
+
+@app.post("/api/prompts/refine")
+def refine_prompt(payload: PromptRefinePayload) -> dict[str, str]:
+    prompt = payload.prompt.strip()
+    category = payload.category if payload.category in ("AfroNova", "Quiet Nova", "GraffitiX") else "AfroNova"
+    labels = {
+        "cinematic": "Cinematic variation",
+        "detailed": "Detailed variation",
+        "simple": "Simplified variation",
+        "style": f"Stronger {category} variation",
+    }
+    if payload.mode not in labels:
+        raise HTTPException(status_code=400, detail="Unknown refinement")
+
+    if payload.mode == "cinematic":
+        refined = prompt + (
+            " Frame it like a prestige film still using a 50mm lens, shallow depth of field, subtle film grain, "
+            "volumetric atmosphere, cinematic blocking, and controlled highlight roll-off."
+        )
+    elif payload.mode == "detailed":
+        refined = prompt + (
+            " Add precise micro-detail in skin, hair, fabric weave, jewelry, hands, surface texture, and environmental "
+            "storytelling while keeping the composition clean and the main subject visually dominant."
+        )
+    elif payload.mode == "simple":
+        sentences = [part.strip() for part in re.split(r"(?<=[.!?])\s+", prompt) if part.strip()]
+        keepers = []
+        for index, sentence in enumerate(sentences):
+            lowered = sentence.lower()
+            if index == 0 or any(key in lowered for key in ("visual direction", "palette", "mood", "no text")):
+                keepers.append(sentence)
+        refined = " ".join(keepers[:5]) or prompt
+    else:
+        palette, direction, mood, avoid = saved_style_direction(category, "", "", "")
+        cues = direction or f"the signature visual language of {category}"
+        refined = prompt + (
+            f" Push the {category} identity further through {cues}. Keep the mood {mood or 'intentional and expressive'}"
+            f"{avoid}."
+        )
+
+    refined = re.sub(r"\s+", " ", refined).strip()
+    return {
+        "reply": f"**{labels[payload.mode]}**\n\n{refined}",
+        "generated_prompt": refined,
+        "prompt_title": labels[payload.mode],
+        "prompt_category": category,
     }
 
 
@@ -364,12 +542,173 @@ def save_style(name: str, payload: StylePayload) -> dict[str, str]:
     return {"status": "saved"}
 
 
+def style_update_suggestions(text: str) -> dict[str, list[str]]:
+    suggestions = {"ingredients": [], "language": [], "dos": [], "donts": []}
+    pieces = re.split(r"[\n•]+|(?<=[.!?])\s+", text)
+    for piece in pieces:
+        item = re.sub(r"^[-*\d.)\s]+", "", piece).strip().rstrip(".")
+        if len(item) < 3:
+            continue
+        lowered = item.lower()
+        if any(word in lowered for word in ("avoid", "don't", "do not", "never", "instead of", "overpower", "crowd")):
+            bucket = "donts"
+        elif any(word in lowered for word in ("rule", "always", "keep", "use", "follow", "hierarchy", "secondary", "main subject")):
+            bucket = "dos"
+        elif any(word in lowered for word in ("phrase", "language", "word", "describe", "call it")):
+            bucket = "language"
+        else:
+            bucket = "ingredients"
+        if item not in suggestions[bucket] and len(suggestions[bucket]) < 12:
+            suggestions[bucket].append(item[:240])
+    return suggestions
+
+
+@app.post("/api/spellcheck")
+def spellcheck_text(payload: SpellCheckPayload) -> dict:
+    checker = SpellChecker(distance=1)
+    protected = {
+        "afronova", "graffitix", "midjourney", "afrofuturist", "afrofuturism",
+        "streetart", "chatgpt", "blackcanvas", "neon", "scribbles", "xeyes",
+    }
+    changes: list[dict[str, str]] = []
+
+    def correct_word(match: re.Match) -> str:
+        word = match.group(0)
+        lowered = word.lower()
+        if len(word) < 4 or lowered in protected or word.isupper() or any(char.isdigit() for char in word):
+            return word
+        if lowered not in checker.unknown([lowered]):
+            return word
+        correction = checker.correction(lowered)
+        if not correction or correction == lowered:
+            return word
+        if word[0].isupper():
+            correction = correction.capitalize()
+        changes.append({"original": word, "replacement": correction})
+        return correction
+
+    corrected = re.sub(r"[A-Za-z][A-Za-z'-]*", correct_word, payload.text)
+    return {"corrected_text": corrected, "changes": changes}
+
+
+@app.get("/api/style-updates")
+def list_style_updates() -> list[dict]:
+    items = rows(
+        "SELECT id, style_name, source_text, suggestions, status, created_at "
+        "FROM style_updates ORDER BY id DESC"
+    )
+    for item in items:
+        item["suggestions"] = json.loads(item["suggestions"])
+    return items
+
+
+@app.post("/api/style-updates")
+def create_style_update(payload: StyleUpdatePayload) -> dict:
+    text = payload.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Paste a style update first")
+    if payload.style_name not in ("AfroNova", "Quiet Nova", "GraffitiX"):
+        raise HTTPException(status_code=400, detail="Choose a valid style")
+    suggestions = style_update_suggestions(text)
+    update_id = execute(
+        "INSERT INTO style_updates(style_name, source_text, suggestions) VALUES (?, ?, ?)",
+        (payload.style_name, text, json.dumps(suggestions)),
+    )
+    return {"id": update_id, "style_name": payload.style_name, "source_text": text,
+            "suggestions": suggestions, "status": "pending"}
+
+
+@app.post("/api/style-updates/{update_id}/approve")
+def approve_style_update(update_id: int, payload: StyleUpdateDecision) -> dict:
+    with connect() as db:
+        update = db.execute(
+            "SELECT style_name, status FROM style_updates WHERE id = ?", (update_id,)
+        ).fetchone()
+        if not update:
+            raise HTTPException(status_code=404, detail="Style update not found")
+        if update["status"] != "pending":
+            raise HTTPException(status_code=409, detail="Style update already reviewed")
+        style_row = db.execute("SELECT content FROM styles WHERE name = ?", (update["style_name"],)).fetchone()
+        if not style_row:
+            raise HTTPException(status_code=404, detail="Style not found")
+        style = json.loads(style_row["content"])
+        for field in ("ingredients", "language", "dos", "donts"):
+            existing = style.setdefault(field, [])
+            for value in payload.suggestions.get(field, []):
+                clean_value = value.strip()[:240]
+                if clean_value and clean_value not in existing:
+                    existing.append(clean_value)
+        db.execute("UPDATE styles SET content = ? WHERE name = ?", (json.dumps(style), update["style_name"]))
+        db.execute("UPDATE style_updates SET suggestions = ?, status = 'approved' WHERE id = ?",
+                   (json.dumps(payload.suggestions), update_id))
+    return {"status": "approved", "style_name": update["style_name"], "content": style}
+
+
+@app.post("/api/style-updates/{update_id}/dismiss")
+def dismiss_style_update(update_id: int) -> dict[str, str]:
+    with connect() as db:
+        cursor = db.execute(
+            "UPDATE style_updates SET status = 'dismissed' WHERE id = ? AND status = 'pending'", (update_id,)
+        )
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Pending style update not found")
+    return {"status": "dismissed"}
+
+
 @app.get("/api/artworks")
 def list_artworks() -> list[dict]:
     items = rows("SELECT id, title, collection, tags, notes, favorite, filename, created_at FROM artworks ORDER BY id DESC")
     for item in items:
         item["url"] = f"/uploads/{item['filename']}"
     return items
+
+
+@app.get("/api/artworks/{artwork_id}/content-kit")
+def artwork_content_kit(artwork_id: int) -> dict:
+    matches = rows("SELECT id, title, collection, tags, notes FROM artworks WHERE id = ?", (artwork_id,))
+    if not matches:
+        raise HTTPException(status_code=404, detail="Artwork not found")
+    artwork = matches[0]
+    title = artwork["title"].strip()
+    collection = artwork["collection"].strip()
+    notes = artwork["notes"].strip() or f"An original {collection} artwork created by Jeffrey McKay."
+    raw_tags = [tag.strip() for tag in artwork["tags"].split(",") if tag.strip()]
+    collection_tones = {
+        "AfroNova": ("future royalty, ancestral power, and Black imagination", "visionary"),
+        "Quiet Nova": ("stillness, honest emotion, and quiet strength", "reflective"),
+        "GraffitiX": ("raw street energy, layered symbolism, and fearless expression", "electric"),
+        "Unsorted": ("original vision, story, and creative expression", "distinctive"),
+    }
+    story, tone = collection_tones.get(collection, collection_tones["Unsorted"])
+    hashtag_words = raw_tags + [collection, "BlackArt", "ContemporaryArt", "OriginalArtwork", "ArtCollector"]
+    hashtags: list[str] = []
+    for tag in hashtag_words:
+        clean = re.sub(r"[^A-Za-z0-9]", "", tag)
+        if clean and clean.lower() not in {item.lower() for item in hashtags}:
+            hashtags.append(clean)
+    hashtag_line = " ".join(f"#{tag}" for tag in hashtags[:12])
+    etsy_tags = raw_tags + [collection, "Black wall art", "original art", "art collector gift"]
+    etsy_tags = list(dict.fromkeys(tag[:20] for tag in etsy_tags if tag))[:13]
+    listing_title = f"{title} | {collection} Original Art | Contemporary Black Wall Art"[:140]
+    return {
+        "artwork_title": title,
+        "instagram": (
+            f"{title}. A {tone} piece from the {collection} collection, shaped by {story}.\n\n"
+            f"{notes}\n\nWhat feeling or story does this piece bring up for you?\n\n{hashtag_line}"
+        ),
+        "tiktok_hook": f"Watch how “{title}” turns {story} into a finished work of art.",
+        "tiktok_caption": f"From the first idea to the final detail—meet “{title}” from my {collection} collection. {hashtag_line}",
+        "listing_title": listing_title,
+        "listing_description": (
+            f'“{title}” is an original piece from the {collection} collection, exploring {story}.\n\n'
+            f"Artwork story:\n{notes}\n\n"
+            "This statement artwork is designed for collectors who value distinctive contemporary Black art, "
+            "intentional storytelling, and work with a strong visual presence.\n\n"
+            "Please review the artwork photographs and listing details carefully for size, materials, framing, "
+            "and shipping information before purchasing."
+        ),
+        "listing_tags": etsy_tags,
+    }
 
 
 @app.post("/api/artworks")

@@ -5,7 +5,7 @@
   <title>Style Bible · Black Canvas AI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/style-bible.css">
+  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/style-bible.css"><link rel="stylesheet" href="/static/style-inbox.css?v=2">
 </head>
 <body>
 <div class="app-shell">
@@ -32,10 +32,15 @@
           <div class="dos-donts"><section class="dos"><h3>✓ Always include</h3><ul id="dos"></ul></section><section class="donts"><h3>× Avoid</h3><ul id="donts"></ul></section></div>
         </div>
       </article>
+      <section class="style-inbox">
+        <div class="inbox-heading"><div><p class="eyebrow">SAFE STYLE UPDATES</p><h2>Style Update Inbox</h2><p>Paste ideas from another conversation. Review every suggestion before it changes your Style Bible.</p></div><button id="openStyleUpdate">＋ Add an update</button></div>
+        <div class="update-list" id="styleUpdateList"><p class="update-empty">No updates waiting for review.</p></div>
+      </section>
     </section>
   </main>
 </div>
 <dialog id="styleDialog"><form id="styleForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">REFINE THE RULEBOOK</p><h2>Edit <span id="editName"></span></h2></div><button class="close" value="cancel">×</button></div><label>Tagline<input id="editTagline"></label><label>Core idea<textarea id="editStatement" rows="4"></textarea></label><label>Mood words <small>Separate with commas</small><input id="editMood"></label><label>Visual ingredients <small>Separate with commas</small><textarea id="editIngredients" rows="3"></textarea></label><label>Prompt language <small>Separate with commas</small><textarea id="editLanguage" rows="3"></textarea></label><label>Always include <small>Separate with commas</small><textarea id="editDos" rows="3"></textarea></label><label>Avoid <small>Separate with commas</small><textarea id="editDonts" rows="3"></textarea></label><div class="dialog-actions"><button class="cancel" value="cancel">Cancel</button><button class="save-style" id="saveStyle" value="default">Save changes</button></div></form></dialog>
-<div class="toast" id="toast"></div><script src="/static/style-bible.js"></script>
+<dialog id="updateDialog"><form id="updateForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">NEW INBOX ITEM</p><h2>Paste a style update</h2></div><button class="close" value="cancel">×</button></div><label>Which style?<select id="updateStyle"><option>AfroNova</option><option>Quiet Nova</option><option>GraffitiX</option></select></label><label>Ideas or rules from the conversation<textarea id="updateText" rows="9" spellcheck="true" lang="en" placeholder="Paste the useful style ideas here..."></textarea></label><div class="spelling-tools"><button type="button" id="checkSpelling">✓ Check spelling</button><div id="spellingReview" hidden><p id="spellingSummary"></p><div id="spellingChanges"></div><button type="button" id="applySpelling">Apply corrections</button></div></div><p class="update-privacy">BlackCanvasAI saves this locally and does not change the Style Bible until you approve it.</p><div class="dialog-actions"><button class="cancel" value="cancel">Cancel</button><button class="save-style" id="reviewUpdate" value="default">Review suggestions</button></div></form></dialog>
+<div class="toast" id="toast"></div><script src="/static/style-bible.js"></script><script src="/static/style-inbox.js?v=2"></script>
 </body>
 </html>
