@@ -8,6 +8,10 @@ const empty = document.querySelector("#empty");
 const toast = document.querySelector("#toast");
 const dialog = document.querySelector("#promptDialog");
 const canonicalCategories = ["AfroNova", "Quiet Nova", "GraffitiX", "Content", "Business", "Unsorted"];
+let reviewQueue = [];
+let reviewPosition = 0;
+let reviewStats = {kept: 0, favorited: 0, skipped: 0, removed: 0};
+let reviewBusy = false;
 
 const notify = message => {
   toast.textContent = message;
@@ -30,6 +34,28 @@ function duplicateIds() {
 
 function sourceLabel(source) {
   return source === "chatgpt" ? "ChatGPT" : source === "drive" ? "Google Drive" : "Manual";
+}
+
+function suggestedCategory(prompt) {
+  if (canonicalCategories.includes(prompt.category)) return prompt.category;
+  const text = `${prompt.title} ${prompt.text}`.toLowerCase();
+  const categorySignals = [
+    ["Content", ["tiktok", "instagram", "caption", "video", "social media", "content idea", "hashtag", "reel"]],
+    ["Business", ["price", "pricing", "etsy", "sell", "sales", "profit", "business", "marketing", "customer", "money"]],
+    ["GraffitiX", ["graffiti", "street art", "urban", "spray paint", "mural", "neon tag"]],
+    ["Quiet Nova", ["quiet nova", "peaceful", "calm", "stillness", "minimal", "soft light", "reflective", "intimate"]],
+    ["AfroNova", ["afronova", "afro nova", "afrofutur", "cosmic", "celestial", "future king", "future queen", "regal black", "ancestral"]],
+  ];
+  let bestCategory = "Unsorted";
+  let bestScore = 0;
+  categorySignals.forEach(([category, words]) => {
+    const score = words.reduce((total, word) => total + (text.includes(word) ? 1 : 0), 0);
+    if (score > bestScore) {
+      bestScore = score;
+      bestCategory = category;
+    }
+  });
+  return bestCategory;
 }
 
 function visiblePrompts() {
@@ -171,5 +197,87 @@ document.querySelector("#applyCategory").onclick = () => {
 };
 document.querySelector("#markReviewed").onclick = () => bulkUpdate({reviewed:true}, "prompts marked reviewed.");
 document.querySelector("#clearSelection").onclick = () => { selectedIds.clear(); render(); };
+function showReviewPrompt() {
+  if (!reviewQueue.length || reviewPosition >= reviewQueue.length) {
+    document.querySelector("#reviewDialog").close();
+    const handled = reviewStats.kept + reviewStats.favorited + reviewStats.removed;
+    notify(`Session complete: ${handled} handled, ${reviewStats.skipped} skipped.`);
+    return;
+  }
+  const prompt = reviewQueue[reviewPosition];
+  document.querySelector("#reviewProgress").textContent = `${reviewPosition + 1} of ${reviewQueue.length} in this session`;
+  document.querySelector("#reviewSessionStats").textContent = `${reviewStats.kept} kept · ${reviewStats.favorited} favorited · ${reviewStats.skipped} skipped · ${reviewStats.removed} removed`;
+  document.querySelector("#reviewSource").textContent = sourceLabel(prompt.source);
+  document.querySelector("#reviewTitle").textContent = prompt.title;
+  document.querySelector("#reviewPrompt").textContent = prompt.text;
+  const suggestion = suggestedCategory(prompt);
+  document.querySelector("#reviewCategory").value = suggestion;
+  document.querySelector("#reviewSuggestion").textContent = suggestion === "Unsorted" ? "No strong match" : `Suggested: ${suggestion}`;
+}
+document.querySelector("#startReviewQueue").onclick = () => {
+  reviewQueue = prompts.filter(prompt => !prompt.reviewed);
+  reviewPosition = 0;
+  reviewStats = {kept: 0, favorited: 0, skipped: 0, removed: 0};
+  if (!reviewQueue.length) return notify("Every prompt has been reviewed.");
+  showReviewPrompt();
+  document.querySelector("#reviewDialog").showModal();
+};
+document.querySelector("#closeReviewQueue").onclick = () => document.querySelector("#reviewDialog").close();
+document.querySelector("#skipReviewPrompt").onclick = () => {
+  if (reviewBusy) return;
+  reviewStats.skipped += 1;
+  reviewPosition += 1;
+  showReviewPrompt();
+};
+async function keepReviewPrompt(favorite = false) {
+  if (reviewBusy) return;
+  const prompt = reviewQueue[reviewPosition];
+  if (!prompt) return;
+  reviewBusy = true;
+  const category = document.querySelector("#reviewCategory").value;
+  const response = await fetch("/api/prompts/bulk-update", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({prompt_ids:[prompt.id], category, reviewed:true}),
+  });
+  if (!response.ok) {
+    reviewBusy = false;
+    return notify("Could not update this prompt.");
+  }
+  if (favorite && !prompt.favorite) await fetch(`/api/prompts/${prompt.id}/favorite?favorite=true`, {method:"PATCH"});
+  if (favorite) reviewStats.favorited += 1;
+  else reviewStats.kept += 1;
+  reviewPosition += 1;
+  await load();
+  reviewBusy = false;
+  showReviewPrompt();
+  notify(favorite ? "Prompt kept and favorited." : "Prompt kept.");
+}
+document.querySelector("#keepReviewPrompt").onclick = () => keepReviewPrompt(false);
+document.querySelector("#favoriteReviewPrompt").onclick = () => keepReviewPrompt(true);
+document.querySelector("#removeReviewPrompt").onclick = async () => {
+  if (reviewBusy) return;
+  const prompt = reviewQueue[reviewPosition];
+  if (!prompt || !window.confirm("Remove this prompt from the library?")) return;
+  reviewBusy = true;
+  const response = await fetch(`/api/prompts/${prompt.id}`, {method:"DELETE"});
+  if (!response.ok) {
+    reviewBusy = false;
+    return notify("Could not remove this prompt.");
+  }
+  reviewStats.removed += 1;
+  reviewPosition += 1;
+  await load();
+  reviewBusy = false;
+  showReviewPrompt();
+  notify("Prompt removed.");
+};
+document.addEventListener("keydown", event => {
+  const reviewDialog = document.querySelector("#reviewDialog");
+  if (!reviewDialog.open || ["SELECT", "INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) return;
+  const key = event.key.toLowerCase();
+  if (key === "k") { event.preventDefault(); keepReviewPrompt(false); }
+  if (key === "f") { event.preventDefault(); keepReviewPrompt(true); }
+  if (key === "s") { event.preventDefault(); document.querySelector("#skipReviewPrompt").click(); }
+});
 document.querySelector("#menuButton").onclick = () => document.querySelector("#sidebar").classList.toggle("open");
 migrate().then(load).catch(() => notify("Could not load the prompt library."));
