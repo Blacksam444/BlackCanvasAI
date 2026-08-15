@@ -33,6 +33,27 @@ def midjourney_v82_suffix(idea: str) -> str:
     if aspect_ratio not in SUPPORTED_ASPECT_RATIOS:
         aspect_ratio = DEFAULT_ASPECT_RATIO
     return f"--ar {aspect_ratio} --raw --v 8.2"
+
+
+def midjourney_syntax_issues(prompt: str) -> list[str]:
+    issues: list[str] = []
+    has_legacy_raw = bool(re.search(r"--style\s+raw\b", prompt, flags=re.IGNORECASE))
+    if has_legacy_raw:
+        issues.append("Legacy --style raw syntax")
+    if not has_legacy_raw and re.search(r"--v\s+8\.2\b", prompt, flags=re.IGNORECASE) and not re.search(
+        r"--raw\b", prompt, flags=re.IGNORECASE
+    ):
+        issues.append("MidJourney v8.2 prompt is missing --raw")
+    return issues
+
+
+def repair_midjourney_syntax(prompt: str) -> str:
+    repaired = re.sub(r"--style\s+raw\b", "--raw", prompt, flags=re.IGNORECASE)
+    if re.search(r"--v\s+8\.2\b", repaired, flags=re.IGNORECASE) and not re.search(
+        r"--raw\b", repaired, flags=re.IGNORECASE
+    ):
+        repaired = re.sub(r"(?=--v\s+8\.2\b)", "--raw ", repaired, count=1, flags=re.IGNORECASE)
+    return repaired
 initialize()
 app = FastAPI(title="Black Canvas AI")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
@@ -304,7 +325,10 @@ def chat_reply(payload: ChatMessage) -> dict[str, str]:
 
 @app.get("/api/prompts")
 def list_prompts() -> list[dict]:
-    return rows("SELECT id, title, category, text, favorite, source, reviewed FROM prompts ORDER BY id DESC")
+    items = rows("SELECT id, title, category, text, favorite, source, reviewed FROM prompts ORDER BY id DESC")
+    for item in items:
+        item["syntax_issues"] = midjourney_syntax_issues(item["text"])
+    return items
 
 
 @app.get("/api/dashboard")
@@ -422,6 +446,28 @@ def delete_prompt(prompt_id: int) -> dict[str, str]:
 def favorite_prompt(prompt_id: int, favorite: bool) -> dict[str, bool]:
     execute("UPDATE prompts SET favorite = ? WHERE id = ?", (int(favorite), prompt_id))
     return {"favorite": favorite}
+
+
+@app.patch("/api/prompts/{prompt_id}/repair-midjourney-syntax")
+def repair_prompt_syntax(prompt_id: int) -> dict:
+    matching = rows(
+        "SELECT id, title, category, text, favorite, source, reviewed FROM prompts WHERE id = ?",
+        (prompt_id,),
+    )
+    if not matching:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    prompt = matching[0]
+    repaired = repair_midjourney_syntax(prompt["text"])
+    if repaired == prompt["text"]:
+        raise HTTPException(status_code=400, detail="No supported MidJourney syntax issue was found")
+    try:
+        execute("UPDATE prompts SET text = ?, reviewed = 1 WHERE id = ?", (repaired, prompt_id))
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=409, detail="The repaired prompt would duplicate an existing prompt")
+    prompt["text"] = repaired
+    prompt["reviewed"] = 1
+    prompt["syntax_issues"] = []
+    return prompt
 
 
 @app.get("/api/styles")

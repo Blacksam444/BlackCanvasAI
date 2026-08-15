@@ -52,6 +52,7 @@ function visiblePrompts() {
     const matchesFilter = filter === "All"
       || (filter === "Unreviewed" && !prompt.reviewed)
       || (filter === "Duplicates" && duplicates.has(prompt.id))
+      || (filter === "Syntax issues" && prompt.syntax_issues?.length)
       || (filter === "Favorites" && prompt.favorite)
       || (filter === "ChatGPT" && prompt.source === "chatgpt")
       || prompt.category === filter;
@@ -93,7 +94,7 @@ function render() {
   shown.forEach(prompt => {
     const card = document.createElement("article");
     card.className = `prompt-card${selectedIds.has(prompt.id) ? " selected" : ""}${!prompt.reviewed ? " unreviewed" : ""}`;
-    card.innerHTML = `<div class="card-top"><label class="select-prompt"><input type="checkbox" ${selectedIds.has(prompt.id) ? "checked" : ""}><span></span></label><div class="card-badges"><span class="category">${escape(prompt.category)}</span><span class="source ${escape(prompt.source)}">${sourceLabel(prompt.source)}</span>${!prompt.reviewed ? '<span class="review-badge">Unreviewed</span>' : ""}${duplicates.has(prompt.id) ? '<span class="duplicate-badge">Duplicate</span>' : ""}</div><button class="favorite ${prompt.favorite ? "on" : ""}" title="Favorite">★</button></div><h2>${escape(prompt.title)}</h2><p class="prompt-preview">${escape(prompt.text)}</p><div class="card-bottom"><button class="view">Review & edit</button><button class="copy">Copy prompt</button></div>`;
+    card.innerHTML = `<div class="card-top"><label class="select-prompt"><input type="checkbox" ${selectedIds.has(prompt.id) ? "checked" : ""}><span></span></label><div class="card-badges"><span class="category">${escape(prompt.category)}</span><span class="source ${escape(prompt.source)}">${sourceLabel(prompt.source)}</span>${!prompt.reviewed ? '<span class="review-badge">Unreviewed</span>' : ""}${duplicates.has(prompt.id) ? '<span class="duplicate-badge">Duplicate</span>' : ""}${prompt.syntax_issues?.length ? '<span class="syntax-badge">Syntax issue</span>' : ""}</div><button class="favorite ${prompt.favorite ? "on" : ""}" title="Favorite">★</button></div><h2>${escape(prompt.title)}</h2><p class="prompt-preview">${escape(prompt.text)}</p><div class="card-bottom"><button class="view">Review & edit</button><button class="copy">Copy prompt</button></div>`;
     const checkbox = card.querySelector('input[type="checkbox"]');
     checkbox.onchange = () => {
       if (checkbox.checked) selectedIds.add(prompt.id);
@@ -132,6 +133,9 @@ function openEditor(prompt = null) {
   document.querySelector("#dialogTitle").textContent = prompt ? "Review and organize" : "Add a prompt";
   document.querySelector("#savePrompt").textContent = prompt ? "Save changes" : "Save prompt";
   document.querySelector("#deletePrompt").hidden = !prompt;
+  const syntaxRepair = document.querySelector("#syntaxRepair");
+  syntaxRepair.hidden = !prompt?.syntax_issues?.length;
+  document.querySelector("#syntaxRepairMessage").textContent = prompt?.syntax_issues?.join(" · ") || "";
   if (prompt) {
     document.querySelector("#promptTitle").value = prompt.title;
     document.querySelector("#promptCategory").value = canonicalCategories.includes(prompt.category) ? prompt.category : "Unsorted";
@@ -171,6 +175,16 @@ document.querySelector("#deletePrompt").onclick = async () => {
   dialog.close();
   await load();
   notify("Prompt removed from the library.");
+};
+document.querySelector("#repairSyntax").onclick = async () => {
+  if (!editingId) return;
+  const response = await fetch(`/api/prompts/${editingId}/repair-midjourney-syntax`, {method:"PATCH"});
+  const result = await response.json();
+  if (!response.ok) return notify(result.detail || "The syntax could not be repaired.");
+  document.querySelector("#promptText").value = result.text;
+  document.querySelector("#syntaxRepair").hidden = true;
+  await load();
+  notify("MidJourney syntax repaired with --raw.");
 };
 
 async function bulkUpdate(changes, successMessage) {

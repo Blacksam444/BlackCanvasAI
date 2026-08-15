@@ -4,7 +4,13 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from app import PromptIdsPayload, bulk_delete_prompts, create_image_prompt
+from app import (
+    PromptIdsPayload,
+    bulk_delete_prompts,
+    create_image_prompt,
+    midjourney_syntax_issues,
+    repair_midjourney_syntax,
+)
 
 
 class PromptRuleTests(unittest.TestCase):
@@ -51,6 +57,22 @@ class PromptRuleTests(unittest.TestCase):
             "Create an image prompt for a cosmic queen in the AfroNova style. Aspect ratio: 99:1."
         )
         self.assertTrue(prompt.endswith("--ar 4:5 --raw --v 8.2"))
+
+    def test_legacy_raw_syntax_is_detected_and_repaired(self):
+        legacy = "A mixed-media portrait --ar 4:5 --style raw --v 8.2"
+        self.assertEqual(midjourney_syntax_issues(legacy), ["Legacy --style raw syntax"])
+        self.assertEqual(
+            repair_midjourney_syntax(legacy),
+            "A mixed-media portrait --ar 4:5 --raw --v 8.2",
+        )
+
+    def test_missing_raw_is_detected_and_repaired(self):
+        legacy = "A mixed-media portrait --ar 4:5 --v 8.2"
+        self.assertEqual(midjourney_syntax_issues(legacy), ["MidJourney v8.2 prompt is missing --raw"])
+        self.assertEqual(
+            repair_midjourney_syntax(legacy),
+            "A mixed-media portrait --ar 4:5 --raw --v 8.2",
+        )
 
 
 class PromptBulkDeleteTests(unittest.TestCase):
