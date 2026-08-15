@@ -17,7 +17,7 @@ const notify = message => {
 const escape = text => (text || "").replace(/[&<>"']/g, character => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"})[character]);
 const normalizedText = text => (text || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
-function duplicateIds() {
+function duplicateGroups() {
   const groups = new Map();
   prompts.forEach(prompt => {
     const key = normalizedText(prompt.text);
@@ -25,7 +25,21 @@ function duplicateIds() {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(prompt.id);
   });
-  return new Set([...groups.values()].filter(group => group.length > 1).flat());
+  return [...groups.values()].filter(group => group.length > 1);
+}
+
+function duplicateIds() {
+  return new Set(duplicateGroups().flat());
+}
+
+function duplicateExtraIds() {
+  return duplicateGroups().flatMap(group => {
+    const ordered = group
+      .map(id => prompts.find(prompt => prompt.id === id))
+      .filter(Boolean)
+      .sort((a, b) => Number(b.favorite) - Number(a.favorite) || a.id - b.id);
+    return ordered.slice(1).map(prompt => prompt.id);
+  });
 }
 
 function sourceLabel(source) {
@@ -101,6 +115,13 @@ function render() {
   empty.hidden = shown.length > 0;
   document.querySelector("#promptCount").textContent = prompts.length;
   document.querySelector("#unreviewedCount").textContent = prompts.filter(prompt => !prompt.reviewed).length;
+  const groups = duplicateGroups();
+  const duplicateTools = document.querySelector("#duplicateTools");
+  duplicateTools.hidden = filter !== "Duplicates";
+  document.querySelector("#duplicateSummary").textContent = groups.length
+    ? `${duplicateIds().size} prompts in ${groups.length} duplicate ${groups.length === 1 ? "group" : "groups"}`
+    : "No duplicate prompts found";
+  document.querySelector("#selectDuplicateExtras").disabled = groups.length === 0;
   updateBulkToolbar();
 }
 
@@ -170,6 +191,25 @@ document.querySelector("#applyCategory").onclick = () => {
   bulkUpdate({category, reviewed:true}, "prompts organized.");
 };
 document.querySelector("#markReviewed").onclick = () => bulkUpdate({reviewed:true}, "prompts marked reviewed.");
+document.querySelector("#selectDuplicateExtras").onclick = () => {
+  selectedIds.clear();
+  duplicateExtraIds().forEach(id => selectedIds.add(id));
+  render();
+  notify(selectedIds.size ? `${selectedIds.size} extra ${selectedIds.size === 1 ? "copy" : "copies"} selected for review.` : "No extra copies found.");
+};
+document.querySelector("#removeSelected").onclick = async () => {
+  if (!selectedIds.size || !window.confirm(`Remove ${selectedIds.size} selected ${selectedIds.size === 1 ? "prompt" : "prompts"} from the library? This cannot be undone.`)) return;
+  const response = await fetch("/api/prompts/bulk-delete", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({prompt_ids:[...selectedIds]}),
+  });
+  const result = await response.json();
+  if (!response.ok) return notify(result.detail || "Those prompts could not be removed.");
+  selectedIds.clear();
+  await load();
+  notify(`${result.deleted} ${result.deleted === 1 ? "prompt" : "prompts"} removed.`);
+};
 document.querySelector("#clearSelection").onclick = () => { selectedIds.clear(); render(); };
 document.querySelector("#menuButton").onclick = () => document.querySelector("#sidebar").classList.toggle("open");
 migrate().then(load).catch(() => notify("Could not load the prompt library."));
