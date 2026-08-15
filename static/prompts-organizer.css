@@ -1,1 +1,63 @@
-.library-counts{display:flex;align-items:end;gap:28px}.library-counts .count:first-child strong{color:#f0b96b}.bulk-toolbar{position:sticky;top:82px;z-index:3;display:flex;align-items:center;gap:9px;border:1px solid #51456a;border-radius:12px;background:#19151f;padding:11px 13px;margin:-10px 0 20px;box-shadow:0 12px 30px #0007}.bulk-toolbar[hidden]{display:none}.bulk-toolbar strong{font-size:11px;margin-right:auto}.bulk-toolbar select{border:1px solid #3b3642;border-radius:8px;background:#0f0e12;color:#fff;padding:8px}.bulk-toolbar button{border:1px solid #4a405d;border-radius:8px;background:#292330;color:#ddd;padding:8px 10px;font-size:10px;font-weight:700;cursor:pointer}.bulk-toolbar #applyCategory,.bulk-toolbar #markReviewed{background:#6f55cb;border-color:#8066dc;color:#fff}.prompt-card.selected{border-color:#8267df;box-shadow:0 0 0 1px #8267df55}.prompt-card.unreviewed{background:linear-gradient(145deg,#17141b,#121216)}.card-top{gap:8px}.select-prompt{width:18px;height:18px;display:grid;place-items:center;flex:none}.select-prompt input{accent-color:#8d6de8}.card-badges{display:flex;gap:5px;align-items:center;flex-wrap:wrap;flex:1}.source,.review-badge,.duplicate-badge{font-size:8px;border-radius:20px;padding:4px 7px}.source{background:#24232a;color:#8e8b95}.source.chatgpt{background:#17332d;color:#7bd2ba}.source.drive{background:#1c2b41;color:#83aee8}.review-badge{background:#382b19;color:#efbc6d}.duplicate-badge{background:#3b2025;color:#ef8b9a}.dialog-actions .dialog-spacer{flex:1}.delete-prompt{border:1px solid #5b3038;background:#2a171b;color:#e98b98;border-radius:9px;padding:10px 15px;cursor:pointer}@media(max-width:760px){.library-counts{display:none}.bulk-toolbar{align-items:stretch;flex-direction:column}.bulk-toolbar strong{margin:0}.bulk-toolbar select,.bulk-toolbar button{width:100%}.card-badges{gap:3px}.source,.review-badge,.duplicate-badge{font-size:7px}}
+.library-counts { display:flex; align-items:end; gap:28px; }
+.library-counts .count:first-child strong { color:#f0b96b; }
+
+.duplicate-tools {
+  display:flex; align-items:center; justify-content:space-between; gap:18px;
+  border:1px solid #4b343b; border-radius:12px; background:#21171b;
+  padding:13px 15px; margin:-10px 0 20px;
+}
+.duplicate-tools[hidden] { display:none; }
+.duplicate-tools strong, .duplicate-tools span { display:block; }
+.duplicate-tools strong { font-size:12px; color:#f2a5b1; }
+.duplicate-tools span { font-size:10px; color:#99919a; margin-top:3px; }
+.duplicate-tools button, .remove-selected {
+  border:1px solid #6a3943; border-radius:8px; background:#3a2026; color:#f3a9b5;
+  padding:8px 11px; font-size:10px; font-weight:700; cursor:pointer;
+}
+.duplicate-tools button:disabled { cursor:default; opacity:.45; }
+
+.bulk-toolbar {
+  position:sticky; top:82px; z-index:3; display:flex; align-items:center; gap:9px;
+  border:1px solid #51456a; border-radius:12px; background:#19151f;
+  padding:11px 13px; margin:-10px 0 20px; box-shadow:0 12px 30px #0007;
+}
+.bulk-toolbar[hidden] { display:none; }
+.bulk-toolbar strong { font-size:11px; margin-right:auto; }
+.bulk-toolbar select {
+  border:1px solid #3b3642; border-radius:8px; background:#0f0e12; color:#fff; padding:8px;
+}
+.bulk-toolbar button {
+  border:1px solid #4a405d; border-radius:8px; background:#292330; color:#ddd;
+  padding:8px 10px; font-size:10px; font-weight:700; cursor:pointer;
+}
+.bulk-toolbar #applyCategory, .bulk-toolbar #markReviewed {
+  background:#6f55cb; border-color:#8066dc; color:#fff;
+}
+.bulk-toolbar .remove-selected { margin-left:2px; }
+
+.prompt-card.selected { border-color:#8267df; box-shadow:0 0 0 1px #8267df55; }
+.prompt-card.unreviewed { background:linear-gradient(145deg,#17141b,#121216); }
+.card-top { gap:8px; }
+.select-prompt { width:18px; height:18px; display:grid; place-items:center; flex:none; }
+.select-prompt input { accent-color:#8d6de8; }
+.card-badges { display:flex; gap:5px; align-items:center; flex-wrap:wrap; flex:1; }
+.source, .review-badge, .duplicate-badge { font-size:8px; border-radius:20px; padding:4px 7px; }
+.source { background:#24232a; color:#8e8b95; }
+.source.chatgpt { background:#17332d; color:#7bd2ba; }
+.source.drive { background:#1c2b41; color:#83aee8; }
+.review-badge { background:#382b19; color:#efbc6d; }
+.duplicate-badge { background:#3b2025; color:#ef8b9a; }
+.dialog-actions .dialog-spacer { flex:1; }
+.delete-prompt {
+  border:1px solid #5b3038; background:#2a171b; color:#e98b98;
+  border-radius:9px; padding:10px 15px; cursor:pointer;
+}
+
+@media (max-width:760px) {
+  .library-counts { display:none; }
+  .duplicate-tools, .bulk-toolbar { align-items:stretch; flex-direction:column; }
+  .duplicate-tools button, .bulk-toolbar strong { margin:0; }
+  .duplicate-tools button, .bulk-toolbar select, .bulk-toolbar button { width:100%; }
+  .card-badges { gap:3px; }
+  .source, .review-badge, .duplicate-badge { font-size:7px; }
+}

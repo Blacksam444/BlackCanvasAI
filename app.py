@@ -51,6 +51,10 @@ class PromptBulkPayload(BaseModel):
     reviewed: bool | None = None
 
 
+class PromptIdsPayload(BaseModel):
+    prompt_ids: list[int]
+
+
 class StylePayload(BaseModel):
     content: dict
 
@@ -371,6 +375,17 @@ def bulk_update_prompts(payload: PromptBulkPayload) -> dict[str, int]:
             (*values, *prompt_ids),
         )
     return {"updated": cursor.rowcount}
+
+
+@app.post("/api/prompts/bulk-delete")
+def bulk_delete_prompts(payload: PromptIdsPayload) -> dict[str, int]:
+    prompt_ids = list(dict.fromkeys(payload.prompt_ids))[:500]
+    if not prompt_ids:
+        raise HTTPException(status_code=400, detail="Select at least one prompt")
+    placeholders = ",".join("?" for _ in prompt_ids)
+    with connect() as db:
+        cursor = db.execute(f"DELETE FROM prompts WHERE id IN ({placeholders})", prompt_ids)
+    return {"deleted": cursor.rowcount}
 
 
 @app.delete("/api/prompts/{prompt_id}")
