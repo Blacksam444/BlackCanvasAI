@@ -156,6 +156,9 @@ def create_image_prompt(message: str) -> tuple[str, str]:
         mood = requested_mood.group(1).strip()
     if requested_colors and "collection color palette" not in requested_colors.group(1).lower():
         palette = requested_colors.group(1).strip()
+    requested_pose = re.search(r"(?:^|[.;])\s*pose\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
+    requested_camera = re.search(r"(?:^|[.;])\s*camera\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
+    requested_hero = re.search(r"(?:^|[.;])\s*hero symbol\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     if "photorealistic" in lowered or "photograph" in lowered:
         medium = "cinematic photorealistic portrait photography"
     elif "acrylic" in lowered:
@@ -170,18 +173,26 @@ def create_image_prompt(message: str) -> tuple[str, str]:
         word in subject.lower() for word in ("child", "boy", "girl", "kid", "baby")
     ) else ""
     if collection == "GraffitiX":
+        pose_direction = requested_pose.group(1).strip() if requested_pose else (
+            "a grounded, readable pose with clearly described planted foot, weight distribution, bent joints, "
+            "hip angle, shoulder counter-rotation, torso twist, and an intentional S-curve, Z-curve, or spiral "
+            "line of action suited to the movement"
+        )
+        camera_direction = requested_camera.group(1).strip() if requested_camera else (
+            "a deliberate cinematic angle—low-angle three-quarter, pavement-level tracking shot, high-angle "
+            "Dutch angle, or another specific viewpoint that strengthens the pose"
+        )
+        hero_symbol = requested_hero.group(1).strip() if requested_hero else (
+            "a rough-painted 444, distorted crown, skull, or X-eye treatment"
+        )
         prompt = (
             f"/imagine prompt: full-body {subject},{safety} presented as the unmistakable focal subject. "
-            "Engineer a grounded, readable pose with clearly described planted foot, weight distribution, "
-            "bent joints, hip angle, shoulder counter-rotation, torso twist, and an intentional S-curve, "
-            "Z-curve, or spiral line of action suited to the movement. Use a deliberate cinematic camera "
-            "angle—low-angle three-quarter, pavement-level tracking shot, high-angle Dutch angle, or another "
-            "specific viewpoint that strengthens the pose—and keep the silhouette immediately readable. "
+            f"Engineer {pose_direction}. Use {camera_direction}, and keep the silhouette immediately readable. "
             "Build authentic 1990s streetwear with construction detail: oversized deeply pleated chinos "
             "stacked at the ankles, loose pocket tee or cropped tank, open flannel or vintage windbreaker, "
             "bandana or snapback when appropriate, and retro statement sneakers. "
-            "Establish the 444 GraffitiX symbol hierarchy: one dominant hero symbol such as a rough-painted "
-            "444, distorted crown, skull or X-eye treatment; one or two small supporting symbols chosen from "
+            f"Establish the 444 GraffitiX symbol hierarchy: one dominant hero symbol—{hero_symbol}; "
+            "one or two small supporting symbols chosen from "
             "a crude diamond, primitive pyramid, tiny xxx marks, or nova glyph; then restrained secondary "
             "background writing. Never let supporting marks compete with the subject or hero symbol. "
             "Render as raw Black Canvas AI / 444 GraffitiX mixed-media fine art using heavy oil stick, thick "

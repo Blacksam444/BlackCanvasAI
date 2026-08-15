@@ -28,6 +28,18 @@ class PromptRuleTests(unittest.TestCase):
         self.assertTrue(prompt.endswith("--ar 4:5 --raw --v 8.2"))
         self.assertIn("no text, no watermark, no signature, no logo, no frame", prompt)
 
+    def test_graffitix_builder_directions_are_used(self):
+        collection, prompt = create_image_prompt(
+            "Create an image prompt for a street oracle in the GraffitiX style. "
+            "Pose: low crouched stance with a compressed S-curve; "
+            "Camera: a pavement-level tracking shot; "
+            "Hero symbol: a distorted hand-drawn crown in thick red oil stick."
+        )
+        self.assertEqual(collection, "GraffitiX")
+        self.assertIn("Engineer low crouched stance with a compressed S-curve", prompt)
+        self.assertIn("Use a pavement-level tracking shot", prompt)
+        self.assertIn("one dominant hero symbol—a distorted hand-drawn crown", prompt)
+
 
 class PromptBulkDeleteTests(unittest.TestCase):
     def test_bulk_delete_removes_only_selected_prompts(self):

@@ -131,6 +131,11 @@ document.querySelector("#builderToggle").onclick = () => {
   document.querySelector("#builderToggle").textContent = builder.hidden ? "✦ Open Prompt Builder" : "× Close Prompt Builder";
   if (!builder.hidden) document.querySelector("#builderSubject").focus();
 };
+const updateGraffitiXOptions = () => {
+  document.querySelector("#graffitixOptions").hidden = document.querySelector("#builderCollection").value !== "GraffitiX";
+};
+document.querySelector("#builderCollection").onchange = updateGraffitiXOptions;
+updateGraffitiXOptions();
 document.querySelector("#promptBuilder").onsubmit = (event) => {
   event.preventDefault();
   const subject = document.querySelector("#builderSubject").value.trim();
@@ -140,7 +145,10 @@ document.querySelector("#promptBuilder").onsubmit = (event) => {
   const imageStyle = document.querySelector("#builderStyle").value;
   if (!subject) return document.querySelector("#builderSubject").focus();
   const colorDirection = colors === "Collection colors" ? "the collection color palette" : colors;
-  send(`Create an image prompt for ${subject} in the ${collection} style, with a ${mood} mood, using ${colorDirection}, as a ${imageStyle}.`);
+  const graffitiDirection = collection === "GraffitiX"
+    ? ` Pose: ${document.querySelector("#builderPose").value}; Camera: ${document.querySelector("#builderCamera").value}; Hero symbol: ${document.querySelector("#builderHero").value}.`
+    : "";
+  send(`Create an image prompt for ${subject} in the ${collection} style, with a ${mood} mood, using ${colorDirection}, as a ${imageStyle}.${graffitiDirection}`);
 };
 JSON.parse(localStorage.getItem(KEY) || "[]").forEach((message) => addMessage(message.role, message.text, false));
 const openingQuestion = new URLSearchParams(window.location.search).get("q");
