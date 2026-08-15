@@ -17,6 +17,13 @@ from pydantic import BaseModel
 from storage import UPLOAD_DIR, backup_data, connect, execute, initialize, rows
 
 BASE_DIR = Path(__file__).resolve().parent
+MIDJOURNEY_V82_SUFFIX = "--ar 4:5 --raw --v 8.2"
+DEFAULT_NEGATIVE_INSTRUCTIONS = "no text, no watermark, no signature, no logo, no frame"
+GRAFFITIX_NEGATIVE_INSTRUCTIONS = (
+    "no digital smoothness, no glossy CGI finish, no polished 3D render, "
+    "no clean vector edges, no random decorative symbols, no cluttered focal hierarchy, "
+    f"{DEFAULT_NEGATIVE_INSTRUCTIONS}"
+)
 initialize()
 app = FastAPI(title="Black Canvas AI")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
@@ -158,6 +165,33 @@ def create_image_prompt(message: str) -> tuple[str, str]:
     safety = " age-appropriate styling and a dignified, authentic expression," if any(
         word in subject.lower() for word in ("child", "boy", "girl", "kid", "baby")
     ) else ""
+    if collection == "GraffitiX":
+        prompt = (
+            f"/imagine prompt: full-body {subject},{safety} presented as the unmistakable focal subject. "
+            "Engineer a grounded, readable pose with clearly described planted foot, weight distribution, "
+            "bent joints, hip angle, shoulder counter-rotation, torso twist, and an intentional S-curve, "
+            "Z-curve, or spiral line of action suited to the movement. Use a deliberate cinematic camera "
+            "angle—low-angle three-quarter, pavement-level tracking shot, high-angle Dutch angle, or another "
+            "specific viewpoint that strengthens the pose—and keep the silhouette immediately readable. "
+            "Build authentic 1990s streetwear with construction detail: oversized deeply pleated chinos "
+            "stacked at the ankles, loose pocket tee or cropped tank, open flannel or vintage windbreaker, "
+            "bandana or snapback when appropriate, and retro statement sneakers. "
+            "Establish the 444 GraffitiX symbol hierarchy: one dominant hero symbol such as a rough-painted "
+            "444, distorted crown, skull or X-eye treatment; one or two small supporting symbols chosen from "
+            "a crude diamond, primitive pyramid, tiny xxx marks, or nova glyph; then restrained secondary "
+            "background writing. Never let supporting marks compete with the subject or hero symbol. "
+            "Render as raw Black Canvas AI / 444 GraffitiX mixed-media fine art using heavy oil stick, thick "
+            "oil pastel, viscous dripping acrylic, palette-knife impasto ridges, aerosol haze and overspray, "
+            "charcoal drag marks and scribbles, scratched paint, chalk geometry, torn pasted-paper collage, "
+            "and exposed unprimed canvas. Embed handwritten ledger numbers, anatomical-style labels, cryptic "
+            "notes, crossed-out phrases, loose scribbles, directional paint streaks, diamonds, pyramids, and "
+            "X/444 treatments into the environment with controlled negative space. "
+            f"Use {palette}, stark graphic directional lighting, brutal contrast, irregular hand-drawn edges, "
+            f"tactile matte surfaces, and a {mood} emotional charge. Keep the figure sharp and emotionally "
+            "present while environmental marks reinforce movement. Museum-quality contemporary urban artwork, "
+            f"{GRAFFITIX_NEGATIVE_INSTRUCTIONS} {MIDJOURNEY_V82_SUFFIX}"
+        )
+        return collection, prompt
     prompt = (
         f"Create {medium} of {subject},{safety} presented as the unmistakable focal subject. "
         f"Use a balanced three-quarter composition at eye level, with confident posture, expressive eyes, "
@@ -167,7 +201,8 @@ def create_image_prompt(message: str) -> tuple[str, str]:
         f"{palette}. Place the subject against an atmospheric, story-rich background that supports the idea "
         f"without competing with the face. The mood is {mood}. Include believable materials, finely rendered "
         f"fabric and accessories, natural depth of field, sophisticated color grading, crisp focal detail, "
-        f"gallery-ready composition, ultra-detailed, cohesive, emotionally resonant, no text, no watermark."
+        f"gallery-ready composition, ultra-detailed, cohesive, emotionally resonant, "
+        f"{DEFAULT_NEGATIVE_INSTRUCTIONS} {MIDJOURNEY_V82_SUFFIX}"
     )
     return collection, prompt
 
