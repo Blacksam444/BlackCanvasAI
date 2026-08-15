@@ -45,6 +45,12 @@ function reviewInsight(prompt) {
   return {tone: "ready", text: "Ready to review · No exact duplicate found"};
 }
 
+function matchingCopies(prompt) {
+  const key = normalizedText(prompt.text);
+  if (!key) return [];
+  return prompts.filter(item => item.id !== prompt.id && normalizedText(item.text) === key);
+}
+
 function suggestedCategory(prompt) {
   if (canonicalCategories.includes(prompt.category)) return prompt.category;
   const text = `${prompt.title} ${prompt.text}`.toLowerCase();
@@ -223,6 +229,12 @@ function showReviewPrompt() {
   const insightElement = document.querySelector("#reviewInsight");
   insightElement.className = `review-insight ${insight.tone}`;
   insightElement.textContent = insight.text;
+  const copies = matchingCopies(prompt);
+  const duplicatePanel = document.querySelector("#reviewDuplicates");
+  duplicatePanel.hidden = copies.length === 0;
+  document.querySelector("#duplicateTitles").textContent = copies.map(copy => copy.title).join(" · ");
+  const removeCopiesButton = document.querySelector("#removeMatchingCopies");
+  removeCopiesButton.textContent = `Keep this one & remove ${copies.length} extra ${copies.length === 1 ? "copy" : "copies"}`;
   const suggestion = suggestedCategory(prompt);
   document.querySelector("#reviewCategory").value = suggestion;
   document.querySelector("#reviewSuggestion").textContent = suggestion === "Unsorted" ? "No strong match" : `Suggested: ${suggestion}`;
@@ -283,6 +295,34 @@ document.querySelector("#removeReviewPrompt").onclick = async () => {
   reviewBusy = false;
   showReviewPrompt();
   notify("Prompt removed.");
+};
+document.querySelector("#removeMatchingCopies").onclick = async () => {
+  if (reviewBusy) return;
+  const prompt = reviewQueue[reviewPosition];
+  const copies = prompt ? matchingCopies(prompt) : [];
+  if (!prompt || !copies.length) return;
+  if (!window.confirm(`Keep this prompt and remove ${copies.length} exact ${copies.length === 1 ? "copy" : "copies"}?`)) return;
+  reviewBusy = true;
+  const category = document.querySelector("#reviewCategory").value;
+  const keepResponse = await fetch("/api/prompts/bulk-update", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({prompt_ids:[prompt.id], category, reviewed:true}),
+  });
+  if (!keepResponse.ok) {
+    reviewBusy = false;
+    return notify("Could not keep this prompt.");
+  }
+  const results = await Promise.all(copies.map(copy => fetch(`/api/prompts/${copy.id}`, {method:"DELETE"})));
+  const removedIds = new Set(copies.filter((copy, index) => results[index].ok).map(copy => copy.id));
+  const processedRemaining = reviewQueue.slice(0, reviewPosition).filter(item => !removedIds.has(item.id)).length;
+  reviewQueue = reviewQueue.filter(item => item.id !== prompt.id && !removedIds.has(item.id));
+  reviewStats.kept += 1;
+  reviewStats.removed += removedIds.size;
+  reviewPosition = processedRemaining;
+  await load();
+  reviewBusy = false;
+  showReviewPrompt();
+  notify(`Kept one prompt and removed ${removedIds.size} extra ${removedIds.size === 1 ? "copy" : "copies"}.`);
 };
 document.addEventListener("keydown", event => {
   const reviewDialog = document.querySelector("#reviewDialog");
