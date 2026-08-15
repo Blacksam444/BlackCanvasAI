@@ -240,10 +240,21 @@ function showReviewPrompt() {
   document.querySelector("#reviewSuggestion").textContent = suggestion === "Unsorted" ? "No strong match" : `Suggested: ${suggestion}`;
 }
 document.querySelector("#startReviewQueue").onclick = () => {
-  reviewQueue = prompts.filter(prompt => !prompt.reviewed);
+  const mode = document.querySelector("#reviewQueueMode").value;
+  const unreviewed = prompts.filter(prompt => !prompt.reviewed);
+  if (mode === "duplicates") {
+    const duplicates = duplicateIds();
+    reviewQueue = unreviewed.filter(prompt => duplicates.has(prompt.id));
+  } else if (mode === "detailed") {
+    reviewQueue = unreviewed.filter(prompt => (prompt.text || "").length > 1200);
+  } else if (mode === "short") {
+    reviewQueue = unreviewed.filter(prompt => (prompt.text || "").length < 80);
+  } else {
+    reviewQueue = unreviewed;
+  }
   reviewPosition = 0;
   reviewStats = {kept: 0, favorited: 0, skipped: 0, removed: 0};
-  if (!reviewQueue.length) return notify("Every prompt has been reviewed.");
+  if (!reviewQueue.length) return notify("No unreviewed prompts match that session.");
   showReviewPrompt();
   document.querySelector("#reviewDialog").showModal();
 };
