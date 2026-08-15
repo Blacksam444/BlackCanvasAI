@@ -1,0 +1,21 @@
+#ordersDialog { width: min(850px, calc(100% - 28px)); max-height: 88vh; padding: 0; border: 1px solid #342e3c; border-radius: 21px; background: #100f14; color: #fff; }
+#ordersDialog::backdrop { background: rgba(0, 0, 0, .78); }
+.orders-head { display: flex; justify-content: space-between; gap: 20px; padding: 27px 29px 20px; border-bottom: 1px solid #2b2631; }
+.orders-head h2 { margin: 5px 0 6px; font: 800 27px Manrope, sans-serif; }
+.orders-head p:last-child { margin: 0; color: #a69eab; }
+.orders-head button { align-self: flex-start; width: 38px; height: 38px; border: 1px solid #443c4c; border-radius: 10px; background: #19161d; color: #fff; font-size: 22px; }
+.orders-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 20px 29px; }
+.orders-summary div { display: grid; gap: 5px; padding: 15px; border: 1px solid #302a38; border-radius: 13px; background: #16131b; }
+.orders-summary span { color: #938b9a; font-size: 12px; }
+.orders-summary strong { font-size: 22px; }
+.orders-list { display: grid; gap: 9px; padding: 0 29px 28px; }
+.order-row { display: flex; justify-content: space-between; align-items: center; gap: 18px; width: 100%; padding: 15px 17px; border: 1px solid #302a38; border-radius: 13px; background: #151219; color: #fff; text-align: left; }
+.order-row:hover { border-color: #7653a0; background: #1b1621; }
+.order-row > div { display: grid; gap: 5px; }
+.order-row > div:last-child { justify-items: end; }
+.order-row span, .order-row small { color: #9f97a5; }
+.order-stage { padding: 5px 9px; border-radius: 999px; background: #29222f; color: #d9c8e9 !important; font-size: 11px; font-weight: 800; }
+.stage-shipped { background: #17314a; color: #a9d5ff !important; }
+.stage-delivered, .stage-local-pickup-complete { background: #153829; color: #9ae6bd !important; }
+.orders-empty { margin: 0 29px 29px; padding: 35px; border: 1px dashed #393240; border-radius: 13px; color: #928a98; text-align: center; }
+@media (max-width: 650px) { .orders-summary { grid-template-columns: 1fr; } .order-row { align-items: flex-start; } }

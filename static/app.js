@@ -52,6 +52,20 @@ async function loadDashboard() {
     document.querySelector("#artworkCount").textContent = data.counts.artworks;
     document.querySelector("#favoriteCount").textContent = data.counts.favorites;
     document.querySelector("#reviewCount").textContent = data.counts.to_review ? `${data.counts.to_review} to review` : "All organized";
+    const dashboardMoney = (value) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value || 0);
+    document.querySelector("#studioCatalogValue").textContent = dashboardMoney(data.studio.catalog_value);
+    document.querySelector("#studioSalesRevenue").textContent = dashboardMoney(data.studio.sales_revenue);
+    document.querySelector("#studioActiveOrders").textContent = data.studio.active_orders;
+    document.querySelector("#studioReadyToList").textContent = data.studio.ready_to_list;
+    document.querySelector("#studioCompletedOrders").textContent = data.studio.completed_orders;
+    document.querySelector("#studioExpenses").textContent = dashboardMoney(data.studio.expenses);
+    document.querySelector("#studioNetProfit").textContent = dashboardMoney(data.studio.net_profit);
+    document.querySelector("#goalRevenue").textContent = dashboardMoney(data.studio.monthly_revenue);
+    document.querySelector("#goalTarget").textContent = dashboardMoney(data.studio.monthly_goal);
+    document.querySelector("#goalBar").style.width = `${data.studio.goal_percent}%`;
+    const goalRemaining = Math.max(data.studio.monthly_goal - data.studio.monthly_revenue, 0);
+    document.querySelector("#goalRemaining").textContent = goalRemaining ? `${dashboardMoney(goalRemaining)} remaining this month` : "Monthly goal reached!";
+    document.querySelector("#studioPriorities").innerHTML = data.priorities.map((priority) => `<a href="${priority.href}" class="priority-card ${priority.tone}"><span>${escapeDashboardHtml(priority.icon)}</span><div><strong>${escapeDashboardHtml(priority.title)}</strong><small>${escapeDashboardHtml(priority.detail)}</small></div>${priority.count ? `<b>${priority.count}</b>` : ""}<em>›</em></a>`).join("");
     if (data.prompt_of_day) {
       document.querySelector("#dailyPrompt").textContent = data.prompt_of_day.text;
       document.querySelector("#dailyCategory").textContent = data.prompt_of_day.category;

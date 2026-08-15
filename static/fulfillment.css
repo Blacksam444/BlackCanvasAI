@@ -1,0 +1,12 @@
+.fulfillment-button { background: #1d2734; border-color: #38516d; color: #b9d9ff; }
+#fulfillmentDialog { width: min(590px, calc(100% - 28px)); padding: 0; border: 1px solid #332d3a; border-radius: 20px; background: #111015; color: #fff; }
+#fulfillmentDialog::backdrop { background: rgba(0, 0, 0, .76); }
+.fulfillment-head { display: flex; justify-content: space-between; gap: 20px; padding: 27px 29px 20px; border-bottom: 1px solid #2b2631; }
+.fulfillment-head h2 { margin: 5px 0 6px; font: 800 26px Manrope, sans-serif; }
+.fulfillment-head p:last-child { margin: 0; color: #a69eab; }
+.fulfillment-head .close { align-self: flex-start; width: 38px; height: 38px; border: 1px solid #443c4c; border-radius: 10px; background: #19161d; color: #fff; font-size: 22px; }
+.fulfillment-fields { display: grid; gap: 15px; padding: 23px 29px 12px; }
+.fulfillment-fields label { display: grid; gap: 7px; color: #c8c0ce; font-size: 13px; font-weight: 700; }
+.fulfillment-fields input, .fulfillment-fields select { width: 100%; box-sizing: border-box; border: 1px solid #393240; border-radius: 10px; padding: 12px 13px; background: #0c0b0f; color: #fff; font: inherit; }
+.fulfillment-hint { margin: 4px 29px 0; color: #847d89; font-size: 12px; }
+.save-fulfillment { background: linear-gradient(135deg, #7c3aed, #a855f7); color: #fff; }

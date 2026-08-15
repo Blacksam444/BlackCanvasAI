@@ -1,4 +1,6 @@
 import base64
+import csv
+import io
 import json
 import re
 import shutil
@@ -13,6 +15,11 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from pydantic import BaseModel
+from PIL import Image, ImageOps
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import landscape, letter
+from reportlab.lib.utils import ImageReader
+from reportlab.pdfgen import canvas
 from spellchecker import SpellChecker
 
 from storage import UPLOAD_DIR, backup_data, connect, execute, initialize, rows
@@ -88,6 +95,10 @@ class ArtworkPayload(BaseModel):
     tags: str = ""
     notes: str = ""
     favorite: bool = False
+    dimensions: str = ""
+    medium: str = ""
+    price: float = 0
+    sale_status: str = "In progress"
     data_url: str
 
 
@@ -96,6 +107,55 @@ class ArtworkDetailsPayload(BaseModel):
     collection: str
     tags: str = ""
     notes: str = ""
+    dimensions: str = ""
+    medium: str = ""
+    price: float = 0
+    sale_status: str = "In progress"
+
+
+class PrintExportPayload(BaseModel):
+    width_inches: float
+    height_inches: float
+
+
+class SaleRecordPayload(BaseModel):
+    sale_price: float
+    sold_date: str
+    sales_channel: str
+    buyer_name: str = ""
+    notes: str = ""
+
+
+class FulfillmentPayload(BaseModel):
+    status: str
+    carrier: str = ""
+    tracking_number: str = ""
+
+
+class ExpensePayload(BaseModel):
+    description: str
+    category: str
+    amount: float
+    expense_date: str
+    notes: str = ""
+
+
+class RevenueGoalPayload(BaseModel):
+    monthly_goal: float
+
+
+class ArtworkPricePayload(BaseModel):
+    price: float
+
+
+class ArtworkPricingPayload(BaseModel):
+    materials: float
+    hours: float
+    hourly_rate: float
+    overhead: float
+    fees_percent: float
+    profit_percent: float
+    recommended_price: float
 
 
 class GoogleCredentialsPayload(BaseModel):
@@ -435,6 +495,37 @@ def dashboard_summary() -> dict:
             "(SELECT COUNT(*) FROM artworks WHERE favorite = 1)"
         ).fetchone()[0]
         review_count = db.execute("SELECT COUNT(*) FROM prompts WHERE reviewed = 0").fetchone()[0]
+        catalog_value = db.execute(
+            "SELECT COALESCE(SUM(price), 0) FROM artworks WHERE sale_status != 'Sold'"
+        ).fetchone()[0]
+        sales_revenue = db.execute(
+            "SELECT COALESCE(SUM(sale_price), 0) FROM artworks WHERE sale_status = 'Sold'"
+        ).fetchone()[0]
+        active_orders = db.execute(
+            "SELECT COUNT(*) FROM artworks WHERE sale_status = 'Sold' "
+            "AND fulfillment_status NOT IN ('Delivered', 'Local pickup complete')"
+        ).fetchone()[0]
+        completed_orders = db.execute(
+            "SELECT COUNT(*) FROM artworks WHERE sale_status = 'Sold' "
+            "AND fulfillment_status IN ('Delivered', 'Local pickup complete')"
+        ).fetchone()[0]
+        total_expenses = db.execute("SELECT COALESCE(SUM(amount), 0) FROM expenses").fetchone()[0]
+        current_month = datetime.now().strftime("%Y-%m")
+        monthly_revenue = db.execute(
+            "SELECT COALESCE(SUM(sale_price), 0) FROM artworks WHERE sale_status = 'Sold' AND sold_date LIKE ?",
+            (f"{current_month}%",),
+        ).fetchone()[0]
+        goal_row = db.execute("SELECT value FROM studio_settings WHERE key = 'monthly_revenue_goal'").fetchone()
+        monthly_goal = float(goal_row["value"]) if goal_row else 1000.0
+        ready_to_list = db.execute(
+            "SELECT COUNT(*) FROM artworks WHERE sale_status = 'Ready to list'"
+        ).fetchone()[0]
+        unpriced_artwork = db.execute(
+            "SELECT COUNT(*) FROM artworks WHERE price <= 0 AND sale_status != 'Sold'"
+        ).fetchone()[0]
+        incomplete_artwork = db.execute(
+            "SELECT COUNT(*) FROM artworks WHERE TRIM(dimensions) = '' OR TRIM(medium) = '' OR TRIM(notes) = ''"
+        ).fetchone()[0]
         prompt_rows = [dict(item) for item in db.execute(
             "SELECT id, title, category, text FROM prompts ORDER BY id DESC LIMIT 3"
         ).fetchall()]
@@ -457,11 +548,43 @@ def dashboard_summary() -> dict:
         for item in artwork_rows
     ]
     activity.sort(key=lambda item: item["id"], reverse=True)
+    priorities: list[dict[str, str | int]] = []
+    if active_orders:
+        priorities.append({"icon": "▣", "title": "Move active orders forward", "count": active_orders,
+                           "detail": "Review packing, shipping, and delivery status.", "href": "/image-studio?focus=orders", "tone": "blue"})
+    if unpriced_artwork:
+        priorities.append({"icon": "$", "title": "Price your available artwork", "count": unpriced_artwork,
+                           "detail": "Use the calculator so catalog value reflects your work.", "href": "/image-studio?focus=unpriced", "tone": "purple"})
+    if incomplete_artwork:
+        priorities.append({"icon": "✓", "title": "Complete artwork details", "count": incomplete_artwork,
+                           "detail": "Add missing size, medium, or descriptions.", "href": "/image-studio?focus=incomplete", "tone": "amber"})
+    if ready_to_list:
+        priorities.append({"icon": "✦", "title": "Publish ready artwork", "count": ready_to_list,
+                           "detail": "These pieces have been marked Ready to List.", "href": "/image-studio?focus=ready", "tone": "pink"})
+    if review_count:
+        priorities.append({"icon": "▤", "title": "Review imported prompts", "count": review_count,
+                           "detail": "Keep the strongest ideas and organize the rest.", "href": "/prompts", "tone": "amber"})
+    if not priorities:
+        priorities.append({"icon": "✦", "title": "Create something new", "count": 0,
+                           "detail": "Your studio records are caught up. Start a new artwork or prompt.", "href": "/chat", "tone": "purple"})
     return {
         "counts": {"prompts": prompt_count, "artworks": artwork_count,
                    "favorites": favorite_count, "to_review": review_count},
+        "studio": {
+            "catalog_value": round(float(catalog_value or 0), 2),
+            "sales_revenue": round(float(sales_revenue or 0), 2),
+            "active_orders": active_orders,
+            "completed_orders": completed_orders,
+            "ready_to_list": ready_to_list,
+            "expenses": round(float(total_expenses or 0), 2),
+            "net_profit": round(float(sales_revenue or 0) - float(total_expenses or 0), 2),
+            "monthly_revenue": round(float(monthly_revenue or 0), 2),
+            "monthly_goal": round(monthly_goal, 2),
+            "goal_percent": min(round(float(monthly_revenue or 0) / monthly_goal * 100, 1), 100) if monthly_goal else 0,
+        },
         "prompt_of_day": dict(prompt_of_day) if prompt_of_day else None,
         "recent": activity[:3],
+        "priorities": priorities[:4],
     }
 
 
@@ -657,15 +780,622 @@ def dismiss_style_update(update_id: int) -> dict[str, str]:
 
 @app.get("/api/artworks")
 def list_artworks() -> list[dict]:
-    items = rows("SELECT id, title, collection, tags, notes, favorite, filename, created_at FROM artworks ORDER BY id DESC")
+    items = rows("SELECT id, title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, sale_price, sold_date, sales_channel, buyer_name, sale_notes, fulfillment_status, shipping_carrier, tracking_number, filename, created_at FROM artworks ORDER BY id DESC")
     for item in items:
         item["url"] = f"/uploads/{item['filename']}"
     return items
 
 
+@app.get("/api/sales")
+def list_sales() -> dict:
+    sales = rows(
+        "SELECT id, title, collection, sale_price, sold_date, sales_channel, buyer_name, sale_notes "
+        "FROM artworks WHERE sale_status = 'Sold' ORDER BY sold_date DESC, id DESC"
+    )
+    total = sum(float(sale["sale_price"] or 0) for sale in sales)
+    return {
+        "sales": sales,
+        "count": len(sales),
+        "total_revenue": round(total, 2),
+        "average_sale": round(total / len(sales), 2) if sales else 0,
+    }
+
+
+@app.get("/api/orders")
+def list_orders() -> dict:
+    orders = rows(
+        "SELECT id, title, collection, buyer_name, sale_price, sold_date, fulfillment_status, "
+        "shipping_carrier, tracking_number FROM artworks WHERE sale_status = 'Sold' "
+        "ORDER BY CASE fulfillment_status WHEN 'Not started' THEN 1 WHEN 'Packing' THEN 2 "
+        "WHEN 'Ready to ship' THEN 3 WHEN 'Shipped' THEN 4 WHEN 'Delivered' THEN 5 ELSE 6 END, sold_date DESC"
+    )
+    active = sum(order["fulfillment_status"] not in {"Delivered", "Local pickup complete"} for order in orders)
+    return {
+        "orders": orders,
+        "count": len(orders),
+        "active": active,
+        "completed": len(orders) - active,
+    }
+
+
+@app.get("/api/expenses")
+def list_expenses() -> dict:
+    expenses = rows(
+        "SELECT id, description, category, amount, expense_date, notes FROM expenses "
+        "ORDER BY expense_date DESC, id DESC"
+    )
+    total = sum(float(item["amount"] or 0) for item in expenses)
+    categories: dict[str, float] = {}
+    for item in expenses:
+        categories[item["category"]] = round(categories.get(item["category"], 0) + float(item["amount"] or 0), 2)
+    return {"expenses": expenses, "count": len(expenses), "total": round(total, 2), "categories": categories}
+
+
+@app.post("/api/expenses")
+def create_expense(payload: ExpensePayload) -> dict:
+    description = payload.description.strip()
+    category = payload.category.strip()
+    if not description:
+        raise HTTPException(status_code=400, detail="Add an expense description")
+    if payload.amount <= 0:
+        raise HTTPException(status_code=400, detail="Expense amount must be greater than zero")
+    try:
+        datetime.strptime(payload.expense_date, "%Y-%m-%d")
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail="Use a valid expense date") from error
+    allowed = {"Art materials", "Printing", "Packaging", "Shipping", "Advertising", "Platform fees", "Studio", "Software", "Other"}
+    if category not in allowed:
+        raise HTTPException(status_code=400, detail="Choose a valid expense category")
+    expense_id = execute(
+        "INSERT INTO expenses(description, category, amount, expense_date, notes) VALUES (?, ?, ?, ?, ?)",
+        (description, category, payload.amount, payload.expense_date, payload.notes.strip()),
+    )
+    return {"id": expense_id, **payload.model_dump(), "description": description, "category": category}
+
+
+@app.delete("/api/expenses/{expense_id}")
+def delete_expense(expense_id: int) -> dict:
+    with connect() as db:
+        cursor = db.execute("DELETE FROM expenses WHERE id = ?", (expense_id,))
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Expense not found")
+    return {"status": "removed"}
+
+
+@app.get("/api/finance-report")
+def finance_report() -> dict:
+    sales = rows(
+        "SELECT id, title AS description, sold_date AS entry_date, sales_channel AS category, "
+        "sale_price AS amount FROM artworks WHERE sale_status = 'Sold' ORDER BY sold_date DESC"
+    )
+    expenses = rows(
+        "SELECT id, description, expense_date AS entry_date, category, amount FROM expenses "
+        "ORDER BY expense_date DESC, id DESC"
+    )
+    revenue = sum(float(item["amount"] or 0) for item in sales)
+    expense_total = sum(float(item["amount"] or 0) for item in expenses)
+    category_totals: dict[str, float] = {}
+    for item in expenses:
+        category_totals[item["category"]] = round(
+            category_totals.get(item["category"], 0) + float(item["amount"] or 0), 2
+        )
+    transactions = [
+        {**item, "type": "Income", "signed_amount": float(item["amount"] or 0)} for item in sales
+    ] + [
+        {**item, "type": "Expense", "signed_amount": -float(item["amount"] or 0)} for item in expenses
+    ]
+    transactions.sort(key=lambda item: (item["entry_date"], item["id"]), reverse=True)
+    goal_data = get_revenue_goal()
+    return {
+        "revenue": round(revenue, 2),
+        "expenses": round(expense_total, 2),
+        "net_profit": round(revenue - expense_total, 2),
+        "sale_count": len(sales),
+        "expense_count": len(expenses),
+        "expense_categories": category_totals,
+        "transactions": transactions,
+        "monthly_goal": goal_data,
+    }
+
+
+@app.get("/api/revenue-goal")
+def get_revenue_goal() -> dict:
+    current_month = datetime.now().strftime("%Y-%m")
+    with connect() as db:
+        goal_row = db.execute("SELECT value FROM studio_settings WHERE key = 'monthly_revenue_goal'").fetchone()
+        goal = float(goal_row["value"]) if goal_row else 1000.0
+        revenue = float(db.execute(
+            "SELECT COALESCE(SUM(sale_price), 0) FROM artworks WHERE sale_status = 'Sold' AND sold_date LIKE ?",
+            (f"{current_month}%",),
+        ).fetchone()[0] or 0)
+    return {
+        "month": current_month,
+        "goal": round(goal, 2),
+        "revenue": round(revenue, 2),
+        "remaining": round(max(goal - revenue, 0), 2),
+        "percent": min(round(revenue / goal * 100, 1), 100) if goal else 0,
+    }
+
+
+@app.put("/api/revenue-goal")
+def update_revenue_goal(payload: RevenueGoalPayload) -> dict:
+    if payload.monthly_goal <= 0:
+        raise HTTPException(status_code=400, detail="Monthly revenue goal must be greater than zero")
+    with connect() as db:
+        db.execute(
+            "INSERT INTO studio_settings(key, value) VALUES ('monthly_revenue_goal', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (str(round(payload.monthly_goal, 2)),),
+        )
+    return get_revenue_goal()
+
+
+@app.get("/api/finance-report/export")
+def export_finance_report() -> Response:
+    report = finance_report()
+    output = io.StringIO(newline="")
+    writer = csv.writer(output)
+    writer.writerow(["Black Canvas Art Studio - Profit and Loss Report"])
+    writer.writerow(["Generated", datetime.now().strftime("%Y-%m-%d")])
+    writer.writerow([])
+    writer.writerow(["Summary", "Amount"])
+    writer.writerow(["Sales revenue", f"{report['revenue']:.2f}"])
+    writer.writerow(["Business expenses", f"{report['expenses']:.2f}"])
+    writer.writerow(["Net profit", f"{report['net_profit']:.2f}"])
+    writer.writerow([])
+    writer.writerow(["Type", "Date", "Description", "Category / Channel", "Amount"])
+    for item in report["transactions"]:
+        writer.writerow([
+            item["type"], item["entry_date"], item["description"], item["category"],
+            f"{item['signed_amount']:.2f}",
+        ])
+    filename = f"BlackCanvasAI-Profit-Loss-{datetime.now().strftime('%Y-%m-%d')}.csv"
+    return Response(
+        content=output.getvalue().encode("utf-8-sig"), media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/api/sales/export")
+def export_sales_report() -> Response:
+    report = list_sales()
+    output = io.StringIO(newline="")
+    writer = csv.writer(output)
+    writer.writerow(["Artwork", "Collection", "Sale Price", "Date Sold", "Sales Channel", "Buyer", "Notes"])
+    for sale in report["sales"]:
+        writer.writerow([
+            sale["title"], sale["collection"], f"{float(sale['sale_price'] or 0):.2f}", sale["sold_date"],
+            sale["sales_channel"], sale["buyer_name"], sale["sale_notes"],
+        ])
+    filename = f"BlackCanvasAI-Sales-{datetime.now().strftime('%Y-%m-%d')}.csv"
+    return Response(
+        content=output.getvalue().encode("utf-8-sig"),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/api/artworks/{artwork_id}/certificate")
+def artwork_certificate(artwork_id: int) -> FileResponse:
+    matches = rows(
+        "SELECT id, title, collection, notes, dimensions, medium, filename, created_at "
+        "FROM artworks WHERE id = ?", (artwork_id,)
+    )
+    if not matches:
+        raise HTTPException(status_code=404, detail="Artwork not found")
+    artwork = matches[0]
+    if not artwork["dimensions"].strip() or not artwork["medium"].strip():
+        raise HTTPException(status_code=400, detail="Add dimensions and medium before creating a certificate")
+    image_path = UPLOAD_DIR / artwork["filename"]
+    if not image_path.is_file():
+        raise HTTPException(status_code=404, detail="Artwork image file not found")
+
+    certificate_id = f"BC-{artwork_id:05d}-{uuid.uuid5(uuid.NAMESPACE_URL, artwork['filename']).hex[:8].upper()}"
+    safe_title = re.sub(r"[^A-Za-z0-9_-]+", "-", artwork["title"]).strip("-") or "artwork"
+    certificate_dir = BASE_DIR / "data" / "certificates"
+    certificate_dir.mkdir(parents=True, exist_ok=True)
+    certificate_path = certificate_dir / f"{safe_title}-certificate-of-authenticity.pdf"
+    page_width, page_height = landscape(letter)
+    document = canvas.Canvas(str(certificate_path), pagesize=(page_width, page_height))
+    document.setTitle(f"Certificate of Authenticity - {artwork['title']}")
+    document.setAuthor("BlackCanvasAI for Jeffrey McKay")
+
+    document.setFillColor(colors.HexColor("#F7F3EA"))
+    document.rect(0, 0, page_width, page_height, fill=1, stroke=0)
+    document.setStrokeColor(colors.HexColor("#17131F"))
+    document.setLineWidth(2)
+    document.rect(24, 24, page_width - 48, page_height - 48, fill=0, stroke=1)
+    document.setStrokeColor(colors.HexColor("#9A7342"))
+    document.setLineWidth(0.8)
+    document.rect(31, 31, page_width - 62, page_height - 62, fill=0, stroke=1)
+
+    image_box_x, image_box_y, image_box_w, image_box_h = 58, 105, 270, 360
+    with Image.open(image_path) as source:
+        image = ImageOps.exif_transpose(source).convert("RGB")
+        image.thumbnail((image_box_w, image_box_h), Image.Resampling.LANCZOS)
+        image_buffer = io.BytesIO()
+        image.save(image_buffer, format="JPEG", quality=92)
+        image_width, image_height = image.size
+    image_x = image_box_x + (image_box_w - image_width) / 2
+    image_y = image_box_y + (image_box_h - image_height) / 2
+    document.setFillColor(colors.white)
+    document.rect(image_box_x - 9, image_box_y - 9, image_box_w + 18, image_box_h + 18, fill=1, stroke=0)
+    document.drawImage(ImageReader(image_buffer), image_x, image_y, width=image_width, height=image_height, mask="auto")
+
+    text_x = 375
+    document.setFillColor(colors.HexColor("#6C4D88"))
+    document.setFont("Helvetica-Bold", 10)
+    document.drawString(text_x, 503, "BLACK CANVAS ART STUDIO")
+    document.setFillColor(colors.HexColor("#17131F"))
+    document.setFont("Helvetica-Bold", 21)
+    document.drawString(text_x, 463, "CERTIFICATE OF AUTHENTICITY")
+    document.setStrokeColor(colors.HexColor("#9A7342"))
+    document.setLineWidth(1.2)
+    document.line(text_x, 447, 730, 447)
+    document.setFont("Helvetica", 10)
+    document.setFillColor(colors.HexColor("#514A58"))
+    document.drawString(text_x, 422, "This certificate confirms that the artwork described below is an authentic work by")
+    document.setFont("Helvetica-Bold", 12)
+    document.setFillColor(colors.HexColor("#17131F"))
+    document.drawString(text_x, 401, "Jeffrey McKay")
+
+    details = [
+        ("TITLE", artwork["title"]),
+        ("COLLECTION", artwork["collection"]),
+        ("MEDIUM", artwork["medium"]),
+        ("DIMENSIONS", artwork["dimensions"]),
+        ("CERTIFICATE NO.", certificate_id),
+    ]
+    detail_y = 360
+    for label, value in details:
+        document.setFillColor(colors.HexColor("#7A707F"))
+        document.setFont("Helvetica-Bold", 8)
+        document.drawString(text_x, detail_y, label)
+        document.setFillColor(colors.HexColor("#17131F"))
+        document.setFont("Helvetica", 11)
+        document.drawString(text_x + 105, detail_y, str(value)[:48])
+        detail_y -= 31
+
+    statement = artwork["notes"].strip() or "An original artwork created as part of the Black Canvas body of work."
+    document.setFillColor(colors.HexColor("#514A58"))
+    document.setFont("Helvetica-Oblique", 9)
+    text_object = document.beginText(text_x, 190)
+    text_object.setLeading(13)
+    words = statement.split()
+    lines: list[str] = []
+    current_line = ""
+    for word in words:
+        candidate = f"{current_line} {word}".strip()
+        if document.stringWidth(candidate, "Helvetica-Oblique", 9) > 355 and current_line:
+            lines.append(current_line)
+            current_line = word
+        else:
+            current_line = candidate
+    if current_line:
+        lines.append(current_line)
+    for line in lines[:4]:
+        text_object.textLine(line)
+    document.drawText(text_object)
+
+    document.setStrokeColor(colors.HexColor("#514A58"))
+    document.setLineWidth(0.7)
+    document.line(text_x, 103, 545, 103)
+    document.line(580, 103, 730, 103)
+    document.setFont("Helvetica", 8)
+    document.setFillColor(colors.HexColor("#6B626E"))
+    document.drawString(text_x, 88, "Artist signature - Jeffrey McKay")
+    document.drawString(580, 88, "Date")
+    document.setFont("Helvetica", 7)
+    document.drawRightString(730, 51, f"Generated by BlackCanvasAI  |  {certificate_id}")
+    document.showPage()
+    document.save()
+    return FileResponse(certificate_path, media_type="application/pdf", filename=certificate_path.name)
+
+
+@app.get("/api/artworks/{artwork_id}/sale-receipt")
+def artwork_sale_receipt(artwork_id: int) -> FileResponse:
+    matches = rows(
+        "SELECT id, title, collection, dimensions, medium, sale_status, sale_price, sold_date, "
+        "sales_channel, buyer_name, sale_notes, filename FROM artworks WHERE id = ?", (artwork_id,)
+    )
+    if not matches:
+        raise HTTPException(status_code=404, detail="Artwork not found")
+    artwork = matches[0]
+    if artwork["sale_status"] != "Sold" or float(artwork["sale_price"] or 0) <= 0:
+        raise HTTPException(status_code=400, detail="Record this artwork as sold before creating a receipt")
+
+    safe_title = re.sub(r"[^A-Za-z0-9_-]+", "-", artwork["title"]).strip("-") or "artwork"
+    receipt_dir = BASE_DIR / "data" / "receipts"
+    receipt_dir.mkdir(parents=True, exist_ok=True)
+    receipt_path = receipt_dir / f"{safe_title}-sale-receipt.pdf"
+    receipt_number = f"BC-SALE-{artwork_id:05d}-{artwork['sold_date'].replace('-', '')}"
+    document = canvas.Canvas(str(receipt_path), pagesize=letter)
+    page_width, page_height = letter
+    document.setTitle(f"Artwork Sale Receipt - {artwork['title']}")
+    document.setAuthor("BlackCanvasAI for Jeffrey McKay")
+
+    document.setFillColor(colors.HexColor("#F7F3EA"))
+    document.rect(0, 0, page_width, page_height, fill=1, stroke=0)
+    document.setFillColor(colors.HexColor("#17131F"))
+    document.rect(0, page_height - 144, page_width, 144, fill=1, stroke=0)
+    document.setFillColor(colors.HexColor("#B58AF8"))
+    document.setFont("Helvetica-Bold", 11)
+    document.drawString(52, page_height - 54, "BLACK CANVAS ART STUDIO")
+    document.setFillColor(colors.white)
+    document.setFont("Helvetica-Bold", 27)
+    document.drawString(52, page_height - 92, "ARTWORK SALE RECEIPT")
+    document.setFont("Helvetica", 9)
+    document.setFillColor(colors.HexColor("#D8D2DF"))
+    document.drawString(52, page_height - 116, f"Receipt {receipt_number}")
+
+    image_path = UPLOAD_DIR / artwork["filename"]
+    if image_path.is_file():
+        with Image.open(image_path) as source:
+            image = ImageOps.exif_transpose(source).convert("RGB")
+            image.thumbnail((180, 210), Image.Resampling.LANCZOS)
+            image_buffer = io.BytesIO()
+            image.save(image_buffer, format="JPEG", quality=90)
+            image_width, image_height = image.size
+        document.setFillColor(colors.white)
+        document.rect(52, 397, 198, 228, fill=1, stroke=0)
+        document.drawImage(
+            ImageReader(image_buffer), 61 + (180 - image_width) / 2, 406 + (210 - image_height) / 2,
+            width=image_width, height=image_height, mask="auto",
+        )
+
+    document.setFillColor(colors.HexColor("#6C4D88"))
+    document.setFont("Helvetica-Bold", 9)
+    document.drawString(285, 602, "ARTWORK")
+    document.setFillColor(colors.HexColor("#17131F"))
+    document.setFont("Helvetica-Bold", 18)
+    document.drawString(285, 574, artwork["title"][:34])
+    document.setStrokeColor(colors.HexColor("#C8B995"))
+    document.setLineWidth(0.8)
+    document.line(285, 558, 560, 558)
+
+    details = [
+        ("Collection", artwork["collection"] or "Unsorted"),
+        ("Dimensions", artwork["dimensions"] or "Not recorded"),
+        ("Medium", artwork["medium"] or "Not recorded"),
+        ("Date sold", artwork["sold_date"]),
+        ("Sales channel", artwork["sales_channel"] or "Direct sale"),
+        ("Buyer", artwork["buyer_name"] or "Private buyer"),
+    ]
+    y = 530
+    for label, value in details:
+        document.setFillColor(colors.HexColor("#786F7C"))
+        document.setFont("Helvetica-Bold", 8)
+        document.drawString(285, y, label.upper())
+        document.setFillColor(colors.HexColor("#17131F"))
+        document.setFont("Helvetica", 9)
+        value_text = str(value)
+        if document.stringWidth(value_text, "Helvetica", 9) <= 175:
+            document.drawString(385, y, value_text)
+        else:
+            words = value_text.split()
+            first_line = ""
+            while words:
+                candidate = f"{first_line} {words[0]}".strip()
+                if first_line and document.stringWidth(candidate, "Helvetica", 9) > 175:
+                    break
+                first_line = candidate
+                words.pop(0)
+            document.drawString(385, y, first_line)
+            document.drawString(385, y - 12, " ".join(words)[:38])
+        y -= 31
+
+    document.setFillColor(colors.white)
+    document.roundRect(52, 270, 508, 92, 8, fill=1, stroke=0)
+    document.setFillColor(colors.HexColor("#6C4D88"))
+    document.setFont("Helvetica-Bold", 9)
+    document.drawString(72, 332, "PAYMENT SUMMARY")
+    document.setFillColor(colors.HexColor("#514A58"))
+    document.setFont("Helvetica", 11)
+    document.drawString(72, 298, artwork["title"][:44])
+    document.setFillColor(colors.HexColor("#17131F"))
+    document.setFont("Helvetica-Bold", 18)
+    document.drawRightString(540, 298, f"${float(artwork['sale_price']):,.2f}")
+
+    notes = artwork["sale_notes"].strip()
+    if notes:
+        document.setFillColor(colors.HexColor("#6C4D88"))
+        document.setFont("Helvetica-Bold", 9)
+        document.drawString(52, 230, "SALE NOTES")
+        document.setFillColor(colors.HexColor("#514A58"))
+        document.setFont("Helvetica", 9)
+        text_object = document.beginText(52, 209)
+        text_object.setLeading(13)
+        current = ""
+        lines: list[str] = []
+        for word in notes.split():
+            candidate = f"{current} {word}".strip()
+            if document.stringWidth(candidate, "Helvetica", 9) > 500 and current:
+                lines.append(current)
+                current = word
+            else:
+                current = candidate
+        if current:
+            lines.append(current)
+        for line in lines[:3]:
+            text_object.textLine(line)
+        document.drawText(text_object)
+
+    document.setStrokeColor(colors.HexColor("#9A7342"))
+    document.line(52, 118, 560, 118)
+    document.setFillColor(colors.HexColor("#17131F"))
+    document.setFont("Helvetica-Bold", 10)
+    document.drawString(52, 92, "Thank you for supporting independent Black art.")
+    document.setFillColor(colors.HexColor("#6B626E"))
+    document.setFont("Helvetica", 8)
+    document.drawString(52, 70, "Artist: Jeffrey McKay  |  Black Canvas Art Studio")
+    document.drawRightString(560, 70, "Generated securely by BlackCanvasAI")
+    document.showPage()
+    document.save()
+    return FileResponse(receipt_path, media_type="application/pdf", filename=receipt_path.name)
+
+
+@app.get("/api/artworks/{artwork_id}/gallery-label")
+def artwork_gallery_label(artwork_id: int) -> FileResponse:
+    matches = rows(
+        "SELECT id, title, collection, notes, dimensions, medium, price, sale_status "
+        "FROM artworks WHERE id = ?", (artwork_id,)
+    )
+    if not matches:
+        raise HTTPException(status_code=404, detail="Artwork not found")
+    artwork = matches[0]
+    if not artwork["medium"].strip() or not artwork["dimensions"].strip():
+        raise HTTPException(status_code=400, detail="Add dimensions and medium before creating a gallery label")
+
+    safe_title = re.sub(r"[^A-Za-z0-9_-]+", "-", artwork["title"]).strip("-") or "artwork"
+    label_dir = BASE_DIR / "data" / "gallery-labels"
+    label_dir.mkdir(parents=True, exist_ok=True)
+    label_path = label_dir / f"{safe_title}-gallery-label.pdf"
+    document = canvas.Canvas(str(label_path), pagesize=letter)
+    page_width, page_height = letter
+    document.setTitle(f"Gallery Label - {artwork['title']}")
+    document.setAuthor("BlackCanvasAI for Jeffrey McKay")
+
+    label_width, label_height = 360, 252
+    label_x = (page_width - label_width) / 2
+    label_y = (page_height - label_height) / 2
+    document.setFillColor(colors.white)
+    document.rect(0, 0, page_width, page_height, fill=1, stroke=0)
+    document.setDash(3, 3)
+    document.setStrokeColor(colors.HexColor("#B8B2BB"))
+    document.setLineWidth(0.5)
+    document.rect(label_x, label_y, label_width, label_height, fill=0, stroke=1)
+    document.setDash()
+
+    content_x = label_x + 28
+    content_right = label_x + label_width - 28
+    document.setFillColor(colors.HexColor("#6C4D88"))
+    document.setFont("Helvetica-Bold", 8)
+    document.drawString(content_x, label_y + 215, "BLACK CANVAS ART STUDIO")
+    document.setFillColor(colors.HexColor("#17131F"))
+    title = artwork["title"].strip() or "Untitled Artwork"
+    title_size = 21 if document.stringWidth(title, "Helvetica-Bold", 21) <= label_width - 56 else 16
+    document.setFont("Helvetica-Bold", title_size)
+    document.drawString(content_x, label_y + 180, title[:44])
+    document.setFont("Helvetica-Oblique", 10)
+    document.setFillColor(colors.HexColor("#514A58"))
+    document.drawString(content_x, label_y + 158, "Jeffrey McKay")
+    document.setStrokeColor(colors.HexColor("#B59258"))
+    document.setLineWidth(1)
+    document.line(content_x, label_y + 143, content_right, label_y + 143)
+
+    document.setFillColor(colors.HexColor("#17131F"))
+    document.setFont("Helvetica", 9)
+    document.drawString(content_x, label_y + 121, artwork["collection"] or "Unsorted")
+    document.drawString(content_x, label_y + 104, artwork["medium"][:58])
+    document.drawString(content_x, label_y + 87, artwork["dimensions"][:45])
+
+    statement = artwork["notes"].strip()
+    if statement:
+        document.setFillColor(colors.HexColor("#514A58"))
+        document.setFont("Helvetica", 8)
+        text_object = document.beginText(content_x, label_y + 62)
+        text_object.setLeading(11)
+        current = ""
+        lines: list[str] = []
+        for word in statement.split():
+            candidate = f"{current} {word}".strip()
+            if document.stringWidth(candidate, "Helvetica", 8) > label_width - 56 and current:
+                lines.append(current)
+                current = word
+            else:
+                current = candidate
+        if current:
+            lines.append(current)
+        for line in lines[:3]:
+            text_object.textLine(line)
+        document.drawText(text_object)
+
+    if artwork["sale_status"] != "Not for sale" and float(artwork["price"] or 0) > 0:
+        document.setFillColor(colors.HexColor("#17131F"))
+        document.setFont("Helvetica-Bold", 10)
+        document.drawRightString(content_right, label_y + 22, f"${float(artwork['price']):,.0f}")
+    document.setFillColor(colors.HexColor("#9A929E"))
+    document.setFont("Helvetica", 6)
+    document.drawCentredString(page_width / 2, label_y - 14, "Cut along the dotted line - finished label size: 5 x 3.5 inches")
+    document.showPage()
+    document.save()
+    return FileResponse(label_path, media_type="application/pdf", filename=label_path.name)
+
+
+@app.get("/api/artworks/{artwork_id}/buyer-kit")
+def artwork_buyer_kit(artwork_id: int) -> dict:
+    matches = rows(
+        "SELECT id, title, collection, notes, dimensions, medium, sale_status, sale_price, sold_date, "
+        "sales_channel, buyer_name FROM artworks WHERE id = ?", (artwork_id,)
+    )
+    if not matches:
+        raise HTTPException(status_code=404, detail="Artwork not found")
+    artwork = matches[0]
+    if artwork["sale_status"] != "Sold":
+        raise HTTPException(status_code=400, detail="Record this artwork as sold before creating a buyer kit")
+
+    buyer = artwork["buyer_name"].strip() or "there"
+    title = artwork["title"].strip() or "your new artwork"
+    collection = artwork["collection"].strip() or "Black Canvas"
+    medium = artwork["medium"].strip() or "original artwork"
+    dimensions = artwork["dimensions"].strip()
+    thank_you = (
+        f"Hi {buyer},\n\nThank you for purchasing {title} from my {collection} collection. "
+        "It means a great deal to know this piece has found a home with you. "
+        "Your support helps me keep building bold, imaginative work centered on Black creativity and possibility.\n\n"
+        "I hope the artwork brings energy, meaning, and inspiration to your space for years to come. "
+        "Please feel free to share a photo once it is displayed.\n\nWith gratitude,\nJeffrey McKay\nBlack Canvas Art Studio"
+    )
+    medium_lower = medium.lower()
+    if "canvas" in medium_lower or "acrylic" in medium_lower or "oil" in medium_lower:
+        care = (
+            f"Care instructions for {title}:\n\n"
+            "- Display away from direct sunlight and strong heat sources.\n"
+            "- Dust gently with a clean, dry, soft cloth. Do not use water or household cleaners.\n"
+            "- Hold and move the artwork by its outer edges or frame.\n"
+            "- Keep the Certificate of Authenticity in a safe place."
+        )
+    elif "print" in medium_lower or "paper" in medium_lower:
+        care = (
+            f"Care instructions for {title}:\n\n"
+            "- Frame behind UV-protective glass or acrylic when possible.\n"
+            "- Use acid-free matting and backing materials.\n"
+            "- Keep away from direct sunlight, moisture, and high humidity.\n"
+            "- Handle with clean, dry hands and keep the Certificate of Authenticity safe."
+        )
+    else:
+        care = (
+            f"Care instructions for {title}:\n\n"
+            "- Keep away from direct sunlight, moisture, and extreme temperatures.\n"
+            "- Dust only with a clean, dry, soft cloth.\n"
+            "- Handle carefully by the edges and avoid touching the artwork surface.\n"
+            "- Store the Certificate of Authenticity in a safe place."
+        )
+    artwork_line = f"{title} - {medium}"
+    if dimensions:
+        artwork_line += f", {dimensions}"
+    checklist = [
+        f"Confirm artwork: {artwork_line}",
+        "Inspect and photograph the artwork before packing",
+        "Include the signed Certificate of Authenticity",
+        "Include printed care instructions and thank-you note",
+        "Protect corners and artwork surface",
+        "Use sturdy packaging with no movement inside",
+        "Photograph the sealed package",
+        "Send pickup or tracking information to the buyer",
+    ]
+    return {
+        "artwork_title": title,
+        "buyer_name": artwork["buyer_name"].strip(),
+        "thank_you": thank_you,
+        "care_instructions": care,
+        "packing_checklist": checklist,
+    }
+
+
 @app.get("/api/artworks/{artwork_id}/content-kit")
 def artwork_content_kit(artwork_id: int) -> dict:
-    matches = rows("SELECT id, title, collection, tags, notes FROM artworks WHERE id = ?", (artwork_id,))
+    matches = rows("SELECT id, title, collection, tags, notes, dimensions, medium, price, sale_status FROM artworks WHERE id = ?", (artwork_id,))
     if not matches:
         raise HTTPException(status_code=404, detail="Artwork not found")
     artwork = matches[0]
@@ -690,6 +1420,13 @@ def artwork_content_kit(artwork_id: int) -> dict:
     etsy_tags = raw_tags + [collection, "Black wall art", "original art", "art collector gift"]
     etsy_tags = list(dict.fromkeys(tag[:20] for tag in etsy_tags if tag))[:13]
     listing_title = f"{title} | {collection} Original Art | Contemporary Black Wall Art"[:140]
+    listing_facts = [
+        f"Size: {artwork['dimensions']}" if artwork["dimensions"] else "",
+        f"Medium: {artwork['medium']}" if artwork["medium"] else "",
+        f"Price: ${artwork['price']:,.0f}" if artwork["price"] else "",
+    ]
+    listing_facts_text = "\n".join(item for item in listing_facts if item)
+    listing_facts_block = f"{listing_facts_text}\n\n" if listing_facts_text else ""
     return {
         "artwork_title": title,
         "instagram": (
@@ -702,6 +1439,7 @@ def artwork_content_kit(artwork_id: int) -> dict:
         "listing_description": (
             f'“{title}” is an original piece from the {collection} collection, exploring {story}.\n\n'
             f"Artwork story:\n{notes}\n\n"
+            f"{listing_facts_block}"
             "This statement artwork is designed for collectors who value distinctive contemporary Black art, "
             "intentional storytelling, and work with a strong visual presence.\n\n"
             "Please review the artwork photographs and listing details carefully for size, materials, framing, "
@@ -709,6 +1447,264 @@ def artwork_content_kit(artwork_id: int) -> dict:
         ),
         "listing_tags": etsy_tags,
     }
+
+
+def artwork_image_record(artwork_id: int) -> tuple[dict, Path]:
+    matches = rows("SELECT id, title, filename FROM artworks WHERE id = ?", (artwork_id,))
+    if not matches:
+        raise HTTPException(status_code=404, detail="Artwork not found")
+    image_path = UPLOAD_DIR / matches[0]["filename"]
+    if not image_path.is_file():
+        raise HTTPException(status_code=404, detail="Artwork image file not found")
+    return matches[0], image_path
+
+
+@app.get("/api/artworks/{artwork_id}/print-info")
+def artwork_print_info(artwork_id: int) -> dict:
+    artwork, image_path = artwork_image_record(artwork_id)
+    with Image.open(image_path) as image:
+        width, height = ImageOps.exif_transpose(image).size
+        dpi_value = image.info.get("dpi", (0, 0))
+    current_dpi = round(float(dpi_value[0])) if isinstance(dpi_value, (tuple, list)) and dpi_value else 0
+    return {
+        "artwork_title": artwork["title"],
+        "pixel_width": width,
+        "pixel_height": height,
+        "current_dpi": current_dpi,
+        "max_width_300": round(width / 300, 2),
+        "max_height_300": round(height / 300, 2),
+        "aspect_ratio": width / height,
+    }
+
+
+@app.post("/api/artworks/{artwork_id}/print-export")
+def export_artwork_for_print(artwork_id: int, payload: PrintExportPayload) -> FileResponse:
+    if payload.width_inches <= 0 or payload.height_inches <= 0:
+        raise HTTPException(status_code=400, detail="Print dimensions must be greater than zero")
+    artwork, image_path = artwork_image_record(artwork_id)
+    required_width = round(payload.width_inches * 300)
+    required_height = round(payload.height_inches * 300)
+    with Image.open(image_path) as source:
+        image = ImageOps.exif_transpose(source)
+        width, height = image.size
+        original_ratio = width / height
+        requested_ratio = required_width / required_height
+        if abs(original_ratio - requested_ratio) / original_ratio > 0.025:
+            raise HTTPException(status_code=400, detail="The requested size does not match this image’s shape")
+        if width < required_width or height < required_height:
+            raise HTTPException(
+                status_code=400,
+                detail=f"This file needs at least {required_width} × {required_height} pixels for that size at 300 DPI",
+            )
+        prepared = image.copy()
+        if prepared.size != (required_width, required_height):
+            prepared = prepared.resize((required_width, required_height), Image.Resampling.LANCZOS)
+        if prepared.mode not in ("RGB", "RGBA"):
+            prepared = prepared.convert("RGBA" if "transparency" in source.info else "RGB")
+        export_dir = BASE_DIR / "data" / "print_exports"
+        export_dir.mkdir(parents=True, exist_ok=True)
+        safe_title = re.sub(r"[^A-Za-z0-9_-]+", "-", artwork["title"]).strip("-") or "artwork"
+        export_path = export_dir / f"{safe_title}-{required_width}x{required_height}-300dpi.png"
+        prepared.save(export_path, format="PNG", dpi=(300, 300), optimize=True)
+    return FileResponse(export_path, media_type="image/png", filename=export_path.name)
+
+
+def listing_readiness_result(artwork_id: int) -> dict:
+    matches = rows(
+        "SELECT id, title, tags, notes, dimensions, medium, price, sale_status, filename "
+        "FROM artworks WHERE id = ?", (artwork_id,)
+    )
+    if not matches:
+        raise HTTPException(status_code=404, detail="Artwork not found")
+    artwork = matches[0]
+    image_path = UPLOAD_DIR / artwork["filename"]
+    pixel_width = pixel_height = 0
+    if image_path.is_file():
+        with Image.open(image_path) as image:
+            pixel_width, pixel_height = ImageOps.exif_transpose(image).size
+    tag_count = len([tag for tag in artwork["tags"].split(",") if tag.strip()])
+    checks = [
+        {"key": "title", "label": "Clear artwork title", "ready": len(artwork["title"].strip()) >= 3,
+         "detail": "Give the piece a recognizable title."},
+        {"key": "description", "label": "Artwork story or description", "ready": len(artwork["notes"].strip()) >= 30,
+         "detail": "Add at least a short paragraph explaining the piece."},
+        {"key": "tags", "label": "Searchable tags", "ready": tag_count >= 3,
+         "detail": f"Add at least 3 tags. Current total: {tag_count}."},
+        {"key": "dimensions", "label": "Dimensions", "ready": bool(artwork["dimensions"].strip()),
+         "detail": "Add the physical or intended print size."},
+        {"key": "medium", "label": "Medium or materials", "ready": bool(artwork["medium"].strip()),
+         "detail": "Example: acrylic on canvas or archival art print."},
+        {"key": "price", "label": "Selling price", "ready": float(artwork["price"] or 0) > 0,
+         "detail": "Add a price greater than $0."},
+        {"key": "image", "label": "High-resolution listing image", "ready": min(pixel_width, pixel_height) >= 1500,
+         "detail": f"Current image: {pixel_width:,} × {pixel_height:,} pixels. Aim for at least 1,500 pixels on the shorter side."},
+    ]
+    completed = sum(1 for check in checks if check["ready"])
+    return {
+        "artwork_id": artwork_id,
+        "artwork_title": artwork["title"],
+        "sale_status": artwork["sale_status"],
+        "completed": completed,
+        "total": len(checks),
+        "percent": round(completed / len(checks) * 100),
+        "ready_to_list": completed == len(checks),
+        "checks": checks,
+    }
+
+
+@app.get("/api/artworks/{artwork_id}/listing-readiness")
+def artwork_listing_readiness(artwork_id: int) -> dict:
+    return listing_readiness_result(artwork_id)
+
+
+@app.post("/api/artworks/{artwork_id}/mark-ready")
+def mark_artwork_ready(artwork_id: int) -> dict:
+    result = listing_readiness_result(artwork_id)
+    if not result["ready_to_list"]:
+        raise HTTPException(status_code=400, detail="Complete the listing checklist first")
+    execute("UPDATE artworks SET sale_status = 'Ready to list' WHERE id = ?", (artwork_id,))
+    result["sale_status"] = "Ready to list"
+    return result
+
+
+@app.post("/api/artworks/{artwork_id}/record-sale")
+def record_artwork_sale(artwork_id: int, payload: SaleRecordPayload) -> dict:
+    if payload.sale_price <= 0:
+        raise HTTPException(status_code=400, detail="Sale price must be greater than zero")
+    try:
+        datetime.strptime(payload.sold_date, "%Y-%m-%d")
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail="Use a valid sale date") from error
+    channel = payload.sales_channel.strip()
+    if not channel:
+        raise HTTPException(status_code=400, detail="Choose a sales channel")
+    with connect() as db:
+        cursor = db.execute(
+            "UPDATE artworks SET sale_status = 'Sold', sale_price = ?, sold_date = ?, sales_channel = ?, buyer_name = ?, sale_notes = ? WHERE id = ?",
+            (payload.sale_price, payload.sold_date, channel, payload.buyer_name.strip(), payload.notes.strip(), artwork_id),
+        )
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Artwork not found")
+    return {"status": "Sold", "sale_price": payload.sale_price, "sold_date": payload.sold_date,
+            "sales_channel": channel, "buyer_name": payload.buyer_name.strip(), "notes": payload.notes.strip()}
+
+
+@app.put("/api/artworks/{artwork_id}/price")
+def update_artwork_price(artwork_id: int, payload: ArtworkPricePayload) -> dict:
+    if payload.price <= 0:
+        raise HTTPException(status_code=400, detail="Artwork price must be greater than zero")
+    with connect() as db:
+        cursor = db.execute("UPDATE artworks SET price = ? WHERE id = ?", (round(payload.price, 2), artwork_id))
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Artwork not found")
+    return {"id": artwork_id, "price": round(payload.price, 2)}
+
+
+@app.get("/api/artworks/{artwork_id}/pricing")
+def get_artwork_pricing(artwork_id: int) -> dict:
+    matches = rows("SELECT price, pricing_data FROM artworks WHERE id = ?", (artwork_id,))
+    if not matches:
+        raise HTTPException(status_code=404, detail="Artwork not found")
+    try:
+        saved = json.loads(matches[0]["pricing_data"] or "{}")
+    except json.JSONDecodeError:
+        saved = {}
+    return {"price": float(matches[0]["price"] or 0), "pricing": saved}
+
+
+@app.put("/api/artworks/{artwork_id}/pricing")
+def save_artwork_pricing(artwork_id: int, payload: ArtworkPricingPayload) -> dict:
+    values = payload.model_dump()
+    if any(float(value) < 0 for value in values.values()):
+        raise HTTPException(status_code=400, detail="Pricing values cannot be negative")
+    if payload.fees_percent >= 100:
+        raise HTTPException(status_code=400, detail="Selling fees must be less than 100 percent")
+    if payload.recommended_price <= 0:
+        raise HTTPException(status_code=400, detail="Recommended price must be greater than zero")
+    with connect() as db:
+        cursor = db.execute(
+            "UPDATE artworks SET price = ?, pricing_data = ? WHERE id = ?",
+            (round(payload.recommended_price, 2), json.dumps(values), artwork_id),
+        )
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Artwork not found")
+    return {"id": artwork_id, "price": round(payload.recommended_price, 2), "pricing": values}
+
+
+@app.post("/api/artworks/{artwork_id}/fulfillment")
+def update_artwork_fulfillment(artwork_id: int, payload: FulfillmentPayload) -> dict:
+    allowed = {"Not started", "Packing", "Ready to ship", "Shipped", "Delivered", "Local pickup complete"}
+    status = payload.status.strip()
+    if status not in allowed:
+        raise HTTPException(status_code=400, detail="Choose a valid fulfillment status")
+    carrier = payload.carrier.strip()
+    tracking_number = payload.tracking_number.strip()
+    if status == "Shipped" and not tracking_number:
+        raise HTTPException(status_code=400, detail="Add a tracking number before marking this order shipped")
+    with connect() as db:
+        artwork = db.execute("SELECT sale_status FROM artworks WHERE id = ?", (artwork_id,)).fetchone()
+        if not artwork:
+            raise HTTPException(status_code=404, detail="Artwork not found")
+        if artwork["sale_status"] != "Sold":
+            raise HTTPException(status_code=400, detail="Record the artwork as sold before tracking fulfillment")
+        db.execute(
+            "UPDATE artworks SET fulfillment_status = ?, shipping_carrier = ?, tracking_number = ? WHERE id = ?",
+            (status, carrier, tracking_number, artwork_id),
+        )
+    return {"status": status, "carrier": carrier, "tracking_number": tracking_number}
+
+
+@app.get("/api/artworks/{artwork_id}/seller-package")
+def download_seller_package(artwork_id: int) -> FileResponse:
+    readiness = listing_readiness_result(artwork_id)
+    if not readiness["ready_to_list"]:
+        raise HTTPException(status_code=400, detail="Complete the listing checklist before creating a seller package")
+    artwork, image_path = artwork_image_record(artwork_id)
+    details = rows(
+        "SELECT title, collection, tags, notes, dimensions, medium, price, sale_status FROM artworks WHERE id = ?",
+        (artwork_id,),
+    )[0]
+    kit = artwork_content_kit(artwork_id)
+    safe_title = re.sub(r"[^A-Za-z0-9_-]+", "-", artwork["title"]).strip("-") or "artwork"
+    package_dir = BASE_DIR / "data" / "seller_packages"
+    package_dir.mkdir(parents=True, exist_ok=True)
+    package_path = package_dir / f"{safe_title}-seller-package.zip"
+
+    listing_text = (
+        f"LISTING TITLE\n{kit['listing_title']}\n\n"
+        f"PRICE\n${details['price']:,.2f}\n\n"
+        f"DIMENSIONS\n{details['dimensions']}\n\n"
+        f"MEDIUM\n{details['medium']}\n\n"
+        f"DESCRIPTION\n{kit['listing_description']}\n\n"
+        f"TAGS\n{', '.join(kit['listing_tags'])}\n"
+    )
+    social_text = (
+        f"INSTAGRAM\n{kit['instagram']}\n\n"
+        f"TIKTOK HOOK\n{kit['tiktok_hook']}\n\n"
+        f"TIKTOK CAPTION\n{kit['tiktok_caption']}\n"
+    )
+    guide_text = (
+        "BLACKCANVASAI SELLER PACKAGE\n\n"
+        "1. Review and personalize all wording before publishing.\n"
+        "2. Confirm price, dimensions, medium, framing, inventory, and shipping details.\n"
+        "3. Use the original image for archiving and the 300-DPI PNG for print preparation.\n"
+        "4. Marketplace requirements vary; preview the final listing before publishing.\n"
+    )
+    with Image.open(image_path) as source:
+        prepared = ImageOps.exif_transpose(source).copy()
+        if prepared.mode not in ("RGB", "RGBA"):
+            prepared = prepared.convert("RGBA" if "transparency" in source.info else "RGB")
+        print_buffer = io.BytesIO()
+        prepared.save(print_buffer, format="PNG", dpi=(300, 300), optimize=True)
+
+    with zipfile.ZipFile(package_path, "w", compression=zipfile.ZIP_DEFLATED) as package:
+        package.write(image_path, f"images/{safe_title}-original{image_path.suffix.lower()}")
+        package.writestr(f"images/{safe_title}-300dpi.png", print_buffer.getvalue())
+        package.writestr("listing-copy.txt", listing_text)
+        package.writestr("social-media-copy.txt", social_text)
+        package.writestr("artwork-details.json", json.dumps(details, indent=2))
+        package.writestr("README.txt", guide_text)
+    return FileResponse(package_path, media_type="application/zip", filename=package_path.name)
 
 
 @app.post("/api/artworks")
@@ -723,8 +1719,9 @@ def create_artwork(payload: ArtworkPayload) -> dict:
     filename = f"{uuid.uuid4().hex}{extension}"
     (UPLOAD_DIR / filename).write_bytes(image_bytes)
     artwork_id = execute(
-        "INSERT INTO artworks(title, collection, tags, notes, favorite, filename) VALUES (?, ?, ?, ?, ?, ?)",
-        (payload.title.strip(), payload.collection, payload.tags.strip(), payload.notes.strip(), int(payload.favorite), filename),
+        "INSERT INTO artworks(title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, filename) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (payload.title.strip(), payload.collection, payload.tags.strip(), payload.notes.strip(), int(payload.favorite),
+         payload.dimensions.strip(), payload.medium.strip(), max(payload.price, 0), payload.sale_status, filename),
     )
     return {"id": artwork_id, "url": f"/uploads/{filename}"}
 
@@ -742,13 +1739,15 @@ def update_artwork(artwork_id: int, payload: ArtworkDetailsPayload) -> dict:
         raise HTTPException(status_code=400, detail="Artwork title is required")
     with connect() as db:
         cursor = db.execute(
-            "UPDATE artworks SET title = ?, collection = ?, tags = ?, notes = ? WHERE id = ?",
-            (title, payload.collection, payload.tags.strip(), payload.notes.strip(), artwork_id),
+            "UPDATE artworks SET title = ?, collection = ?, tags = ?, notes = ?, dimensions = ?, medium = ?, price = ?, sale_status = ? WHERE id = ?",
+            (title, payload.collection, payload.tags.strip(), payload.notes.strip(), payload.dimensions.strip(),
+             payload.medium.strip(), max(payload.price, 0), payload.sale_status, artwork_id),
         )
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Artwork not found")
     return {"id": artwork_id, "title": title, "collection": payload.collection,
-            "tags": payload.tags.strip(), "notes": payload.notes.strip()}
+            "tags": payload.tags.strip(), "notes": payload.notes.strip(), "dimensions": payload.dimensions.strip(),
+            "medium": payload.medium.strip(), "price": max(payload.price, 0), "sale_status": payload.sale_status}
 
 
 @app.delete("/api/artworks/{artwork_id}")
@@ -1052,6 +2051,22 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
             restored_prompts += max(cursor.rowcount, 0)
         for name, content in (manifest.get("styles") or {}).items():
             db.execute("INSERT OR REPLACE INTO styles(name, content) VALUES (?, ?)", (name, json.dumps(content)))
+        for expense in manifest.get("expenses", []):
+            db.execute(
+                "INSERT OR IGNORE INTO expenses(description, category, amount, expense_date, notes, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    expense.get("description", "Restored expense"), expense.get("category", "Other"),
+                    max(float(expense.get("amount", 0) or 0), 0), expense.get("expense_date", ""),
+                    expense.get("notes", ""), expense.get("created_at") or datetime.now(timezone.utc).isoformat(),
+                ),
+            )
+        for setting in manifest.get("studio_settings", []):
+            if setting.get("key") and setting.get("value") is not None:
+                db.execute(
+                    "INSERT OR REPLACE INTO studio_settings(key, value) VALUES (?, ?)",
+                    (str(setting["key"]), str(setting["value"])),
+                )
         for artwork in manifest.get("artworks", []):
             filename = Path(str(artwork.get("filename", ""))).name
             if not filename:
@@ -1065,10 +2080,16 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
             if existing or not image_path.exists():
                 continue
             db.execute(
-                "INSERT INTO artworks(title, collection, tags, notes, favorite, filename, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO artworks(title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, sale_price, sold_date, sales_channel, buyer_name, sale_notes, fulfillment_status, shipping_carrier, tracking_number, pricing_data, filename, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     artwork.get("title", "Restored artwork"), artwork.get("collection", "Unsorted"), artwork.get("tags", ""),
-                    artwork.get("notes", ""), int(bool(artwork.get("favorite"))), filename,
+                    artwork.get("notes", ""), int(bool(artwork.get("favorite"))), artwork.get("dimensions", ""),
+                    artwork.get("medium", ""), max(float(artwork.get("price", 0) or 0), 0),
+                    artwork.get("sale_status", "In progress"), max(float(artwork.get("sale_price", 0) or 0), 0),
+                    artwork.get("sold_date", ""), artwork.get("sales_channel", ""), artwork.get("buyer_name", ""),
+                    artwork.get("sale_notes", ""), artwork.get("fulfillment_status", "Not started"),
+                    artwork.get("shipping_carrier", ""), artwork.get("tracking_number", ""),
+                    artwork.get("pricing_data", "{}"), filename,
                     artwork.get("created_at") or datetime.now(timezone.utc).isoformat(),
                 ),
             )

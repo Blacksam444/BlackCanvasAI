@@ -1,0 +1,18 @@
+.buyer-kit-button { background: linear-gradient(135deg, #6f42c1, #a855f7); border: 0; color: #fff; }
+#buyerKitDialog { width: min(920px, calc(100% - 28px)); max-height: 90vh; padding: 0; border: 1px solid #332b3d; border-radius: 22px; background: #0f0e13; color: #fff; }
+#buyerKitDialog::backdrop { background: rgba(0, 0, 0, .78); }
+.buyer-kit-head { display: flex; justify-content: space-between; gap: 20px; padding: 28px 30px 20px; border-bottom: 1px solid #29242f; }
+.buyer-kit-head h2 { margin: 5px 0 7px; font: 800 27px Manrope, sans-serif; }
+.buyer-kit-head p:last-child { margin: 0; color: #a8a0af; }
+.buyer-kit-head button { align-self: flex-start; width: 38px; height: 38px; border: 1px solid #443b4e; border-radius: 10px; background: #17141c; color: #fff; font-size: 22px; }
+.buyer-kit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 22px 30px 16px; }
+.buyer-kit-grid section, .packing-card { border: 1px solid #302a38; border-radius: 15px; background: #151219; padding: 17px; }
+.buyer-kit-grid section > div, .packing-card > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.buyer-kit-grid button, .packing-card button { border: 1px solid #584172; border-radius: 8px; padding: 7px 11px; background: #21182b; color: #d8b7ff; font-weight: 700; }
+.buyer-kit-grid textarea { width: 100%; resize: vertical; border: 1px solid #37303f; border-radius: 10px; padding: 13px; background: #0d0b10; color: #eee9f3; line-height: 1.55; box-sizing: border-box; }
+.packing-card { margin: 0 30px 28px; }
+#packingChecklist { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 18px; }
+#packingChecklist label { display: flex; gap: 10px; align-items: flex-start; color: #c7c0cd; line-height: 1.4; }
+#packingChecklist input { margin-top: 3px; accent-color: #a855f7; }
+#packingChecklist input:checked + span { color: #756d7c; text-decoration: line-through; }
+@media (max-width: 720px) { .buyer-kit-grid, #packingChecklist { grid-template-columns: 1fr; } .buyer-kit-grid { padding-inline: 18px; } .packing-card { margin-inline: 18px; } }

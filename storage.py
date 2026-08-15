@@ -50,6 +50,19 @@ def initialize() -> None:
                 tags TEXT NOT NULL DEFAULT '',
                 notes TEXT NOT NULL DEFAULT '',
                 favorite INTEGER NOT NULL DEFAULT 0,
+                dimensions TEXT NOT NULL DEFAULT '',
+                medium TEXT NOT NULL DEFAULT '',
+                price REAL NOT NULL DEFAULT 0,
+                sale_status TEXT NOT NULL DEFAULT 'In progress',
+                sale_price REAL NOT NULL DEFAULT 0,
+                sold_date TEXT NOT NULL DEFAULT '',
+                sales_channel TEXT NOT NULL DEFAULT '',
+                buyer_name TEXT NOT NULL DEFAULT '',
+                sale_notes TEXT NOT NULL DEFAULT '',
+                fulfillment_status TEXT NOT NULL DEFAULT 'Not started',
+                shipping_carrier TEXT NOT NULL DEFAULT '',
+                tracking_number TEXT NOT NULL DEFAULT '',
+                pricing_data TEXT NOT NULL DEFAULT '{}',
                 filename TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
@@ -60,6 +73,20 @@ def initialize() -> None:
                 suggestions TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'pending',
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE TABLE IF NOT EXISTS expenses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                description TEXT NOT NULL,
+                category TEXT NOT NULL,
+                amount REAL NOT NULL,
+                expense_date TEXT NOT NULL,
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(description, category, amount, expense_date, notes)
+            );
+            CREATE TABLE IF NOT EXISTS studio_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS conversations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -82,6 +109,33 @@ def initialize() -> None:
             db.execute("ALTER TABLE prompts ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'")
         if "reviewed" not in prompt_columns:
             db.execute("ALTER TABLE prompts ADD COLUMN reviewed INTEGER NOT NULL DEFAULT 1")
+        artwork_columns = {row[1] for row in db.execute("PRAGMA table_info(artworks)")}
+        if "dimensions" not in artwork_columns:
+            db.execute("ALTER TABLE artworks ADD COLUMN dimensions TEXT NOT NULL DEFAULT ''")
+        if "medium" not in artwork_columns:
+            db.execute("ALTER TABLE artworks ADD COLUMN medium TEXT NOT NULL DEFAULT ''")
+        if "price" not in artwork_columns:
+            db.execute("ALTER TABLE artworks ADD COLUMN price REAL NOT NULL DEFAULT 0")
+        if "sale_status" not in artwork_columns:
+            db.execute("ALTER TABLE artworks ADD COLUMN sale_status TEXT NOT NULL DEFAULT 'In progress'")
+        if "sale_price" not in artwork_columns:
+            db.execute("ALTER TABLE artworks ADD COLUMN sale_price REAL NOT NULL DEFAULT 0")
+        if "sold_date" not in artwork_columns:
+            db.execute("ALTER TABLE artworks ADD COLUMN sold_date TEXT NOT NULL DEFAULT ''")
+        if "sales_channel" not in artwork_columns:
+            db.execute("ALTER TABLE artworks ADD COLUMN sales_channel TEXT NOT NULL DEFAULT ''")
+        if "buyer_name" not in artwork_columns:
+            db.execute("ALTER TABLE artworks ADD COLUMN buyer_name TEXT NOT NULL DEFAULT ''")
+        if "sale_notes" not in artwork_columns:
+            db.execute("ALTER TABLE artworks ADD COLUMN sale_notes TEXT NOT NULL DEFAULT ''")
+        if "fulfillment_status" not in artwork_columns:
+            db.execute("ALTER TABLE artworks ADD COLUMN fulfillment_status TEXT NOT NULL DEFAULT 'Not started'")
+        if "shipping_carrier" not in artwork_columns:
+            db.execute("ALTER TABLE artworks ADD COLUMN shipping_carrier TEXT NOT NULL DEFAULT ''")
+        if "tracking_number" not in artwork_columns:
+            db.execute("ALTER TABLE artworks ADD COLUMN tracking_number TEXT NOT NULL DEFAULT ''")
+        if "pricing_data" not in artwork_columns:
+            db.execute("ALTER TABLE artworks ADD COLUMN pricing_data TEXT NOT NULL DEFAULT '{}'")
         db.execute("UPDATE prompts SET source = 'chatgpt', reviewed = 0 WHERE category = 'ChatGPT Import' AND source = 'manual'")
         db.execute("UPDATE prompts SET source = 'drive', reviewed = 0 WHERE category = 'Imported' AND source = 'manual'")
         if db.execute("SELECT COUNT(*) FROM prompts").fetchone()[0] == 0:
@@ -105,8 +159,10 @@ def backup_data() -> dict[str, Any]:
         "version": 1,
         "prompts": rows("SELECT id, title, category, text, favorite, source, reviewed FROM prompts ORDER BY id"),
         "styles": {item["name"]: json.loads(item["content"]) for item in styles},
-        "artworks": rows("SELECT id, title, collection, tags, notes, favorite, filename, created_at FROM artworks ORDER BY id"),
+        "artworks": rows("SELECT id, title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, sale_price, sold_date, sales_channel, buyer_name, sale_notes, fulfillment_status, shipping_carrier, tracking_number, pricing_data, filename, created_at FROM artworks ORDER BY id"),
         "style_updates": rows("SELECT id, style_name, source_text, suggestions, status, created_at FROM style_updates ORDER BY id"),
         "conversations": rows("SELECT id, title, created_at, updated_at FROM conversations ORDER BY id"),
         "chat_messages": rows("SELECT id, conversation_id, role, text, metadata, created_at FROM chat_messages ORDER BY id"),
+        "expenses": rows("SELECT id, description, category, amount, expense_date, notes, created_at FROM expenses ORDER BY id"),
+        "studio_settings": rows("SELECT key, value FROM studio_settings ORDER BY key"),
     }

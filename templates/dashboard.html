@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/styles.css">
-    <link rel="stylesheet" href="/static/dashboard-live.css?v=1">
+    <link rel="stylesheet" href="/static/dashboard-live.css?v=2">
 </head>
 <body>
     <div class="app-shell">
@@ -61,6 +61,25 @@
                     <a class="quick-card pink" href="/style-bible"><span class="card-icon">◇</span><strong>Choose a style</strong><small>Build with a consistent visual voice</small><b>View styles →</b></a>
                 </div>
 
+                <section class="studio-snapshot">
+                    <div class="section-heading"><div><p class="eyebrow">YOUR CREATIVE BUSINESS</p><h2>Studio snapshot</h2></div><a href="/image-studio">Open Image Studio</a></div>
+                    <div class="studio-stat-grid">
+                        <a href="/image-studio"><span>Catalog value</span><strong id="studioCatalogValue">—</strong><small>Available artwork</small></a>
+                        <a href="/image-studio"><span>Sales revenue</span><strong id="studioSalesRevenue">—</strong><small>Recorded artwork sales</small></a>
+                        <a href="/image-studio"><span>Active orders</span><strong id="studioActiveOrders">—</strong><small>Still being fulfilled</small></a>
+                        <a href="/image-studio"><span>Ready to list</span><strong id="studioReadyToList">—</strong><small>Prepared for sale</small></a>
+                        <a href="/image-studio"><span>Completed orders</span><strong id="studioCompletedOrders">—</strong><small>Delivered or picked up</small></a>
+                        <a href="/image-studio"><span>Expenses</span><strong id="studioExpenses">—</strong><small>Recorded studio costs</small></a>
+                        <a href="/image-studio"><span>Net profit</span><strong id="studioNetProfit">—</strong><small>Revenue minus expenses</small></a>
+                    </div>
+                    <div class="revenue-goal-card"><div><span>Monthly revenue goal</span><strong><b id="goalRevenue">$0</b> of <b id="goalTarget">$0</b></strong></div><div class="goal-track"><i id="goalBar"></i></div><small id="goalRemaining">Loading goal...</small></div>
+                </section>
+
+                <section class="studio-priorities">
+                    <div class="section-heading"><div><p class="eyebrow">FOCUS ON WHAT MOVES YOU FORWARD</p><h2>Today’s studio priorities</h2></div></div>
+                    <div class="priority-grid" id="studioPriorities"><p class="activity-loading">Reviewing your studio...</p></div>
+                </section>
+
                 <div class="content-grid">
                     <section class="panel focus-panel library-snapshot">
                         <div class="panel-title"><div><p class="eyebrow">YOUR COLLECTION</p><h2>Library snapshot</h2></div></div>
@@ -88,6 +107,6 @@
         </main>
     </div>
     <div class="toast" id="toast" role="status"></div>
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=3"></script>
 </body>
 </html>
