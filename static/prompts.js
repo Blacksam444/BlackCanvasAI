@@ -36,6 +36,15 @@ function sourceLabel(source) {
   return source === "chatgpt" ? "ChatGPT" : source === "drive" ? "Google Drive" : "Manual";
 }
 
+function reviewInsight(prompt) {
+  const key = normalizedText(prompt.text);
+  const matches = key ? prompts.filter(item => normalizedText(item.text) === key).length : 0;
+  if (matches > 1) return {tone: "warning", text: `Possible duplicate · ${matches} matching copies are in your library`};
+  if ((prompt.text || "").length < 80) return {tone: "caution", text: "Short entry · Check that this is a complete reusable prompt"};
+  if ((prompt.text || "").length > 1200) return {tone: "strong", text: "Detailed prompt · Good candidate for your permanent library"};
+  return {tone: "ready", text: "Ready to review · No exact duplicate found"};
+}
+
 function suggestedCategory(prompt) {
   if (canonicalCategories.includes(prompt.category)) return prompt.category;
   const text = `${prompt.title} ${prompt.text}`.toLowerCase();
@@ -210,6 +219,10 @@ function showReviewPrompt() {
   document.querySelector("#reviewSource").textContent = sourceLabel(prompt.source);
   document.querySelector("#reviewTitle").textContent = prompt.title;
   document.querySelector("#reviewPrompt").textContent = prompt.text;
+  const insight = reviewInsight(prompt);
+  const insightElement = document.querySelector("#reviewInsight");
+  insightElement.className = `review-insight ${insight.tone}`;
+  insightElement.textContent = insight.text;
   const suggestion = suggestedCategory(prompt);
   document.querySelector("#reviewCategory").value = suggestion;
   document.querySelector("#reviewSuggestion").textContent = suggestion === "Unsorted" ? "No strong match" : `Suggested: ${suggestion}`;
