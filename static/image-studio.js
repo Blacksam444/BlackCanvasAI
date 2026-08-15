@@ -535,12 +535,21 @@ document.querySelector("#openOrdersDashboard").onclick = async () => {
   }
 };
 document.querySelector("#closeOrders").onclick = () => document.querySelector("#ordersDialog").close();
+let editingExpenseId = null;
+function resetExpenseForm() {
+  editingExpenseId = null;
+  document.querySelector("#expenseDescription").value = "";
+  document.querySelector("#expenseAmount").value = "";
+  document.querySelector("#expenseNotes").value = "";
+  document.querySelector("#saveExpense").textContent = "Add expense";
+  document.querySelector("#cancelExpenseEdit").hidden = true;
+}
 async function loadExpenses() {
   const response = await fetch("/api/expenses");
   if (!response.ok) throw new Error();
   const report = await response.json();
   document.querySelector("#expenseTotal").textContent = money(report.total);
-  document.querySelector("#expenseList").innerHTML = report.expenses.map((expense) => `<div><span><strong>${escapeHtml(expense.description)}</strong><small>${escapeHtml(expense.category)} · ${escapeHtml(expense.expense_date)}</small></span><b>${money(expense.amount)}</b><button data-delete-expense="${expense.id}" aria-label="Delete expense">×</button></div>`).join("");
+  document.querySelector("#expenseList").innerHTML = report.expenses.map((expense) => `<div><span><strong>${escapeHtml(expense.description)}</strong><small>${escapeHtml(expense.category)} · ${escapeHtml(expense.expense_date)}</small></span><b>${money(expense.amount)}</b><div class="expense-row-actions"><button data-edit-expense="${expense.id}">Edit</button><button data-delete-expense="${expense.id}" aria-label="Delete expense">×</button></div></div>`).join("");
   document.querySelector("#expensesEmpty").hidden = report.count > 0;
   document.querySelectorAll("[data-delete-expense]").forEach((button) => {
     button.onclick = async () => {
@@ -549,6 +558,21 @@ async function loadExpenses() {
       if (!result.ok) return notify("Could not remove the expense.");
       await loadExpenses();
       notify("Expense removed.");
+    };
+  });
+  document.querySelectorAll("[data-edit-expense]").forEach((button) => {
+    button.onclick = () => {
+      const expense = report.expenses.find((item) => item.id === Number(button.dataset.editExpense));
+      if (!expense) return;
+      editingExpenseId = expense.id;
+      document.querySelector("#expenseDescription").value = expense.description;
+      document.querySelector("#expenseCategory").value = expense.category;
+      document.querySelector("#expenseAmount").value = expense.amount;
+      document.querySelector("#expenseDate").value = expense.expense_date;
+      document.querySelector("#expenseNotes").value = expense.notes || "";
+      document.querySelector("#saveExpense").textContent = "Update expense";
+      document.querySelector("#cancelExpenseEdit").hidden = false;
+      document.querySelector("#expenseDescription").focus();
     };
   });
 }
@@ -563,6 +587,7 @@ document.querySelector("#openExpenses").onclick = async () => {
   }
 };
 document.querySelector("#closeExpenses").onclick = () => document.querySelector("#expensesDialog").close();
+document.querySelector("#cancelExpenseEdit").onclick = resetExpenseForm;
 document.querySelector("#expenseForm").onsubmit = async (event) => {
   event.preventDefault();
   const payload = {
@@ -572,36 +597,39 @@ document.querySelector("#expenseForm").onsubmit = async (event) => {
     expense_date: document.querySelector("#expenseDate").value,
     notes: document.querySelector("#expenseNotes").value.trim(),
   };
-  const response = await fetch("/api/expenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  const response = await fetch(editingExpenseId ? `/api/expenses/${editingExpenseId}` : "/api/expenses", { method: editingExpenseId ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
   if (!response.ok) {
     const error = await response.json();
     return notify(error.detail || "Could not save the expense.");
   }
-  document.querySelector("#expenseDescription").value = "";
-  document.querySelector("#expenseAmount").value = "";
-  document.querySelector("#expenseNotes").value = "";
+  const wasEditing = Boolean(editingExpenseId);
+  resetExpenseForm();
   await loadExpenses();
-  notify("Expense recorded.");
+  notify(wasEditing ? "Expense updated." : "Expense recorded.");
 };
+async function loadFinanceReport() {
+  const period = document.querySelector("#financePeriod").value;
+  const response = await fetch(`/api/finance-report?period=${period}`);
+  if (!response.ok) throw new Error();
+  const report = await response.json();
+  document.querySelector("#financeRevenue").textContent = money(report.revenue);
+  document.querySelector("#financeExpenses").textContent = money(report.expenses);
+  document.querySelector("#financeNet").textContent = money(report.net_profit);
+  document.querySelector("#financeNet").classList.toggle("negative", report.net_profit < 0);
+  document.querySelector("#financeGoalRevenue").textContent = money(report.monthly_goal.revenue);
+  document.querySelector("#financeGoalTarget").textContent = money(report.monthly_goal.goal);
+  document.querySelector("#financeGoalBar").style.width = `${report.monthly_goal.percent}%`;
+  document.querySelector("#monthlyRevenueGoal").value = report.monthly_goal.goal;
+  const categories = Object.entries(report.expense_categories).sort((a, b) => b[1] - a[1]);
+  document.querySelector("#financeCategories").innerHTML = categories.length ? categories.map(([category, amount]) => `<div><span>${escapeHtml(category)}</span><strong>${money(amount)}</strong></div>`).join("") : '<p class="finance-empty">No expenses recorded.</p>';
+  document.querySelector("#financeTransactions").innerHTML = report.transactions.length ? report.transactions.slice(0, 10).map((item) => `<div><span><strong>${escapeHtml(item.description)}</strong><small>${escapeHtml(item.type)} · ${escapeHtml(item.entry_date)}</small></span><b class="${item.signed_amount < 0 ? "negative" : ""}">${item.signed_amount < 0 ? "−" : "+"}${money(Math.abs(item.signed_amount))}</b></div>`).join("") : '<p class="finance-empty">No financial activity recorded.</p>';
+}
 document.querySelector("#openFinanceReport").onclick = async () => {
   const button = document.querySelector("#openFinanceReport");
   button.disabled = true;
   button.textContent = "Loading report...";
   try {
-    const response = await fetch("/api/finance-report");
-    if (!response.ok) throw new Error();
-    const report = await response.json();
-    document.querySelector("#financeRevenue").textContent = money(report.revenue);
-    document.querySelector("#financeExpenses").textContent = money(report.expenses);
-    document.querySelector("#financeNet").textContent = money(report.net_profit);
-    document.querySelector("#financeNet").classList.toggle("negative", report.net_profit < 0);
-    document.querySelector("#financeGoalRevenue").textContent = money(report.monthly_goal.revenue);
-    document.querySelector("#financeGoalTarget").textContent = money(report.monthly_goal.goal);
-    document.querySelector("#financeGoalBar").style.width = `${report.monthly_goal.percent}%`;
-    document.querySelector("#monthlyRevenueGoal").value = report.monthly_goal.goal;
-    const categories = Object.entries(report.expense_categories).sort((a, b) => b[1] - a[1]);
-    document.querySelector("#financeCategories").innerHTML = categories.length ? categories.map(([category, amount]) => `<div><span>${escapeHtml(category)}</span><strong>${money(amount)}</strong></div>`).join("") : '<p class="finance-empty">No expenses recorded.</p>';
-    document.querySelector("#financeTransactions").innerHTML = report.transactions.length ? report.transactions.slice(0, 10).map((item) => `<div><span><strong>${escapeHtml(item.description)}</strong><small>${escapeHtml(item.type)} · ${escapeHtml(item.entry_date)}</small></span><b class="${item.signed_amount < 0 ? "negative" : ""}">${item.signed_amount < 0 ? "−" : "+"}${money(Math.abs(item.signed_amount))}</b></div>`).join("") : '<p class="finance-empty">No financial activity recorded.</p>';
+    await loadFinanceReport();
     document.querySelector("#financeDialog").showModal();
   } catch {
     notify("Could not load the profit and loss report.");
@@ -609,6 +637,9 @@ document.querySelector("#openFinanceReport").onclick = async () => {
     button.disabled = false;
     button.textContent = "Profit & loss";
   }
+};
+document.querySelector("#financePeriod").onchange = async () => {
+  try { await loadFinanceReport(); } catch { notify("Could not change the report period."); }
 };
 document.querySelector("#revenueGoalForm").onsubmit = async (event) => {
   event.preventDefault();
@@ -629,7 +660,8 @@ document.querySelector("#downloadFinanceCsv").onclick = async () => {
   button.disabled = true;
   button.textContent = "Preparing CSV...";
   try {
-    const response = await fetch("/api/finance-report/export");
+    const period = document.querySelector("#financePeriod").value;
+    const response = await fetch(`/api/finance-report/export?period=${period}`);
     if (!response.ok) throw new Error();
     const url = URL.createObjectURL(await response.blob());
     const link = document.createElement("a");
@@ -646,6 +678,27 @@ document.querySelector("#downloadFinanceCsv").onclick = async () => {
   }
 };
 document.querySelector("#closeSalesReport").onclick = () => document.querySelector("#salesReportDialog").close();
+document.querySelector("#downloadCatalogCsv").onclick = async () => {
+  const button = document.querySelector("#downloadCatalogCsv");
+  button.disabled = true;
+  button.textContent = "Preparing catalog...";
+  try {
+    const response = await fetch("/api/artworks-export");
+    if (!response.ok) throw new Error();
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `BlackCanvasAI-Artwork-Catalog-${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    notify("Artwork catalog CSV downloaded.");
+  } catch {
+    notify("Could not download the artwork catalog.");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Catalog CSV";
+  }
+};
 document.querySelector("#downloadSalesCsv").onclick = async () => {
   const button = document.querySelector("#downloadSalesCsv");
   button.disabled = true;
@@ -850,6 +903,9 @@ document.querySelector("#removeArtwork").onclick = async () => {
   notify("Artwork removed from this catalog.");
 };
 document.querySelector("#menuButton").onclick = () => document.querySelector("#sidebar").classList.toggle("open");
+document.querySelectorAll("#studioToolsMenu button").forEach((button) => {
+  button.addEventListener("click", () => { document.querySelector("#studioToolsMenu").open = false; });
+});
 function clearStudioFocus() {
   focusMode = "";
   document.querySelector("#studioFocus").hidden = true;

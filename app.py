@@ -786,6 +786,35 @@ def list_artworks() -> list[dict]:
     return items
 
 
+@app.get("/api/artworks-export")
+def export_artwork_catalog() -> Response:
+    artworks = rows(
+        "SELECT id, title, collection, dimensions, medium, tags, notes, price, sale_status, "
+        "sale_price, sold_date, sales_channel, buyer_name, fulfillment_status, shipping_carrier, "
+        "tracking_number, created_at FROM artworks ORDER BY id DESC"
+    )
+    output = io.StringIO(newline="")
+    writer = csv.writer(output)
+    writer.writerow([
+        "Catalog ID", "Artwork", "Collection", "Dimensions", "Medium", "Tags", "Description / Notes",
+        "List Price", "Artwork Status", "Sale Price", "Date Sold", "Sales Channel", "Buyer",
+        "Fulfillment Status", "Shipping Carrier", "Tracking Number", "Date Added",
+    ])
+    for artwork in artworks:
+        writer.writerow([
+            artwork["id"], artwork["title"], artwork["collection"], artwork["dimensions"], artwork["medium"],
+            artwork["tags"], artwork["notes"], f"{float(artwork['price'] or 0):.2f}", artwork["sale_status"],
+            f"{float(artwork['sale_price'] or 0):.2f}", artwork["sold_date"], artwork["sales_channel"],
+            artwork["buyer_name"], artwork["fulfillment_status"], artwork["shipping_carrier"],
+            artwork["tracking_number"], artwork["created_at"],
+        ])
+    filename = f"BlackCanvasAI-Artwork-Catalog-{datetime.now().strftime('%Y-%m-%d')}.csv"
+    return Response(
+        content=output.getvalue().encode("utf-8-sig"), media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @app.get("/api/sales")
 def list_sales() -> dict:
     sales = rows(
@@ -862,15 +891,55 @@ def delete_expense(expense_id: int) -> dict:
     return {"status": "removed"}
 
 
+@app.put("/api/expenses/{expense_id}")
+def update_expense(expense_id: int, payload: ExpensePayload) -> dict:
+    description = payload.description.strip()
+    category = payload.category.strip()
+    if not description:
+        raise HTTPException(status_code=400, detail="Add an expense description")
+    if payload.amount <= 0:
+        raise HTTPException(status_code=400, detail="Expense amount must be greater than zero")
+    try:
+        datetime.strptime(payload.expense_date, "%Y-%m-%d")
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail="Use a valid expense date") from error
+    allowed = {"Art materials", "Printing", "Packaging", "Shipping", "Advertising", "Platform fees", "Studio", "Software", "Other"}
+    if category not in allowed:
+        raise HTTPException(status_code=400, detail="Choose a valid expense category")
+    with connect() as db:
+        try:
+            cursor = db.execute(
+                "UPDATE expenses SET description = ?, category = ?, amount = ?, expense_date = ?, notes = ? WHERE id = ?",
+                (description, category, payload.amount, payload.expense_date, payload.notes.strip(), expense_id),
+            )
+        except sqlite3.IntegrityError as error:
+            raise HTTPException(status_code=409, detail="That expense is already recorded") from error
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Expense not found")
+    return {"id": expense_id, **payload.model_dump(), "description": description, "category": category}
+
+
 @app.get("/api/finance-report")
-def finance_report() -> dict:
+def finance_report(period: str = "all") -> dict:
+    period = period.lower().strip()
+    if period not in {"all", "month", "year"}:
+        raise HTTPException(status_code=400, detail="Choose all, month, or year")
+    date_prefix = ""
+    if period == "month":
+        date_prefix = datetime.now().strftime("%Y-%m")
+    elif period == "year":
+        date_prefix = datetime.now().strftime("%Y")
+    sales_filter = " AND sold_date LIKE ?" if date_prefix else ""
+    expense_filter = " WHERE expense_date LIKE ?" if date_prefix else ""
+    query_values = (f"{date_prefix}%",) if date_prefix else ()
     sales = rows(
         "SELECT id, title AS description, sold_date AS entry_date, sales_channel AS category, "
-        "sale_price AS amount FROM artworks WHERE sale_status = 'Sold' ORDER BY sold_date DESC"
+        f"sale_price AS amount FROM artworks WHERE sale_status = 'Sold'{sales_filter} ORDER BY sold_date DESC",
+        query_values,
     )
     expenses = rows(
-        "SELECT id, description, expense_date AS entry_date, category, amount FROM expenses "
-        "ORDER BY expense_date DESC, id DESC"
+        f"SELECT id, description, expense_date AS entry_date, category, amount FROM expenses{expense_filter} "
+        "ORDER BY expense_date DESC, id DESC", query_values,
     )
     revenue = sum(float(item["amount"] or 0) for item in sales)
     expense_total = sum(float(item["amount"] or 0) for item in expenses)
@@ -895,6 +964,7 @@ def finance_report() -> dict:
         "expense_categories": category_totals,
         "transactions": transactions,
         "monthly_goal": goal_data,
+        "period": period,
     }
 
 
@@ -931,12 +1001,13 @@ def update_revenue_goal(payload: RevenueGoalPayload) -> dict:
 
 
 @app.get("/api/finance-report/export")
-def export_finance_report() -> Response:
-    report = finance_report()
+def export_finance_report(period: str = "all") -> Response:
+    report = finance_report(period)
     output = io.StringIO(newline="")
     writer = csv.writer(output)
     writer.writerow(["Black Canvas Art Studio - Profit and Loss Report"])
     writer.writerow(["Generated", datetime.now().strftime("%Y-%m-%d")])
+    writer.writerow(["Period", {"all": "All time", "month": "This month", "year": "This year"}[report["period"]]])
     writer.writerow([])
     writer.writerow(["Summary", "Amount"])
     writer.writerow(["Sales revenue", f"{report['revenue']:.2f}"])
