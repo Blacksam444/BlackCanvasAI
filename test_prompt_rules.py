@@ -40,6 +40,18 @@ class PromptRuleTests(unittest.TestCase):
         self.assertIn("Use a pavement-level tracking shot", prompt)
         self.assertIn("one dominant hero symbol—a distorted hand-drawn crown", prompt)
 
+    def test_supported_aspect_ratio_is_used(self):
+        _, prompt = create_image_prompt(
+            "Create an image prompt for a cosmic queen in the AfroNova style. Aspect ratio: 16:9."
+        )
+        self.assertTrue(prompt.endswith("--ar 16:9 --raw --v 8.2"))
+
+    def test_unsupported_aspect_ratio_falls_back_to_portrait(self):
+        _, prompt = create_image_prompt(
+            "Create an image prompt for a cosmic queen in the AfroNova style. Aspect ratio: 99:1."
+        )
+        self.assertTrue(prompt.endswith("--ar 4:5 --raw --v 8.2"))
+
 
 class PromptBulkDeleteTests(unittest.TestCase):
     def test_bulk_delete_removes_only_selected_prompts(self):

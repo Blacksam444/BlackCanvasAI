@@ -143,12 +143,13 @@ document.querySelector("#promptBuilder").onsubmit = (event) => {
   const mood = document.querySelector("#builderMood").value;
   const colors = document.querySelector("#builderColors").value;
   const imageStyle = document.querySelector("#builderStyle").value;
+  const aspectRatio = document.querySelector("#builderAspectRatio").value;
   if (!subject) return document.querySelector("#builderSubject").focus();
   const colorDirection = colors === "Collection colors" ? "the collection color palette" : colors;
   const graffitiDirection = collection === "GraffitiX"
     ? ` Pose: ${document.querySelector("#builderPose").value}; Camera: ${document.querySelector("#builderCamera").value}; Hero symbol: ${document.querySelector("#builderHero").value}.`
     : "";
-  send(`Create an image prompt for ${subject} in the ${collection} style, with a ${mood} mood, using ${colorDirection}, as a ${imageStyle}.${graffitiDirection}`);
+  send(`Create an image prompt for ${subject} in the ${collection} style, with a ${mood} mood, using ${colorDirection}, as a ${imageStyle}. Aspect ratio: ${aspectRatio}.${graffitiDirection}`);
 };
 JSON.parse(localStorage.getItem(KEY) || "[]").forEach((message) => addMessage(message.role, message.text, false));
 const openingQuestion = new URLSearchParams(window.location.search).get("q");

@@ -17,13 +17,22 @@ from pydantic import BaseModel
 from storage import UPLOAD_DIR, backup_data, connect, execute, initialize, rows
 
 BASE_DIR = Path(__file__).resolve().parent
-MIDJOURNEY_V82_SUFFIX = "--ar 4:5 --raw --v 8.2"
+DEFAULT_ASPECT_RATIO = "4:5"
+SUPPORTED_ASPECT_RATIOS = {"1:1", "4:5", "3:2", "16:9", "9:16"}
 DEFAULT_NEGATIVE_INSTRUCTIONS = "no text, no watermark, no signature, no logo, no frame"
 GRAFFITIX_NEGATIVE_INSTRUCTIONS = (
     "no digital smoothness, no glossy CGI finish, no polished 3D render, "
     "no clean vector edges, no random decorative symbols, no cluttered focal hierarchy, "
     f"{DEFAULT_NEGATIVE_INSTRUCTIONS}"
 )
+
+
+def midjourney_v82_suffix(idea: str) -> str:
+    requested_ratio = re.search(r"(?:^|[.;])\s*aspect ratio\s*:\s*([0-9]+:[0-9]+)", idea, flags=re.IGNORECASE)
+    aspect_ratio = requested_ratio.group(1) if requested_ratio else DEFAULT_ASPECT_RATIO
+    if aspect_ratio not in SUPPORTED_ASPECT_RATIOS:
+        aspect_ratio = DEFAULT_ASPECT_RATIO
+    return f"--ar {aspect_ratio} --raw --v 8.2"
 initialize()
 app = FastAPI(title="Black Canvas AI")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
@@ -159,6 +168,7 @@ def create_image_prompt(message: str) -> tuple[str, str]:
     requested_pose = re.search(r"(?:^|[.;])\s*pose\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     requested_camera = re.search(r"(?:^|[.;])\s*camera\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     requested_hero = re.search(r"(?:^|[.;])\s*hero symbol\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
+    midjourney_suffix = midjourney_v82_suffix(idea)
     if "photorealistic" in lowered or "photograph" in lowered:
         medium = "cinematic photorealistic portrait photography"
     elif "acrylic" in lowered:
@@ -204,7 +214,7 @@ def create_image_prompt(message: str) -> tuple[str, str]:
             f"Use {palette}, stark graphic directional lighting, brutal contrast, irregular hand-drawn edges, "
             f"tactile matte surfaces, and a {mood} emotional charge. Keep the figure sharp and emotionally "
             "present while environmental marks reinforce movement. Museum-quality contemporary urban artwork, "
-            f"{GRAFFITIX_NEGATIVE_INSTRUCTIONS} {MIDJOURNEY_V82_SUFFIX}"
+            f"{GRAFFITIX_NEGATIVE_INSTRUCTIONS} {midjourney_suffix}"
         )
         return collection, prompt
     prompt = (
@@ -217,7 +227,7 @@ def create_image_prompt(message: str) -> tuple[str, str]:
         f"without competing with the face. The mood is {mood}. Include believable materials, finely rendered "
         f"fabric and accessories, natural depth of field, sophisticated color grading, crisp focal detail, "
         f"gallery-ready composition, ultra-detailed, cohesive, emotionally resonant, "
-        f"{DEFAULT_NEGATIVE_INSTRUCTIONS} {MIDJOURNEY_V82_SUFFIX}"
+        f"{DEFAULT_NEGATIVE_INSTRUCTIONS} {midjourney_suffix}"
     )
     return collection, prompt
 
