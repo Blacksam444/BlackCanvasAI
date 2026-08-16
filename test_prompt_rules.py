@@ -1,10 +1,12 @@
 import unittest
+import json
 import sqlite3
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
 from app import (
+    ChatGPTImportPayload,
     PromptIdsPayload,
     PromptBulkPayload,
     PromptPayload,
@@ -15,6 +17,7 @@ from app import (
     create_image_prompt,
     create_prompt,
     format_prompt_pack,
+    import_chatgpt_prompts,
     midjourney_syntax_issues,
     repair_midjourney_syntax,
 )
@@ -33,6 +36,42 @@ class PromptRuleTests(unittest.TestCase):
         expected = "A raw mixed-media guardian --ar 4:5 --raw --v 8.2"
         self.assertEqual(saved_values[2], expected)
         self.assertEqual(result["text"], expected)
+
+    def test_chatgpt_import_normalizes_legacy_v82_syntax(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            database = root / "prompts.db"
+            cache = root / "candidates.json"
+            connection = sqlite3.connect(database)
+            connection.execute(
+                "CREATE TABLE prompts (id INTEGER PRIMARY KEY, title TEXT, category TEXT, text TEXT UNIQUE, "
+                "favorite INTEGER, source TEXT, reviewed INTEGER)"
+            )
+            connection.commit()
+            connection.close()
+            cache.write_text(json.dumps([{
+                "id": "legacy-444",
+                "conversation": "Legacy GraffitiX",
+                "text": "A street oracle --ar 4:5 --style raw --v 8.2",
+            }]), encoding="utf-8")
+            opened_connections = []
+
+            def test_connect():
+                opened_connection = sqlite3.connect(database)
+                opened_connections.append(opened_connection)
+                return opened_connection
+
+            with patch("app.CHATGPT_IMPORT_CACHE", cache), patch("app.connect", test_connect):
+                result = import_chatgpt_prompts(ChatGPTImportPayload(candidate_ids=["legacy-444"]))
+            for opened_connection in opened_connections:
+                opened_connection.close()
+            self.assertEqual(result, {"imported": 1, "selected": 1})
+            check = sqlite3.connect(database)
+            try:
+                saved = check.execute("SELECT text FROM prompts").fetchone()[0]
+                self.assertEqual(saved, "A street oracle --ar 4:5 --raw --v 8.2")
+            finally:
+                check.close()
 
     def test_graffitix_uses_v82_raw_and_hierarchy(self):
         collection, prompt = create_image_prompt(

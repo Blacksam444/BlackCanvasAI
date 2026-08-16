@@ -747,7 +747,7 @@ def import_chatgpt_prompts(payload: ChatGPTImportPayload) -> dict[str, int]:
             title = str(candidate["conversation"])[:120]
             cursor = db.execute(
                 "INSERT OR IGNORE INTO prompts(title, category, text, favorite, source, reviewed) VALUES (?, ?, ?, 0, 'chatgpt', 0)",
-                (title, "ChatGPT Import", candidate["text"]),
+                (title, "ChatGPT Import", repair_midjourney_syntax(str(candidate["text"]).strip())),
             )
             imported += max(cursor.rowcount, 0)
     return {"imported": imported, "selected": len(selected)}
@@ -1002,7 +1002,7 @@ def import_google_prompt(file_id: str) -> dict[str, str | bool]:
         content = service.files().get_media(fileId=file_id).execute()
     else:
         raise HTTPException(status_code=400, detail="This file type cannot be imported as a prompt yet")
-    prompt_text = content.decode("utf-8", errors="replace").strip()
+    prompt_text = repair_midjourney_syntax(content.decode("utf-8", errors="replace").strip())
     if not prompt_text:
         raise HTTPException(status_code=400, detail="That document is empty")
     if len(prompt_text) > 100_000:
