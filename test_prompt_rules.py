@@ -6,7 +6,9 @@ from unittest.mock import patch
 
 from app import (
     PromptIdsPayload,
+    PromptBulkPayload,
     bulk_delete_prompts,
+    bulk_update_prompts,
     bulk_restore_prompts,
     bulk_repair_prompt_syntax,
     create_image_prompt,
@@ -114,6 +116,39 @@ class PromptBulkDeleteTests(unittest.TestCase):
             check = sqlite3.connect(database)
             try:
                 self.assertEqual(check.execute("SELECT id, trashed FROM prompts ORDER BY id").fetchall(),
+                                 [(1, 0), (2, 1), (3, 0)])
+            finally:
+                check.close()
+
+
+class PromptBulkUpdateTests(unittest.TestCase):
+    def test_bulk_favorite_updates_only_active_selected_prompts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "prompts.db"
+            connection = sqlite3.connect(database)
+            connection.execute(
+                "CREATE TABLE prompts (id INTEGER PRIMARY KEY, favorite INTEGER NOT NULL DEFAULT 0, trashed INTEGER NOT NULL DEFAULT 0)"
+            )
+            connection.executemany("INSERT INTO prompts(id, favorite, trashed) VALUES (?, ?, ?)",
+                                   [(1, 0, 0), (2, 0, 0), (3, 0, 1)])
+            connection.commit()
+            connection.close()
+            opened_connections = []
+
+            def test_connect():
+                opened_connection = sqlite3.connect(database)
+                opened_connections.append(opened_connection)
+                return opened_connection
+
+            with patch("app.connect", test_connect):
+                result = bulk_update_prompts(PromptBulkPayload(prompt_ids=[2, 3, 3], favorite=True))
+            for opened_connection in opened_connections:
+                opened_connection.close()
+
+            self.assertEqual(result, {"updated": 1})
+            check = sqlite3.connect(database)
+            try:
+                self.assertEqual(check.execute("SELECT id, favorite FROM prompts ORDER BY id").fetchall(),
                                  [(1, 0), (2, 1), (3, 0)])
             finally:
                 check.close()

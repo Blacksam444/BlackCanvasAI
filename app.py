@@ -95,6 +95,7 @@ class PromptBulkPayload(BaseModel):
     prompt_ids: list[int]
     category: str | None = None
     reviewed: bool | None = None
+    favorite: bool | None = None
 
 
 class PromptIdsPayload(BaseModel):
@@ -427,6 +428,9 @@ def bulk_update_prompts(payload: PromptBulkPayload) -> dict[str, int]:
     if payload.reviewed is not None:
         updates.append("reviewed = ?")
         values.append(int(payload.reviewed))
+    if payload.favorite is not None:
+        updates.append("favorite = ?")
+        values.append(int(payload.favorite))
     if not updates:
         raise HTTPException(status_code=400, detail="No changes were requested")
     placeholders = ",".join("?" for _ in prompt_ids)
