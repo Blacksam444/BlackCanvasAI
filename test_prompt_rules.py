@@ -7,6 +7,7 @@ from unittest.mock import patch
 from app import (
     PromptIdsPayload,
     bulk_delete_prompts,
+    bulk_repair_prompt_syntax,
     create_image_prompt,
     format_prompt_pack,
     midjourney_syntax_issues,
@@ -112,6 +113,45 @@ class PromptBulkDeleteTests(unittest.TestCase):
             check = sqlite3.connect(database)
             try:
                 self.assertEqual(check.execute("SELECT id FROM prompts ORDER BY id").fetchall(), [(1,), (3,)])
+            finally:
+                check.close()
+
+
+class PromptBulkRepairTests(unittest.TestCase):
+    def test_bulk_repair_changes_only_supported_selected_prompts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "prompts.db"
+            connection = sqlite3.connect(database)
+            connection.execute(
+                "CREATE TABLE prompts (id INTEGER PRIMARY KEY, text TEXT UNIQUE, reviewed INTEGER NOT NULL DEFAULT 0)"
+            )
+            connection.executemany("INSERT INTO prompts(id, text) VALUES (?, ?)", [
+                (1, "Legacy --style raw --v 8.2"),
+                (2, "Already ready --raw --v 8.2"),
+                (3, "Not selected --style raw --v 8.2"),
+            ])
+            connection.commit()
+            connection.close()
+
+            opened_connections = []
+
+            def test_connect():
+                opened_connection = sqlite3.connect(database)
+                opened_connections.append(opened_connection)
+                return opened_connection
+
+            with patch("app.connect", test_connect):
+                result = bulk_repair_prompt_syntax(PromptIdsPayload(prompt_ids=[1, 2, 2]))
+            for opened_connection in opened_connections:
+                opened_connection.close()
+
+            self.assertEqual(result, {"repaired": 1, "skipped": 1})
+            check = sqlite3.connect(database)
+            try:
+                self.assertEqual(check.execute("SELECT text, reviewed FROM prompts WHERE id = 1").fetchone(),
+                                 ("Legacy --raw --v 8.2", 1))
+                self.assertEqual(check.execute("SELECT text FROM prompts WHERE id = 3").fetchone()[0],
+                                 "Not selected --style raw --v 8.2")
             finally:
                 check.close()
 

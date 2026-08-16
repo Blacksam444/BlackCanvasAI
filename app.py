@@ -449,6 +449,35 @@ def bulk_delete_prompts(payload: PromptIdsPayload) -> dict[str, int]:
     return {"deleted": cursor.rowcount}
 
 
+@app.post("/api/prompts/bulk-repair-midjourney-syntax")
+def bulk_repair_prompt_syntax(payload: PromptIdsPayload) -> dict[str, int]:
+    prompt_ids = list(dict.fromkeys(payload.prompt_ids))[:500]
+    if not prompt_ids:
+        raise HTTPException(status_code=400, detail="Select at least one prompt")
+    placeholders = ",".join("?" for _ in prompt_ids)
+    repaired_count = 0
+    skipped_count = 0
+    with connect() as db:
+        selected = db.execute(
+            f"SELECT id, text FROM prompts WHERE id IN ({placeholders})",
+            prompt_ids,
+        ).fetchall()
+        for prompt_id, text in selected:
+            repaired = repair_midjourney_syntax(text)
+            if repaired == text:
+                skipped_count += 1
+                continue
+            try:
+                db.execute(
+                    "UPDATE prompts SET text = ?, reviewed = 1 WHERE id = ?",
+                    (repaired, prompt_id),
+                )
+                repaired_count += 1
+            except sqlite3.IntegrityError:
+                skipped_count += 1
+    return {"repaired": repaired_count, "skipped": skipped_count}
+
+
 @app.post("/api/prompts/export")
 def export_prompts(payload: PromptIdsPayload) -> Response:
     prompt_ids = list(dict.fromkeys(payload.prompt_ids))[:500]
