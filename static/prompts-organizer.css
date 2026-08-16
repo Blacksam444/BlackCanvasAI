@@ -4,6 +4,8 @@
 .search-row .search { flex:1; }
 .sort-prompts { display:flex; align-items:center; gap:7px; color:#77747e; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; }
 .sort-prompts select { border:1px solid #34333b; border-radius:9px; background:#111114; color:#ddd; padding:10px 27px 10px 10px; font:600 10px "DM Sans"; cursor:pointer; }
+.filters .filter-count { display:inline-grid; place-items:center; min-width:18px; height:18px; margin-left:6px; border-radius:10px; background:#242129; color:#aaa3b4; font-size:8px; }
+.filters button.active .filter-count { background:#6f55cb; color:#fff; }
 .select-visible {
   border:1px solid #4a405d; border-radius:9px; background:#211c28; color:#c7b8ef;
   padding:11px 13px; font-size:10px; font-weight:700; cursor:pointer; white-space:nowrap;
