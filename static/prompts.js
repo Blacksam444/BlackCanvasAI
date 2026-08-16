@@ -1,6 +1,9 @@
 let prompts = [];
 let filter = "All";
 let query = "";
+const supportedSorts = new Set(["newest", "oldest", "title", "collection", "favorites"]);
+let sortMode = localStorage.getItem("blackCanvasPromptSort") || "newest";
+if (!supportedSorts.has(sortMode)) sortMode = "newest";
 let editingId = null;
 const selectedIds = new Set();
 const grid = document.querySelector("#promptGrid");
@@ -49,7 +52,7 @@ function sourceLabel(source) {
 
 function visiblePrompts() {
   const duplicates = duplicateIds();
-  return prompts.filter(prompt => {
+  const visible = prompts.filter(prompt => {
     const matchesFilter = (filter === "Trash" && prompt.trashed)
       || (!prompt.trashed && (filter === "All"
       || (filter === "Unreviewed" && !prompt.reviewed)
@@ -61,6 +64,12 @@ function visiblePrompts() {
     const searchable = `${prompt.title} ${prompt.category} ${prompt.text} ${sourceLabel(prompt.source)}`.toLowerCase();
     return matchesFilter && searchable.includes(query);
   });
+  const byTitle = (a, b) => a.title.localeCompare(b.title, undefined, {sensitivity:"base"}) || b.id - a.id;
+  if (sortMode === "oldest") return visible.sort((a, b) => a.id - b.id);
+  if (sortMode === "title") return visible.sort(byTitle);
+  if (sortMode === "collection") return visible.sort((a, b) => a.category.localeCompare(b.category, undefined, {sensitivity:"base"}) || byTitle(a, b));
+  if (sortMode === "favorites") return visible.sort((a, b) => Number(b.favorite) - Number(a.favorite) || b.id - a.id);
+  return visible.sort((a, b) => b.id - a.id);
 }
 
 function updateBulkToolbar() {
@@ -170,6 +179,12 @@ function openEditor(prompt = null) {
 }
 
 document.querySelector("#searchInput").oninput = event => { query = event.target.value.toLowerCase().trim(); render(); };
+document.querySelector("#sortPrompts").value = sortMode;
+document.querySelector("#sortPrompts").onchange = event => {
+  sortMode = event.target.value;
+  localStorage.setItem("blackCanvasPromptSort", sortMode);
+  render();
+};
 document.querySelectorAll("#filters button").forEach(button => button.onclick = () => {
   document.querySelectorAll("#filters button").forEach(item => item.classList.remove("active"));
   button.classList.add("active");

@@ -2,6 +2,8 @@
 .library-counts .count:first-child strong { color:#f0b96b; }
 .search-row { display:flex; align-items:center; gap:10px; }
 .search-row .search { flex:1; }
+.sort-prompts { display:flex; align-items:center; gap:7px; color:#77747e; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; }
+.sort-prompts select { border:1px solid #34333b; border-radius:9px; background:#111114; color:#ddd; padding:10px 27px 10px 10px; font:600 10px "DM Sans"; cursor:pointer; }
 .select-visible {
   border:1px solid #4a405d; border-radius:9px; background:#211c28; color:#c7b8ef;
   padding:11px 13px; font-size:10px; font-weight:700; cursor:pointer; white-space:nowrap;
@@ -83,7 +85,8 @@
 @media (max-width:760px) {
   .library-counts { display:none; }
   .search-row { align-items:stretch; flex-direction:column; }
-  .search-row .search, .select-visible { max-width:none; width:100%; }
+  .search-row .search, .select-visible, .sort-prompts, .sort-prompts select { max-width:none; width:100%; }
+  .sort-prompts { align-items:stretch; flex-direction:column; }
   .duplicate-tools, .bulk-toolbar { align-items:stretch; flex-direction:column; }
   .duplicate-tools button, .bulk-toolbar strong { margin:0; }
   .duplicate-tools button, .bulk-toolbar select, .bulk-toolbar button { width:100%; }
