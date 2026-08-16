@@ -207,6 +207,8 @@ def create_image_prompt(message: str) -> tuple[str, str]:
     requested_camera = re.search(r"(?:^|[.;])\s*camera\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     requested_wardrobe = re.search(r"(?:^|[.;])\s*wardrobe\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     requested_hero = re.search(r"(?:^|[.;])\s*hero symbol\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
+    requested_supporting = re.search(r"(?:^|[.;])\s*supporting symbols\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
+    requested_background = re.search(r"(?:^|[.;])\s*background marks\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     requested_lighting = re.search(r"(?:^|[.;])\s*lighting\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     midjourney_suffix = midjourney_v82_suffix(idea)
     if "photorealistic" in lowered or "photograph" in lowered:
@@ -242,14 +244,20 @@ def create_image_prompt(message: str) -> tuple[str, str]:
         lighting_direction = requested_lighting.group(1).strip() if requested_lighting else (
             "stark graphic directional lighting with brutal contrast and hard-edged shadows"
         )
+        supporting_symbols = requested_supporting.group(1).strip() if requested_supporting else (
+            "one or two small symbols chosen from a crude diamond, primitive pyramid, tiny xxx marks, or nova glyph"
+        )
+        background_marks = requested_background.group(1).strip() if requested_background else (
+            "restrained ledger numbers, anatomical labels, cryptic notes, crossed-out phrases, and loose scribbles"
+        )
         prompt = (
             f"/imagine prompt: full-body {subject},{safety} presented as the unmistakable focal subject. "
             f"Engineer {pose_direction}. Use {camera_direction}, and keep the silhouette immediately readable. "
             f"Build authentic 1990s streetwear with construction detail: {wardrobe_direction}. "
             f"Establish the 444 GraffitiX symbol hierarchy: one dominant hero symbol—{hero_symbol}; "
-            "one or two small supporting symbols chosen from "
-            "a crude diamond, primitive pyramid, tiny xxx marks, or nova glyph; then restrained secondary "
-            "background writing. Never let supporting marks compete with the subject or hero symbol. "
+            f"supporting layer with one or two small supporting symbols—{supporting_symbols}; "
+            f"secondary background layer—{background_marks}. "
+            "Never let either secondary layer compete with the subject or hero symbol. "
             "Render as raw Black Canvas AI / 444 GraffitiX mixed-media fine art using heavy oil stick, thick "
             "oil pastel, viscous dripping acrylic, palette-knife impasto ridges, aerosol haze and overspray, "
             "charcoal drag marks and scribbles, scratched paint, chalk geometry, torn pasted-paper collage, "
