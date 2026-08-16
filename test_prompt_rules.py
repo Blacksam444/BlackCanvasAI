@@ -17,6 +17,7 @@ from app import (
     create_image_prompt,
     create_prompt,
     format_prompt_pack,
+    get_midjourney_rules,
     import_chatgpt_prompts,
     midjourney_syntax_issues,
     repair_midjourney_syntax,
@@ -24,6 +25,14 @@ from app import (
 
 
 class PromptRuleTests(unittest.TestCase):
+    def test_midjourney_rules_are_centralized_and_exposed(self):
+        rules = get_midjourney_rules()
+
+        self.assertEqual(rules["version"], "8.2")
+        self.assertEqual(rules["raw_parameter"], "--raw")
+        self.assertEqual(rules["deprecated_parameters"]["--style raw"], "--raw")
+        self.assertIn(rules["default_aspect_ratio"], rules["supported_aspect_ratios"])
+
     def test_manual_prompt_save_normalizes_legacy_v82_syntax(self):
         payload = PromptPayload(
             title="Legacy recipe",
