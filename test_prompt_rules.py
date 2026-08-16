@@ -47,6 +47,7 @@ class PromptRuleTests(unittest.TestCase):
             "Wardrobe: baggy charcoal denim with a tied bandana; "
             "Hero symbol: a distorted hand-drawn crown in thick red oil stick; "
             "Supporting symbols: two tiny xxx marks used as quiet accents; "
+            "Physical media: dominant oil stick with dry charcoal drag marks and exposed raw canvas; "
             "Background marks: minimal scratched paint and faint ledger numbers; "
             "Lighting: a hot-magenta side light cut by a cold cyan rim light."
         )
@@ -56,6 +57,7 @@ class PromptRuleTests(unittest.TestCase):
         self.assertIn("baggy charcoal denim with a tied bandana", prompt)
         self.assertIn("one dominant hero symbol—a distorted hand-drawn crown", prompt)
         self.assertIn("supporting layer with one or two small supporting symbols—two tiny xxx marks used as quiet accents", prompt)
+        self.assertIn("Physical media treatment: dominant oil stick with dry charcoal drag marks and exposed raw canvas", prompt)
         self.assertIn("secondary background layer—minimal scratched paint and faint ledger numbers", prompt)
         self.assertIn("Light the scene with a hot-magenta side light cut by a cold cyan rim light", prompt)
 

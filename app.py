@@ -208,6 +208,7 @@ def create_image_prompt(message: str) -> tuple[str, str]:
     requested_wardrobe = re.search(r"(?:^|[.;])\s*wardrobe\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     requested_hero = re.search(r"(?:^|[.;])\s*hero symbol\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     requested_supporting = re.search(r"(?:^|[.;])\s*supporting symbols\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
+    requested_media = re.search(r"(?:^|[.;])\s*physical media\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     requested_background = re.search(r"(?:^|[.;])\s*background marks\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     requested_lighting = re.search(r"(?:^|[.;])\s*lighting\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     midjourney_suffix = midjourney_v82_suffix(idea)
@@ -250,6 +251,10 @@ def create_image_prompt(message: str) -> tuple[str, str]:
         background_marks = requested_background.group(1).strip() if requested_background else (
             "restrained ledger numbers, anatomical labels, cryptic notes, crossed-out phrases, and loose scribbles"
         )
+        physical_media = requested_media.group(1).strip() if requested_media else (
+            "heavy oil stick, thick oil pastel, viscous dripping acrylic, palette-knife impasto ridges, "
+            "aerosol haze and overspray, charcoal drag marks, scratches, torn collage, and exposed unprimed canvas"
+        )
         prompt = (
             f"/imagine prompt: full-body {subject},{safety} presented as the unmistakable focal subject. "
             f"Engineer {pose_direction}. Use {camera_direction}, and keep the silhouette immediately readable. "
@@ -258,10 +263,8 @@ def create_image_prompt(message: str) -> tuple[str, str]:
             f"supporting layer with one or two small supporting symbols—{supporting_symbols}; "
             f"secondary background layer—{background_marks}. "
             "Never let either secondary layer compete with the subject or hero symbol. "
-            "Render as raw Black Canvas AI / 444 GraffitiX mixed-media fine art using heavy oil stick, thick "
-            "oil pastel, viscous dripping acrylic, palette-knife impasto ridges, aerosol haze and overspray, "
-            "charcoal drag marks and scribbles, scratched paint, chalk geometry, torn pasted-paper collage, "
-            "and exposed unprimed canvas. Embed handwritten ledger numbers, anatomical-style labels, cryptic "
+            "Render as raw Black Canvas AI / 444 GraffitiX mixed-media fine art. "
+            f"Physical media treatment: {physical_media}. Embed handwritten ledger numbers, anatomical-style labels, cryptic "
             "notes, crossed-out phrases, loose scribbles, directional paint streaks, diamonds, pyramids, and "
             "X/444 treatments into the environment with controlled negative space. "
             f"Use {palette}. Light the scene with {lighting_direction}, irregular hand-drawn edges, "
