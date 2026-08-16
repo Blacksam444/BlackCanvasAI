@@ -299,5 +299,15 @@ class PromptBulkRepairTests(unittest.TestCase):
                 check.close()
 
 
+class BackupRestoreSyntaxTests(unittest.TestCase):
+    def test_google_restore_normalizes_legacy_midjourney_syntax(self):
+        source = Path("app.py").read_text(encoding="utf-8")
+
+        self.assertIn(
+            'repair_midjourney_syntax(str(prompt.get("text", "")).strip())',
+            source,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
