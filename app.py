@@ -418,29 +418,31 @@ def dashboard_summary() -> dict:
 
 @app.post("/api/prompts")
 def create_prompt(payload: PromptPayload) -> dict:
+    normalized_text = repair_midjourney_syntax(payload.text.strip())
     try:
         prompt_id = execute(
             "INSERT INTO prompts(title, category, text, favorite, source, reviewed) VALUES (?, ?, ?, ?, 'manual', 1)",
-            (payload.title.strip(), payload.category, payload.text.strip(), int(payload.favorite)),
+            (payload.title.strip(), payload.category, normalized_text, int(payload.favorite)),
         )
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=409, detail="Prompt already exists")
-    return {"id": prompt_id, **payload.model_dump()}
+    return {"id": prompt_id, **payload.model_dump(), "text": normalized_text}
 
 
 @app.put("/api/prompts/{prompt_id}")
 def update_prompt(prompt_id: int, payload: PromptPayload) -> dict:
+    normalized_text = repair_midjourney_syntax(payload.text.strip())
     try:
         with connect() as db:
             cursor = db.execute(
                 "UPDATE prompts SET title = ?, category = ?, text = ?, favorite = ?, reviewed = 1 WHERE id = ?",
-                (payload.title.strip(), payload.category, payload.text.strip(), int(payload.favorite), prompt_id),
+                (payload.title.strip(), payload.category, normalized_text, int(payload.favorite), prompt_id),
             )
             if cursor.rowcount == 0:
                 raise HTTPException(status_code=404, detail="Prompt not found")
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=409, detail="That prompt is already saved")
-    return {"id": prompt_id, **payload.model_dump(), "reviewed": True}
+    return {"id": prompt_id, **payload.model_dump(), "text": normalized_text, "reviewed": True}
 
 
 @app.post("/api/prompts/bulk-update")

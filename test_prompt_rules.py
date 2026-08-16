@@ -7,11 +7,13 @@ from unittest.mock import patch
 from app import (
     PromptIdsPayload,
     PromptBulkPayload,
+    PromptPayload,
     bulk_delete_prompts,
     bulk_update_prompts,
     bulk_restore_prompts,
     bulk_repair_prompt_syntax,
     create_image_prompt,
+    create_prompt,
     format_prompt_pack,
     midjourney_syntax_issues,
     repair_midjourney_syntax,
@@ -19,6 +21,19 @@ from app import (
 
 
 class PromptRuleTests(unittest.TestCase):
+    def test_manual_prompt_save_normalizes_legacy_v82_syntax(self):
+        payload = PromptPayload(
+            title="Legacy recipe",
+            category="GraffitiX",
+            text="A raw mixed-media guardian --ar 4:5 --style raw --v 8.2",
+        )
+        with patch("app.execute", return_value=444) as execute_mock:
+            result = create_prompt(payload)
+        saved_values = execute_mock.call_args.args[1]
+        expected = "A raw mixed-media guardian --ar 4:5 --raw --v 8.2"
+        self.assertEqual(saved_values[2], expected)
+        self.assertEqual(result["text"], expected)
+
     def test_graffitix_uses_v82_raw_and_hierarchy(self):
         collection, prompt = create_image_prompt(
             "Create an image prompt for a street dancer in the GraffitiX style"
