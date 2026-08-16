@@ -205,7 +205,9 @@ def create_image_prompt(message: str) -> tuple[str, str]:
         palette = requested_colors.group(1).strip()
     requested_pose = re.search(r"(?:^|[.;])\s*pose\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     requested_camera = re.search(r"(?:^|[.;])\s*camera\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
+    requested_wardrobe = re.search(r"(?:^|[.;])\s*wardrobe\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     requested_hero = re.search(r"(?:^|[.;])\s*hero symbol\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
+    requested_lighting = re.search(r"(?:^|[.;])\s*lighting\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     midjourney_suffix = midjourney_v82_suffix(idea)
     if "photorealistic" in lowered or "photograph" in lowered:
         medium = "cinematic photorealistic portrait photography"
@@ -233,12 +235,17 @@ def create_image_prompt(message: str) -> tuple[str, str]:
         hero_symbol = requested_hero.group(1).strip() if requested_hero else (
             "a rough-painted 444, distorted crown, skull, or X-eye treatment"
         )
+        wardrobe_direction = requested_wardrobe.group(1).strip() if requested_wardrobe else (
+            "oversized deeply pleated chinos stacked at the ankles, a loose pocket tee or cropped tank, "
+            "an open flannel or vintage windbreaker, a bandana or snapback when appropriate, and retro statement sneakers"
+        )
+        lighting_direction = requested_lighting.group(1).strip() if requested_lighting else (
+            "stark graphic directional lighting with brutal contrast and hard-edged shadows"
+        )
         prompt = (
             f"/imagine prompt: full-body {subject},{safety} presented as the unmistakable focal subject. "
             f"Engineer {pose_direction}. Use {camera_direction}, and keep the silhouette immediately readable. "
-            "Build authentic 1990s streetwear with construction detail: oversized deeply pleated chinos "
-            "stacked at the ankles, loose pocket tee or cropped tank, open flannel or vintage windbreaker, "
-            "bandana or snapback when appropriate, and retro statement sneakers. "
+            f"Build authentic 1990s streetwear with construction detail: {wardrobe_direction}. "
             f"Establish the 444 GraffitiX symbol hierarchy: one dominant hero symbol—{hero_symbol}; "
             "one or two small supporting symbols chosen from "
             "a crude diamond, primitive pyramid, tiny xxx marks, or nova glyph; then restrained secondary "
@@ -249,7 +256,7 @@ def create_image_prompt(message: str) -> tuple[str, str]:
             "and exposed unprimed canvas. Embed handwritten ledger numbers, anatomical-style labels, cryptic "
             "notes, crossed-out phrases, loose scribbles, directional paint streaks, diamonds, pyramids, and "
             "X/444 treatments into the environment with controlled negative space. "
-            f"Use {palette}, stark graphic directional lighting, brutal contrast, irregular hand-drawn edges, "
+            f"Use {palette}. Light the scene with {lighting_direction}, irregular hand-drawn edges, "
             f"tactile matte surfaces, and a {mood} emotional charge. Keep the figure sharp and emotionally "
             "present while environmental marks reinforce movement. Museum-quality contemporary urban artwork, "
             f"{GRAFFITIX_NEGATIVE_INSTRUCTIONS} {midjourney_suffix}"

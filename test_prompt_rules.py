@@ -44,12 +44,16 @@ class PromptRuleTests(unittest.TestCase):
             "Create an image prompt for a street oracle in the GraffitiX style. "
             "Pose: low crouched stance with a compressed S-curve; "
             "Camera: a pavement-level tracking shot; "
-            "Hero symbol: a distorted hand-drawn crown in thick red oil stick."
+            "Wardrobe: baggy charcoal denim with a tied bandana; "
+            "Hero symbol: a distorted hand-drawn crown in thick red oil stick; "
+            "Lighting: a hot-magenta side light cut by a cold cyan rim light."
         )
         self.assertEqual(collection, "GraffitiX")
         self.assertIn("Engineer low crouched stance with a compressed S-curve", prompt)
         self.assertIn("Use a pavement-level tracking shot", prompt)
+        self.assertIn("baggy charcoal denim with a tied bandana", prompt)
         self.assertIn("one dominant hero symbol—a distorted hand-drawn crown", prompt)
+        self.assertIn("Light the scene with a hot-magenta side light cut by a cold cyan rim light", prompt)
 
     def test_supported_aspect_ratio_is_used(self):
         _, prompt = create_image_prompt(

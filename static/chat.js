@@ -131,6 +131,7 @@ document.querySelector("#builderToggle").onclick = () => {
   document.querySelector("#builderToggle").textContent = builder.hidden ? "✦ Open Prompt Builder" : "× Close Prompt Builder";
   if (!builder.hidden) document.querySelector("#builderSubject").focus();
 };
+document.querySelector("#graffitixOptions").insertAdjacentHTML("beforeend", `<label>Wardrobe construction<select id="builderWardrobe"><option value="oversized deeply pleated black chinos stacked at the ankles, a loose white pocket tee, an open flannel, and retro high-top sneakers">Pleated chinos + flannel</option><option value="oversized tan chinos with deep pleats, a fitted cropped tank, a vintage windbreaker, and retro statement sneakers">Tan chinos + windbreaker</option><option value="baggy charcoal denim, a loose graphic-free tee, a tied bandana, and scuffed high-top sneakers">Baggy denim + bandana</option><option value="wide black work pants, a sleeveless pocket tee, a backward snapback, and heavy retro trainers">Work pants + snapback</option></select></label><label>Lighting direction<select id="builderLighting"><option value="stark graphic directional lighting with brutal contrast and hard-edged shadows">Stark graphic contrast</option><option value="a hot-magenta side light cut by a cold cyan rim light, with deep matte shadows">Magenta + cyan split</option><option value="a single overhead streetlight creating a tight pool of light and long broken shadows">Overhead streetlight</option><option value="flat frontal flash with a dark falloff, raw highlights, and confrontational poster-like tension">Raw frontal flash</option></select></label>`);
 const updateGraffitiXOptions = () => {
   document.querySelector("#graffitixOptions").hidden = document.querySelector("#builderCollection").value !== "GraffitiX";
 };
@@ -147,7 +148,7 @@ document.querySelector("#promptBuilder").onsubmit = (event) => {
   if (!subject) return document.querySelector("#builderSubject").focus();
   const colorDirection = colors === "Collection colors" ? "the collection color palette" : colors;
   const graffitiDirection = collection === "GraffitiX"
-    ? ` Pose: ${document.querySelector("#builderPose").value}; Camera: ${document.querySelector("#builderCamera").value}; Hero symbol: ${document.querySelector("#builderHero").value}.`
+    ? ` Pose: ${document.querySelector("#builderPose").value}; Camera: ${document.querySelector("#builderCamera").value}; Wardrobe: ${document.querySelector("#builderWardrobe").value}; Hero symbol: ${document.querySelector("#builderHero").value}; Lighting: ${document.querySelector("#builderLighting").value}.`
     : "";
   send(`Create an image prompt for ${subject} in the ${collection} style, with a ${mood} mood, using ${colorDirection}, as a ${imageStyle}. Aspect ratio: ${aspectRatio}.${graffitiDirection}`);
 };
