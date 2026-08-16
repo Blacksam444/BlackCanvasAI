@@ -84,6 +84,10 @@ function updateBulkToolbar() {
   document.querySelector("#bulkCategory").disabled = hasTrashed;
   document.querySelector("#applyCategory").disabled = hasTrashed;
   document.querySelector("#markReviewed").disabled = hasTrashed;
+  const allFavorite = selected.length > 0 && selected.every(prompt => prompt.favorite);
+  const favoriteSelected = document.querySelector("#favoriteSelected");
+  favoriteSelected.disabled = hasTrashed;
+  favoriteSelected.textContent = allFavorite ? "☆ Unfavorite selected" : "★ Favorite selected";
   document.querySelector("#downloadPack").disabled = hasTrashed;
   const issueCount = prompts.filter(prompt => selectedIds.has(prompt.id) && prompt.syntax_issues?.length).length;
   const repairSelected = document.querySelector("#repairSelected");
@@ -263,6 +267,11 @@ document.querySelector("#applyCategory").onclick = () => {
   bulkUpdate({category, reviewed:true}, "prompts organized.");
 };
 document.querySelector("#markReviewed").onclick = () => bulkUpdate({reviewed:true}, "prompts marked reviewed.");
+document.querySelector("#favoriteSelected").onclick = () => {
+  const selected = prompts.filter(prompt => selectedIds.has(prompt.id));
+  const allFavorite = selected.length > 0 && selected.every(prompt => prompt.favorite);
+  bulkUpdate({favorite:!allFavorite}, allFavorite ? "prompts unfavorited." : "prompts favorited.");
+};
 document.querySelector("#repairSelected").onclick = async () => {
   const issueCount = prompts.filter(prompt => selectedIds.has(prompt.id) && prompt.syntax_issues?.length).length;
   if (!issueCount || !window.confirm(`Repair supported MidJourney syntax in ${issueCount} selected ${issueCount === 1 ? "prompt" : "prompts"}?`)) return;

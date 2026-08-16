@@ -50,6 +50,7 @@
 .bulk-toolbar .repair-selected {
   background:#3a2a17; border-color:#76572d; color:#f0bd68;
 }
+.bulk-toolbar .favorite-selected { color:#f3bc59; }
 .bulk-toolbar .repair-selected:disabled { cursor:default; opacity:.4; }
 .bulk-toolbar .remove-selected { margin-left:2px; }
 
