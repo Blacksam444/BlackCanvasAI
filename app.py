@@ -127,6 +127,13 @@ class StylePayload(BaseModel):
     content: dict
 
 
+class MidJourneyRulesPayload(BaseModel):
+    version: str
+    default_aspect_ratio: str
+    supported_aspect_ratios: list[str]
+    raw_parameter: str
+
+
 class ArtworkPayload(BaseModel):
     title: str
     collection: str
@@ -601,6 +608,37 @@ def list_styles() -> dict:
 @app.get("/api/midjourney-rules")
 def get_midjourney_rules() -> dict:
     return MIDJOURNEY_RULES
+
+
+@app.put("/api/midjourney-rules")
+def save_midjourney_rules(payload: MidJourneyRulesPayload) -> dict:
+    version = payload.version.strip()
+    raw_parameter = payload.raw_parameter.strip().lower()
+    aspect_ratios = list(dict.fromkeys(ratio.strip() for ratio in payload.supported_aspect_ratios if ratio.strip()))
+    default_ratio = payload.default_aspect_ratio.strip()
+    if not re.fullmatch(r"[1-9][0-9]*(?:\.[0-9]+)?", version):
+        raise HTTPException(status_code=400, detail="Use a numeric MidJourney version such as 8.2")
+    if not re.fullmatch(r"--[a-z][a-z0-9-]*", raw_parameter):
+        raise HTTPException(status_code=400, detail="The raw parameter must look like --raw")
+    if not aspect_ratios or any(not re.fullmatch(r"[1-9][0-9]*:[1-9][0-9]*", ratio) for ratio in aspect_ratios):
+        raise HTTPException(status_code=400, detail="Aspect ratios must look like 4:5 or 16:9")
+    if default_ratio not in aspect_ratios:
+        raise HTTPException(status_code=400, detail="The default aspect ratio must be in the supported list")
+    updated = {
+        "ruleset": f"midjourney-v{version}-custom",
+        "version": version,
+        "default_aspect_ratio": default_ratio,
+        "supported_aspect_ratios": aspect_ratios,
+        "raw_parameter": raw_parameter,
+        "deprecated_parameters": MIDJOURNEY_RULES["deprecated_parameters"],
+    }
+    MIDJOURNEY_RULES_PATH.write_text(json.dumps(updated, indent=2) + "\n", encoding="utf-8")
+    MIDJOURNEY_RULES.clear()
+    MIDJOURNEY_RULES.update(updated)
+    global DEFAULT_ASPECT_RATIO, SUPPORTED_ASPECT_RATIOS
+    DEFAULT_ASPECT_RATIO = default_ratio
+    SUPPORTED_ASPECT_RATIOS = set(aspect_ratios)
+    return updated
 
 
 @app.put("/api/styles/{name}")

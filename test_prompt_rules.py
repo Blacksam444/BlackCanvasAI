@@ -10,6 +10,7 @@ from app import (
     PromptIdsPayload,
     PromptBulkPayload,
     PromptPayload,
+    MidJourneyRulesPayload,
     bulk_delete_prompts,
     bulk_update_prompts,
     bulk_restore_prompts,
@@ -21,10 +22,31 @@ from app import (
     import_chatgpt_prompts,
     midjourney_syntax_issues,
     repair_midjourney_syntax,
+    save_midjourney_rules,
 )
 
 
 class PromptRuleTests(unittest.TestCase):
+    def test_midjourney_rules_editor_validates_and_persists(self):
+        original_rules = get_midjourney_rules().copy()
+        with tempfile.TemporaryDirectory() as directory, patch("app.MIDJOURNEY_RULES_PATH", Path(directory) / "rules.json"):
+            try:
+                result = save_midjourney_rules(MidJourneyRulesPayload(
+                    version="8.3",
+                    default_aspect_ratio="4:5",
+                    supported_aspect_ratios=["4:5", "1:1", "4:5"],
+                    raw_parameter="--raw",
+                ))
+                self.assertEqual(result["version"], "8.3")
+                self.assertEqual(result["supported_aspect_ratios"], ["4:5", "1:1"])
+                self.assertEqual(json.loads((Path(directory) / "rules.json").read_text())["version"], "8.3")
+            finally:
+                import app
+                app.MIDJOURNEY_RULES.clear()
+                app.MIDJOURNEY_RULES.update(original_rules)
+                app.DEFAULT_ASPECT_RATIO = original_rules["default_aspect_ratio"]
+                app.SUPPORTED_ASPECT_RATIOS = set(original_rules["supported_aspect_ratios"])
+
     def test_midjourney_rules_are_centralized_and_exposed(self):
         rules = get_midjourney_rules()
 
