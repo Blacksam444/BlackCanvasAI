@@ -35,6 +35,16 @@ def midjourney_v82_suffix(idea: str) -> str:
     return f"--ar {aspect_ratio} --raw --v 8.2"
 
 
+def strip_midjourney_parameters(text: str) -> str:
+    cleaned = re.sub(
+        r"\s*--(?:style\s+raw\b|ar\s+[0-9]+:[0-9]+\b|raw\b|v\s+[0-9]+(?:\.[0-9]+)?\b)",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
+    return re.sub(r"\s{2,}", " ", cleaned).strip()
+
+
 def midjourney_syntax_issues(prompt: str) -> list[str]:
     issues: list[str] = []
     has_legacy_raw = bool(re.search(r"--style\s+raw\b", prompt, flags=re.IGNORECASE))
@@ -272,7 +282,7 @@ def create_image_prompt(message: str) -> tuple[str, str]:
             "present while environmental marks reinforce movement. Museum-quality contemporary urban artwork, "
             f"{GRAFFITIX_NEGATIVE_INSTRUCTIONS} {midjourney_suffix}"
         )
-        return collection, prompt
+        return collection, f"{strip_midjourney_parameters(prompt)} {midjourney_suffix}"
     prompt = (
         f"Create {medium} of {subject},{safety} presented as the unmistakable focal subject. "
         f"Use a balanced three-quarter composition at eye level, with confident posture, expressive eyes, "
@@ -285,7 +295,7 @@ def create_image_prompt(message: str) -> tuple[str, str]:
         f"gallery-ready composition, ultra-detailed, cohesive, emotionally resonant, "
         f"{DEFAULT_NEGATIVE_INSTRUCTIONS} {midjourney_suffix}"
     )
-    return collection, prompt
+    return collection, f"{strip_midjourney_parameters(prompt)} {midjourney_suffix}"
 
 
 @app.get("/")

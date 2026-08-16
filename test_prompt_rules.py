@@ -73,6 +73,20 @@ class PromptRuleTests(unittest.TestCase):
         )
         self.assertTrue(prompt.endswith("--ar 4:5 --raw --v 8.2"))
 
+    def test_pasted_parameters_are_removed_from_generated_prompt_body(self):
+        for collection in ("GraffitiX", "AfroNova"):
+            with self.subTest(collection=collection):
+                _, prompt = create_image_prompt(
+                    f"Create an image prompt for a street guardian --style raw --ar 1:1 --raw --v 7 "
+                    f"in the {collection} style. Aspect ratio: 16:9."
+                )
+                lowered = prompt.lower()
+                self.assertNotIn("--style raw", lowered)
+                self.assertEqual(lowered.count("--ar"), 1)
+                self.assertEqual(lowered.count("--raw"), 1)
+                self.assertEqual(lowered.count("--v"), 1)
+                self.assertTrue(prompt.endswith("--ar 16:9 --raw --v 8.2"))
+
     def test_legacy_raw_syntax_is_detected_and_repaired(self):
         legacy = "A mixed-media portrait --ar 4:5 --style raw --v 8.2"
         self.assertEqual(midjourney_syntax_issues(legacy), ["Legacy --style raw syntax"])
