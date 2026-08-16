@@ -135,10 +135,20 @@ document.querySelector("#graffitixOptions").insertAdjacentHTML("beforeend", `<la
 document.querySelector("#graffitixOptions").insertAdjacentHTML("beforeend", `<label>Supporting symbols<select id="builderSupporting"><option value="one crude diamond and one primitive pyramid, both small and visually subordinate">Diamond + pyramid</option><option value="two tiny xxx marks used as quiet directional accents">Tiny xxx marks</option><option value="one small nova glyph and one scratched diamond, kept away from the face">Nova + diamond</option><option value="one primitive pyramid only, isolated as a secondary accent">Single pyramid</option></select></label><label>Background marks<select id="builderBackground"><option value="restrained ledger numbers, anatomical labels, and a few crossed-out notes fading into controlled negative space">Ledger + anatomy notes</option><option value="sparse cryptic phrases, chalk geometry, and directional charcoal scribbles following the line of action">Cryptic chalk marks</option><option value="torn paper fragments, faded inventory stamps, and loose oil-stick calculations at the outer edges">Collage + inventory marks</option><option value="minimal scratched paint and two faint handwritten number clusters, leaving most of the canvas exposed">Minimal scratched marks</option></select></label>`);
 document.querySelector("#graffitixOptions").insertAdjacentHTML("beforeend", `<label>Physical media<select id="builderMedia"><option value="heavy oil stick, thick oil pastel, viscous dripping acrylic, palette-knife impasto, aerosol haze, charcoal drag marks, scratches, torn collage, and exposed unprimed canvas">Full mixed-media stack</option><option value="dominant oil stick and thick oil pastel with dry charcoal drag marks, scratched pigment, and broad areas of exposed raw canvas">Oil stick + charcoal</option><option value="viscous dripping acrylic and palette-knife impasto over torn pasted-paper collage, with restrained aerosol overspray">Acrylic + collage</option><option value="aerosol haze, chalk geometry, scraped matte paint, and sparse oil-stick accents over heavily exposed unprimed canvas">Aerosol + raw canvas</option></select></label>`);
 document.querySelector("#graffitixOptions").insertAdjacentHTML("beforeend", `<button class="shuffle-direction" id="shuffleBuilder" type="button">↻ Shuffle GraffitiX direction</button>`);
+const directionKey = "blackcanvas-graffitix-direction";
+const directionFields = ["Pose", "Camera", "Wardrobe", "Hero", "Supporting", "Media", "Background", "Lighting"];
+const savedDirection = () => { try { return JSON.parse(localStorage.getItem(directionKey) || "{}"); } catch { return {}; } };
+const saveDirection = () => localStorage.setItem(directionKey, JSON.stringify(Object.fromEntries(directionFields.map((field) => [field, document.querySelector(`#builder${field}`).value]))));
+Object.entries(savedDirection()).forEach(([field, value]) => {
+  const select = document.querySelector(`#builder${field}`);
+  if (select && [...select.options].some((option) => option.value === value)) select.value = value;
+});
+document.querySelectorAll("#graffitixOptions select").forEach((select) => { select.onchange = saveDirection; });
 document.querySelector("#shuffleBuilder").onclick = () => {
   document.querySelectorAll("#graffitixOptions select").forEach((select) => {
     if (select.options.length > 1) select.selectedIndex = (select.selectedIndex + 1 + Math.floor(Math.random() * (select.options.length - 1))) % select.options.length;
   });
+  saveDirection();
   notify("New GraffitiX direction ready.");
 };
 const updateGraffitiXOptions = () => {
