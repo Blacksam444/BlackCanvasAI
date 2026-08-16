@@ -17,8 +17,10 @@ from pydantic import BaseModel
 from storage import UPLOAD_DIR, backup_data, connect, execute, initialize, rows
 
 BASE_DIR = Path(__file__).resolve().parent
-DEFAULT_ASPECT_RATIO = "4:5"
-SUPPORTED_ASPECT_RATIOS = {"1:1", "4:5", "3:2", "16:9", "9:16"}
+MIDJOURNEY_RULES_PATH = BASE_DIR / "midjourney_rules.json"
+MIDJOURNEY_RULES = json.loads(MIDJOURNEY_RULES_PATH.read_text(encoding="utf-8"))
+DEFAULT_ASPECT_RATIO = MIDJOURNEY_RULES["default_aspect_ratio"]
+SUPPORTED_ASPECT_RATIOS = set(MIDJOURNEY_RULES["supported_aspect_ratios"])
 DEFAULT_NEGATIVE_INSTRUCTIONS = "no text, no watermark, no signature, no logo, no frame"
 GRAFFITIX_NEGATIVE_INSTRUCTIONS = (
     "no digital smoothness, no glossy CGI finish, no polished 3D render, "
@@ -32,7 +34,7 @@ def midjourney_v82_suffix(idea: str) -> str:
     aspect_ratio = requested_ratio.group(1) if requested_ratio else DEFAULT_ASPECT_RATIO
     if aspect_ratio not in SUPPORTED_ASPECT_RATIOS:
         aspect_ratio = DEFAULT_ASPECT_RATIO
-    return f"--ar {aspect_ratio} --raw --v 8.2"
+    return f"--ar {aspect_ratio} {MIDJOURNEY_RULES['raw_parameter']} --v {MIDJOURNEY_RULES['version']}"
 
 
 def strip_midjourney_parameters(text: str) -> str:
@@ -50,19 +52,28 @@ def midjourney_syntax_issues(prompt: str) -> list[str]:
     has_legacy_raw = bool(re.search(r"--style\s+raw\b", prompt, flags=re.IGNORECASE))
     if has_legacy_raw:
         issues.append("Legacy --style raw syntax")
-    if not has_legacy_raw and re.search(r"--v\s+8\.2\b", prompt, flags=re.IGNORECASE) and not re.search(
-        r"--raw\b", prompt, flags=re.IGNORECASE
+    version_pattern = re.escape(MIDJOURNEY_RULES["version"])
+    raw_pattern = rf"{re.escape(MIDJOURNEY_RULES['raw_parameter'])}\b"
+    if not has_legacy_raw and re.search(rf"--v\s+{version_pattern}\b", prompt, flags=re.IGNORECASE) and not re.search(
+        raw_pattern, prompt, flags=re.IGNORECASE
     ):
-        issues.append("MidJourney v8.2 prompt is missing --raw")
+        issues.append(f"MidJourney v{MIDJOURNEY_RULES['version']} prompt is missing {MIDJOURNEY_RULES['raw_parameter']}")
     return issues
 
 
 def repair_midjourney_syntax(prompt: str) -> str:
-    repaired = re.sub(r"--style\s+raw\b", "--raw", prompt, flags=re.IGNORECASE)
-    if re.search(r"--v\s+8\.2\b", repaired, flags=re.IGNORECASE) and not re.search(
-        r"--raw\b", repaired, flags=re.IGNORECASE
+    repaired = prompt
+    for deprecated, replacement in MIDJOURNEY_RULES["deprecated_parameters"].items():
+        deprecated_pattern = re.escape(deprecated).replace(r"\ ", r"\s+")
+        repaired = re.sub(deprecated_pattern, replacement, repaired, flags=re.IGNORECASE)
+    version_pattern = re.escape(MIDJOURNEY_RULES["version"])
+    raw_parameter = MIDJOURNEY_RULES["raw_parameter"]
+    if re.search(rf"--v\s+{version_pattern}\b", repaired, flags=re.IGNORECASE) and not re.search(
+        rf"{re.escape(raw_parameter)}\b", repaired, flags=re.IGNORECASE
     ):
-        repaired = re.sub(r"(?=--v\s+8\.2\b)", "--raw ", repaired, count=1, flags=re.IGNORECASE)
+        repaired = re.sub(
+            rf"(?=--v\s+{version_pattern}\b)", f"{raw_parameter} ", repaired, count=1, flags=re.IGNORECASE
+        )
     return repaired
 
 
@@ -585,6 +596,11 @@ def repair_prompt_syntax(prompt_id: int) -> dict:
 @app.get("/api/styles")
 def list_styles() -> dict:
     return {item["name"]: json.loads(item["content"]) for item in rows("SELECT name, content FROM styles")}
+
+
+@app.get("/api/midjourney-rules")
+def get_midjourney_rules() -> dict:
+    return MIDJOURNEY_RULES
 
 
 @app.put("/api/styles/{name}")
