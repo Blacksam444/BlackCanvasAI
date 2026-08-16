@@ -45,6 +45,10 @@
 .bulk-toolbar .download-pack {
   background:#18342e; border-color:#2c5b50; color:#8bd8c5;
 }
+.bulk-toolbar .repair-selected {
+  background:#3a2a17; border-color:#76572d; color:#f0bd68;
+}
+.bulk-toolbar .repair-selected:disabled { cursor:default; opacity:.4; }
 .bulk-toolbar .remove-selected { margin-left:2px; }
 
 .prompt-card.selected { border-color:#8267df; box-shadow:0 0 0 1px #8267df55; }

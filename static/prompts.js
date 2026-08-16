@@ -65,6 +65,10 @@ function updateBulkToolbar() {
   const toolbar = document.querySelector("#bulkToolbar");
   toolbar.hidden = selectedIds.size === 0;
   document.querySelector("#selectedCount").textContent = `${selectedIds.size} selected`;
+  const issueCount = prompts.filter(prompt => selectedIds.has(prompt.id) && prompt.syntax_issues?.length).length;
+  const repairSelected = document.querySelector("#repairSelected");
+  repairSelected.disabled = issueCount === 0;
+  repairSelected.textContent = issueCount ? `Repair syntax (${issueCount})` : "Repair syntax";
 }
 
 async function load() {
@@ -217,6 +221,21 @@ document.querySelector("#applyCategory").onclick = () => {
   bulkUpdate({category, reviewed:true}, "prompts organized.");
 };
 document.querySelector("#markReviewed").onclick = () => bulkUpdate({reviewed:true}, "prompts marked reviewed.");
+document.querySelector("#repairSelected").onclick = async () => {
+  const issueCount = prompts.filter(prompt => selectedIds.has(prompt.id) && prompt.syntax_issues?.length).length;
+  if (!issueCount || !window.confirm(`Repair supported MidJourney syntax in ${issueCount} selected ${issueCount === 1 ? "prompt" : "prompts"}?`)) return;
+  const response = await fetch("/api/prompts/bulk-repair-midjourney-syntax", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({prompt_ids:[...selectedIds]}),
+  });
+  const result = await response.json();
+  if (!response.ok) return notify(result.detail || "Those prompts could not be repaired.");
+  selectedIds.clear();
+  await load();
+  const skipped = result.skipped ? ` ${result.skipped} skipped because no change was needed or a duplicate would result.` : "";
+  notify(`${result.repaired} ${result.repaired === 1 ? "prompt" : "prompts"} repaired.${skipped}`);
+};
 document.querySelector("#downloadPack").onclick = async () => {
   const response = await fetch("/api/prompts/export", {
     method:"POST",
