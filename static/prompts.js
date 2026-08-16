@@ -123,6 +123,11 @@ function render() {
     ? `${duplicateIds().size} prompts in ${groups.length} duplicate ${groups.length === 1 ? "group" : "groups"}`
     : "No duplicate prompts found";
   document.querySelector("#selectDuplicateExtras").disabled = groups.length === 0;
+  const selectVisible = document.querySelector("#selectVisible");
+  const allVisibleSelected = shown.length > 0 && shown.every(prompt => selectedIds.has(prompt.id));
+  selectVisible.disabled = shown.length === 0;
+  selectVisible.textContent = allVisibleSelected ? `Clear visible (${shown.length})` : `Select visible (${shown.length})`;
+  selectVisible.classList.toggle("clearing", allVisibleSelected);
   updateBulkToolbar();
 }
 
@@ -152,6 +157,13 @@ document.querySelectorAll("#filters button").forEach(button => button.onclick = 
   render();
 });
 document.querySelector("#addPrompt").onclick = () => openEditor();
+document.querySelector("#selectVisible").onclick = () => {
+  const shown = visiblePrompts();
+  const allVisibleSelected = shown.length > 0 && shown.every(prompt => selectedIds.has(prompt.id));
+  shown.forEach(prompt => allVisibleSelected ? selectedIds.delete(prompt.id) : selectedIds.add(prompt.id));
+  render();
+  notify(allVisibleSelected ? `${shown.length} visible selections cleared.` : `${shown.length} visible prompts selected.`);
+};
 document.querySelector("#savePrompt").onclick = async event => {
   event.preventDefault();
   const title = document.querySelector("#promptTitle").value.trim();
