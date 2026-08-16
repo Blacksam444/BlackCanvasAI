@@ -1,0 +1,13 @@
+.prompt-recipe {
+  margin-top:30px; border:1px solid #3d3550; border-radius:14px; background:#17131d;
+  padding:20px; display:grid; grid-template-columns:1fr auto; gap:14px;
+}
+.prompt-recipe h3 { font:700 16px Manrope; margin:6px 0; }
+.prompt-recipe > div > p:last-child { color:#8f8997; font-size:11px; margin:0; }
+.prompt-recipe button { align-self:center; border:1px solid #675692; border-radius:9px; background:#282131; color:#d3c5ff; padding:10px 13px; font-weight:700; cursor:pointer; }
+.prompt-recipe pre { grid-column:1/-1; white-space:pre-wrap; word-break:break-word; margin:0; border-top:1px solid #302a39; padding-top:16px; color:#aaa4b0; font:11px/1.7 "DM Sans"; }
+@media(max-width:700px) {
+  .prompt-recipe { grid-template-columns:1fr; }
+  .prompt-recipe button { width:100%; }
+  .prompt-recipe pre { grid-column:1; }
+}
