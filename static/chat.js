@@ -26,7 +26,7 @@ const notify = (message) => {
   setTimeout(() => toast.classList.remove("show"), 1800);
 };
 
-function addMessage(role, text, save = true) {
+function addMessage(role, text, save = true, promptData = null) {
   welcome.hidden = true;
   const element = document.createElement("article");
   element.className = `message ${role}`;
@@ -37,9 +37,10 @@ function addMessage(role, text, save = true) {
   };
   messages.appendChild(element);
   messages.scrollTop = messages.scrollHeight;
+  if (promptData?.generated_prompt) addPromptSaveButton(element, promptData);
   if (save) {
     const history = JSON.parse(localStorage.getItem(KEY) || "[]");
-    history.push({ role, text });
+    history.push({ role, text, promptData });
     localStorage.setItem(KEY, JSON.stringify(history));
   }
   return element;
@@ -102,8 +103,7 @@ async function send(text) {
     if (!response.ok) throw new Error();
     const data = await response.json();
     typing.remove();
-    const answer = addMessage("assistant", data.reply);
-    if (data.generated_prompt) addPromptSaveButton(answer, data);
+    addMessage("assistant", data.reply, true, data.generated_prompt ? data : null);
   } catch {
     typing.remove();
     addMessage("assistant", "I couldn’t answer just now. Please try again.");
@@ -161,6 +161,6 @@ document.querySelector("#promptBuilder").onsubmit = (event) => {
     : "";
   send(`Create an image prompt for ${subject} in the ${collection} style, with a ${mood} mood, using ${colorDirection}, as a ${imageStyle}. Aspect ratio: ${aspectRatio}.${graffitiDirection}`);
 };
-JSON.parse(localStorage.getItem(KEY) || "[]").forEach((message) => addMessage(message.role, message.text, false));
+JSON.parse(localStorage.getItem(KEY) || "[]").forEach((message) => addMessage(message.role, message.text, false, message.promptData));
 const openingQuestion = new URLSearchParams(window.location.search).get("q");
 if (openingQuestion) { history.replaceState({}, "", "/chat"); send(openingQuestion); }
