@@ -30,13 +30,13 @@
             <section><p class="eyebrow">PROMPT LANGUAGE</p><div class="language" id="language"></div></section>
           </div>
           <div class="dos-donts"><section class="dos"><h3>✓ Always include</h3><ul id="dos"></ul></section><section class="donts"><h3>× Avoid</h3><ul id="donts"></ul></section></div>
-          <section class="prompt-recipe"><div><p class="eyebrow">MIDJOURNEY V8.2 RECIPE</p><h3>Start every prompt on-brand</h3><p>Add your focal subject while the collection rules stay protected.</p></div><div class="recipe-actions"><button id="copyRecipe">Copy recipe</button><button id="saveRecipe">Save to library</button></div><label class="recipe-subject">Creative direction<input id="recipeSubject" placeholder="Example: a young street oracle holding a cracked crown"></label><pre id="promptRecipe"></pre></section>
+          <section class="prompt-recipe"><div><p class="eyebrow">MIDJOURNEY V8.2 RECIPE</p><h3>Start every prompt on-brand</h3><p>Add your focal subject and output shape while the collection rules stay protected.</p></div><div class="recipe-actions"><button id="copyRecipe">Copy recipe</button><button id="saveRecipe">Save to library</button></div><div class="recipe-fields"><label class="recipe-subject">Creative direction<input id="recipeSubject" placeholder="Example: a young street oracle holding a cracked crown"></label><label>Aspect ratio<select id="recipeAspect"><option value="4:5">Portrait · 4:5</option><option value="1:1">Square · 1:1</option><option value="3:2">Landscape · 3:2</option><option value="16:9">Widescreen · 16:9</option><option value="9:16">Story / Reel · 9:16</option></select></label></div><pre id="promptRecipe"></pre></section>
         </div>
       </article>
     </section>
   </main>
 </div>
 <dialog id="styleDialog"><form id="styleForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">REFINE THE RULEBOOK</p><h2>Edit <span id="editName"></span></h2></div><button class="close" value="cancel">×</button></div><label>Tagline<input id="editTagline"></label><label>Core idea<textarea id="editStatement" rows="4"></textarea></label><label>Mood words <small>Separate with commas</small><input id="editMood"></label><label>Visual ingredients <small>Separate with commas</small><textarea id="editIngredients" rows="3"></textarea></label><label>Prompt language <small>Separate with commas</small><textarea id="editLanguage" rows="3"></textarea></label><label>Always include <small>Separate with commas</small><textarea id="editDos" rows="3"></textarea></label><label>Avoid <small>Separate with commas</small><textarea id="editDonts" rows="3"></textarea></label><div class="dialog-actions"><button class="cancel" value="cancel">Cancel</button><button class="save-style" id="saveStyle" value="default">Save changes</button></div></form></dialog>
-<div class="toast" id="toast"></div><script src="/static/style-bible.js?v=4"></script>
+<div class="toast" id="toast"></div><script src="/static/style-bible.js?v=5"></script>
 </body>
 </html>
