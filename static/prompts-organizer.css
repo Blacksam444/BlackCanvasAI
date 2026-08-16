@@ -57,13 +57,17 @@
 .select-prompt { width:18px; height:18px; display:grid; place-items:center; flex:none; }
 .select-prompt input { accent-color:#8d6de8; }
 .card-badges { display:flex; gap:5px; align-items:center; flex-wrap:wrap; flex:1; }
-.source, .review-badge, .duplicate-badge, .syntax-badge { font-size:8px; border-radius:20px; padding:4px 7px; }
+.source, .review-badge, .duplicate-badge, .syntax-badge, .trash-badge { font-size:8px; border-radius:20px; padding:4px 7px; }
 .source { background:#24232a; color:#8e8b95; }
 .source.chatgpt { background:#17332d; color:#7bd2ba; }
 .source.drive { background:#1c2b41; color:#83aee8; }
 .review-badge { background:#382b19; color:#efbc6d; }
 .duplicate-badge { background:#3b2025; color:#ef8b9a; }
 .syntax-badge { background:#3b2e18; color:#f0bd68; }
+.trash-badge { background:#2d2b31; color:#b8b3c0; }
+.prompt-card.trashed { opacity:.72; border-style:dashed; }
+.prompt-card.trashed:hover { opacity:1; }
+.card-bottom .restore, .bulk-toolbar .restore-selected { color:#8bd8c5; }
 .syntax-repair { display:flex; align-items:center; justify-content:space-between; gap:14px; border:1px solid #65471f; border-radius:10px; background:#251d12; padding:11px 12px; margin:4px 0 16px; }
 .syntax-repair[hidden] { display:none; }
 .syntax-repair strong, .syntax-repair span { display:block; }
@@ -84,6 +88,6 @@
   .duplicate-tools button, .bulk-toolbar strong { margin:0; }
   .duplicate-tools button, .bulk-toolbar select, .bulk-toolbar button { width:100%; }
   .card-badges { gap:3px; }
-  .source, .review-badge, .duplicate-badge, .syntax-badge { font-size:7px; }
+  .source, .review-badge, .duplicate-badge, .syntax-badge, .trash-badge { font-size:7px; }
   .syntax-repair { align-items:stretch; flex-direction:column; }
 }

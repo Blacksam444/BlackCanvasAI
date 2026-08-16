@@ -341,7 +341,7 @@ def chat_reply(payload: ChatMessage) -> dict[str, str]:
 
 @app.get("/api/prompts")
 def list_prompts() -> list[dict]:
-    items = rows("SELECT id, title, category, text, favorite, source, reviewed FROM prompts ORDER BY id DESC")
+    items = rows("SELECT id, title, category, text, favorite, source, reviewed, trashed FROM prompts ORDER BY id DESC")
     for item in items:
         item["syntax_issues"] = midjourney_syntax_issues(item["text"])
     return items
@@ -350,21 +350,21 @@ def list_prompts() -> list[dict]:
 @app.get("/api/dashboard")
 def dashboard_summary() -> dict:
     with connect() as db:
-        prompt_count = db.execute("SELECT COUNT(*) FROM prompts").fetchone()[0]
+        prompt_count = db.execute("SELECT COUNT(*) FROM prompts WHERE trashed = 0").fetchone()[0]
         artwork_count = db.execute("SELECT COUNT(*) FROM artworks").fetchone()[0]
         favorite_count = db.execute(
-            "SELECT (SELECT COUNT(*) FROM prompts WHERE favorite = 1) + "
+            "SELECT (SELECT COUNT(*) FROM prompts WHERE favorite = 1 AND trashed = 0) + "
             "(SELECT COUNT(*) FROM artworks WHERE favorite = 1)"
         ).fetchone()[0]
-        review_count = db.execute("SELECT COUNT(*) FROM prompts WHERE reviewed = 0").fetchone()[0]
+        review_count = db.execute("SELECT COUNT(*) FROM prompts WHERE reviewed = 0 AND trashed = 0").fetchone()[0]
         prompt_rows = [dict(item) for item in db.execute(
-            "SELECT id, title, category, text FROM prompts ORDER BY id DESC LIMIT 3"
+            "SELECT id, title, category, text FROM prompts WHERE trashed = 0 ORDER BY id DESC LIMIT 3"
         ).fetchall()]
         artwork_rows = [dict(item) for item in db.execute(
             "SELECT id, title, collection, notes FROM artworks ORDER BY id DESC LIMIT 3"
         ).fetchall()]
         prompt_of_day = db.execute(
-            "SELECT id, title, category, text FROM prompts "
+            "SELECT id, title, category, text FROM prompts WHERE trashed = 0 "
             "ORDER BY favorite DESC, id DESC LIMIT 1 OFFSET ?",
             ((datetime.now().timetuple().tm_yday - 1) % max(prompt_count, 1),),
         ).fetchone() if prompt_count else None
@@ -432,7 +432,7 @@ def bulk_update_prompts(payload: PromptBulkPayload) -> dict[str, int]:
     placeholders = ",".join("?" for _ in prompt_ids)
     with connect() as db:
         cursor = db.execute(
-            f"UPDATE prompts SET {', '.join(updates)} WHERE id IN ({placeholders})",
+            f"UPDATE prompts SET {', '.join(updates)} WHERE trashed = 0 AND id IN ({placeholders})",
             (*values, *prompt_ids),
         )
     return {"updated": cursor.rowcount}
@@ -445,8 +445,19 @@ def bulk_delete_prompts(payload: PromptIdsPayload) -> dict[str, int]:
         raise HTTPException(status_code=400, detail="Select at least one prompt")
     placeholders = ",".join("?" for _ in prompt_ids)
     with connect() as db:
-        cursor = db.execute(f"DELETE FROM prompts WHERE id IN ({placeholders})", prompt_ids)
-    return {"deleted": cursor.rowcount}
+        cursor = db.execute(f"UPDATE prompts SET trashed = 1 WHERE trashed = 0 AND id IN ({placeholders})", prompt_ids)
+    return {"trashed": cursor.rowcount}
+
+
+@app.post("/api/prompts/bulk-restore")
+def bulk_restore_prompts(payload: PromptIdsPayload) -> dict[str, int]:
+    prompt_ids = list(dict.fromkeys(payload.prompt_ids))[:500]
+    if not prompt_ids:
+        raise HTTPException(status_code=400, detail="Select at least one prompt")
+    placeholders = ",".join("?" for _ in prompt_ids)
+    with connect() as db:
+        cursor = db.execute(f"UPDATE prompts SET trashed = 0 WHERE trashed = 1 AND id IN ({placeholders})", prompt_ids)
+    return {"restored": cursor.rowcount}
 
 
 @app.post("/api/prompts/bulk-repair-midjourney-syntax")
@@ -459,7 +470,7 @@ def bulk_repair_prompt_syntax(payload: PromptIdsPayload) -> dict[str, int]:
     skipped_count = 0
     with connect() as db:
         selected = db.execute(
-            f"SELECT id, text FROM prompts WHERE id IN ({placeholders})",
+            f"SELECT id, text FROM prompts WHERE trashed = 0 AND id IN ({placeholders})",
             prompt_ids,
         ).fetchall()
         for prompt_id, text in selected:
@@ -485,7 +496,7 @@ def export_prompts(payload: PromptIdsPayload) -> Response:
         raise HTTPException(status_code=400, detail="Select at least one prompt")
     placeholders = ",".join("?" for _ in prompt_ids)
     selected = rows(
-        f"SELECT id, title, category, text FROM prompts WHERE id IN ({placeholders})",
+        f"SELECT id, title, category, text FROM prompts WHERE trashed = 0 AND id IN ({placeholders})",
         tuple(prompt_ids),
     )
     by_id = {prompt["id"]: prompt for prompt in selected}
@@ -503,10 +514,10 @@ def export_prompts(payload: PromptIdsPayload) -> Response:
 @app.delete("/api/prompts/{prompt_id}")
 def delete_prompt(prompt_id: int) -> dict[str, str]:
     with connect() as db:
-        cursor = db.execute("DELETE FROM prompts WHERE id = ?", (prompt_id,))
+        cursor = db.execute("UPDATE prompts SET trashed = 1 WHERE trashed = 0 AND id = ?", (prompt_id,))
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Prompt not found")
-    return {"status": "removed"}
+    return {"status": "trashed"}
 
 
 @app.patch("/api/prompts/{prompt_id}/favorite")
@@ -888,10 +899,11 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
     with connect() as db:
         for prompt in manifest.get("prompts", []):
             cursor = db.execute(
-                "INSERT OR IGNORE INTO prompts(title, category, text, favorite, source, reviewed) VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO prompts(title, category, text, favorite, source, reviewed, trashed) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (
                     prompt.get("title", "Restored prompt"), prompt.get("category", "Unsorted"), prompt.get("text", ""),
                     int(bool(prompt.get("favorite"))), prompt.get("source", "backup"), int(bool(prompt.get("reviewed", True))),
+                    int(bool(prompt.get("trashed", False))),
                 ),
             )
             restored_prompts += max(cursor.rowcount, 0)

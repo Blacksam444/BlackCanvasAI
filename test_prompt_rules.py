@@ -7,6 +7,7 @@ from unittest.mock import patch
 from app import (
     PromptIdsPayload,
     bulk_delete_prompts,
+    bulk_restore_prompts,
     bulk_repair_prompt_syntax,
     create_image_prompt,
     format_prompt_pack,
@@ -92,7 +93,7 @@ class PromptBulkDeleteTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             database = Path(directory) / "prompts.db"
             connection = sqlite3.connect(database)
-            connection.execute("CREATE TABLE prompts (id INTEGER PRIMARY KEY, title TEXT)")
+            connection.execute("CREATE TABLE prompts (id INTEGER PRIMARY KEY, title TEXT, trashed INTEGER NOT NULL DEFAULT 0)")
             connection.executemany("INSERT INTO prompts(id, title) VALUES (?, ?)", [(1, "Keep"), (2, "Extra"), (3, "Other")])
             connection.commit()
             connection.close()
@@ -109,10 +110,39 @@ class PromptBulkDeleteTests(unittest.TestCase):
             for opened_connection in opened_connections:
                 opened_connection.close()
 
-            self.assertEqual(result, {"deleted": 1})
+            self.assertEqual(result, {"trashed": 1})
             check = sqlite3.connect(database)
             try:
-                self.assertEqual(check.execute("SELECT id FROM prompts ORDER BY id").fetchall(), [(1,), (3,)])
+                self.assertEqual(check.execute("SELECT id, trashed FROM prompts ORDER BY id").fetchall(),
+                                 [(1, 0), (2, 1), (3, 0)])
+            finally:
+                check.close()
+
+    def test_bulk_restore_returns_only_trashed_prompts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "prompts.db"
+            connection = sqlite3.connect(database)
+            connection.execute("CREATE TABLE prompts (id INTEGER PRIMARY KEY, trashed INTEGER NOT NULL DEFAULT 0)")
+            connection.executemany("INSERT INTO prompts(id, trashed) VALUES (?, ?)", [(1, 0), (2, 1), (3, 1)])
+            connection.commit()
+            connection.close()
+            opened_connections = []
+
+            def test_connect():
+                opened_connection = sqlite3.connect(database)
+                opened_connections.append(opened_connection)
+                return opened_connection
+
+            with patch("app.connect", test_connect):
+                result = bulk_restore_prompts(PromptIdsPayload(prompt_ids=[2, 2]))
+            for opened_connection in opened_connections:
+                opened_connection.close()
+
+            self.assertEqual(result, {"restored": 1})
+            check = sqlite3.connect(database)
+            try:
+                self.assertEqual(check.execute("SELECT id, trashed FROM prompts ORDER BY id").fetchall(),
+                                 [(1, 0), (2, 0), (3, 1)])
             finally:
                 check.close()
 
@@ -123,7 +153,7 @@ class PromptBulkRepairTests(unittest.TestCase):
             database = Path(directory) / "prompts.db"
             connection = sqlite3.connect(database)
             connection.execute(
-                "CREATE TABLE prompts (id INTEGER PRIMARY KEY, text TEXT UNIQUE, reviewed INTEGER NOT NULL DEFAULT 0)"
+                "CREATE TABLE prompts (id INTEGER PRIMARY KEY, text TEXT UNIQUE, reviewed INTEGER NOT NULL DEFAULT 0, trashed INTEGER NOT NULL DEFAULT 0)"
             )
             connection.executemany("INSERT INTO prompts(id, text) VALUES (?, ?)", [
                 (1, "Legacy --style raw --v 8.2"),

@@ -20,6 +20,7 @@ const normalizedText = text => (text || "").toLowerCase().replace(/[^a-z0-9]+/g,
 function duplicateGroups() {
   const groups = new Map();
   prompts.forEach(prompt => {
+    if (prompt.trashed) return;
     const key = normalizedText(prompt.text);
     if (!key) return;
     if (!groups.has(key)) groups.set(key, []);
@@ -49,13 +50,14 @@ function sourceLabel(source) {
 function visiblePrompts() {
   const duplicates = duplicateIds();
   return prompts.filter(prompt => {
-    const matchesFilter = filter === "All"
+    const matchesFilter = (filter === "Trash" && prompt.trashed)
+      || (!prompt.trashed && (filter === "All"
       || (filter === "Unreviewed" && !prompt.reviewed)
       || (filter === "Duplicates" && duplicates.has(prompt.id))
       || (filter === "Syntax issues" && prompt.syntax_issues?.length)
       || (filter === "Favorites" && prompt.favorite)
       || (filter === "ChatGPT" && prompt.source === "chatgpt")
-      || prompt.category === filter;
+      || prompt.category === filter));
     const searchable = `${prompt.title} ${prompt.category} ${prompt.text} ${sourceLabel(prompt.source)}`.toLowerCase();
     return matchesFilter && searchable.includes(query);
   });
@@ -65,9 +67,18 @@ function updateBulkToolbar() {
   const toolbar = document.querySelector("#bulkToolbar");
   toolbar.hidden = selectedIds.size === 0;
   document.querySelector("#selectedCount").textContent = `${selectedIds.size} selected`;
+  const selected = prompts.filter(prompt => selectedIds.has(prompt.id));
+  const hasTrashed = selected.some(prompt => prompt.trashed);
+  const onlyTrashed = selected.length > 0 && selected.every(prompt => prompt.trashed);
+  document.querySelector("#restoreSelected").hidden = !onlyTrashed;
+  document.querySelector("#removeSelected").hidden = hasTrashed;
+  document.querySelector("#bulkCategory").disabled = hasTrashed;
+  document.querySelector("#applyCategory").disabled = hasTrashed;
+  document.querySelector("#markReviewed").disabled = hasTrashed;
+  document.querySelector("#downloadPack").disabled = hasTrashed;
   const issueCount = prompts.filter(prompt => selectedIds.has(prompt.id) && prompt.syntax_issues?.length).length;
   const repairSelected = document.querySelector("#repairSelected");
-  repairSelected.disabled = issueCount === 0;
+  repairSelected.disabled = issueCount === 0 || hasTrashed;
   repairSelected.textContent = issueCount ? `Repair syntax (${issueCount})` : "Repair syntax";
 }
 
@@ -97,8 +108,9 @@ function render() {
   grid.innerHTML = "";
   shown.forEach(prompt => {
     const card = document.createElement("article");
-    card.className = `prompt-card${selectedIds.has(prompt.id) ? " selected" : ""}${!prompt.reviewed ? " unreviewed" : ""}`;
-    card.innerHTML = `<div class="card-top"><label class="select-prompt"><input type="checkbox" ${selectedIds.has(prompt.id) ? "checked" : ""}><span></span></label><div class="card-badges"><span class="category">${escape(prompt.category)}</span><span class="source ${escape(prompt.source)}">${sourceLabel(prompt.source)}</span>${!prompt.reviewed ? '<span class="review-badge">Unreviewed</span>' : ""}${duplicates.has(prompt.id) ? '<span class="duplicate-badge">Duplicate</span>' : ""}${prompt.syntax_issues?.length ? '<span class="syntax-badge">Syntax issue</span>' : ""}</div><button class="favorite ${prompt.favorite ? "on" : ""}" title="Favorite">★</button></div><h2>${escape(prompt.title)}</h2><p class="prompt-preview">${escape(prompt.text)}</p><div class="card-bottom"><button class="view">Review & edit</button><button class="copy">Copy prompt</button></div>`;
+    card.className = `prompt-card${selectedIds.has(prompt.id) ? " selected" : ""}${!prompt.reviewed ? " unreviewed" : ""}${prompt.trashed ? " trashed" : ""}`;
+    const cardActions = prompt.trashed ? '<button class="restore">Restore prompt</button>' : '<button class="view">Review & edit</button><button class="copy">Copy prompt</button>';
+    card.innerHTML = `<div class="card-top"><label class="select-prompt"><input type="checkbox" ${selectedIds.has(prompt.id) ? "checked" : ""}><span></span></label><div class="card-badges"><span class="category">${escape(prompt.category)}</span><span class="source ${escape(prompt.source)}">${sourceLabel(prompt.source)}</span>${prompt.trashed ? '<span class="trash-badge">Trash</span>' : ""}${!prompt.reviewed ? '<span class="review-badge">Unreviewed</span>' : ""}${duplicates.has(prompt.id) ? '<span class="duplicate-badge">Duplicate</span>' : ""}${prompt.syntax_issues?.length ? '<span class="syntax-badge">Syntax issue</span>' : ""}</div><button class="favorite ${prompt.favorite ? "on" : ""}" title="Favorite">★</button></div><h2>${escape(prompt.title)}</h2><p class="prompt-preview">${escape(prompt.text)}</p><div class="card-bottom">${cardActions}</div>`;
     const checkbox = card.querySelector('input[type="checkbox"]');
     checkbox.onchange = () => {
       if (checkbox.checked) selectedIds.add(prompt.id);
@@ -110,16 +122,20 @@ function render() {
       await fetch(`/api/prompts/${prompt.id}/favorite?favorite=${prompt.favorite}`, {method:"PATCH"});
       render();
     };
-    card.querySelector(".copy").onclick = async () => {
-      await navigator.clipboard.writeText(prompt.text);
-      notify("Prompt copied.");
-    };
-    card.querySelector(".view").onclick = () => openEditor(prompt);
+    if (prompt.trashed) {
+      card.querySelector(".restore").onclick = () => restorePrompts([prompt.id]);
+    } else {
+      card.querySelector(".copy").onclick = async () => {
+        await navigator.clipboard.writeText(prompt.text);
+        notify("Prompt copied.");
+      };
+      card.querySelector(".view").onclick = () => openEditor(prompt);
+    }
     grid.appendChild(card);
   });
   empty.hidden = shown.length > 0;
-  document.querySelector("#promptCount").textContent = prompts.length;
-  document.querySelector("#unreviewedCount").textContent = prompts.filter(prompt => !prompt.reviewed).length;
+  document.querySelector("#promptCount").textContent = prompts.filter(prompt => !prompt.trashed).length;
+  document.querySelector("#unreviewedCount").textContent = prompts.filter(prompt => !prompt.trashed && !prompt.reviewed).length;
   const groups = duplicateGroups();
   const duplicateTools = document.querySelector("#duplicateTools");
   duplicateTools.hidden = filter !== "Duplicates";
@@ -185,13 +201,24 @@ document.querySelector("#savePrompt").onclick = async event => {
   notify(editingId ? "Prompt reviewed and updated." : "Prompt saved permanently.");
 };
 document.querySelector("#deletePrompt").onclick = async () => {
-  if (!editingId || !window.confirm("Remove this prompt from the library?")) return;
+  if (!editingId || !window.confirm("Move this prompt to Trash? You can restore it later.")) return;
   await fetch(`/api/prompts/${editingId}`, {method:"DELETE"});
   selectedIds.delete(editingId);
   dialog.close();
   await load();
-  notify("Prompt removed from the library.");
+  notify("Prompt moved to Trash.");
 };
+
+async function restorePrompts(promptIds) {
+  const response = await fetch("/api/prompts/bulk-restore", {
+    method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({prompt_ids:promptIds}),
+  });
+  const result = await response.json();
+  if (!response.ok) return notify(result.detail || "Those prompts could not be restored.");
+  promptIds.forEach(id => selectedIds.delete(id));
+  await load();
+  notify(`${result.restored} ${result.restored === 1 ? "prompt" : "prompts"} restored.`);
+}
 document.querySelector("#repairSyntax").onclick = async () => {
   if (!editingId) return;
   const response = await fetch(`/api/prompts/${editingId}/repair-midjourney-syntax`, {method:"PATCH"});
@@ -264,8 +291,9 @@ document.querySelector("#selectDuplicateExtras").onclick = () => {
   render();
   notify(selectedIds.size ? `${selectedIds.size} extra ${selectedIds.size === 1 ? "copy" : "copies"} selected for review.` : "No extra copies found.");
 };
+document.querySelector("#restoreSelected").onclick = () => restorePrompts([...selectedIds]);
 document.querySelector("#removeSelected").onclick = async () => {
-  if (!selectedIds.size || !window.confirm(`Remove ${selectedIds.size} selected ${selectedIds.size === 1 ? "prompt" : "prompts"} from the library? This cannot be undone.`)) return;
+  if (!selectedIds.size || !window.confirm(`Move ${selectedIds.size} selected ${selectedIds.size === 1 ? "prompt" : "prompts"} to Trash? You can restore them later.`)) return;
   const response = await fetch("/api/prompts/bulk-delete", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
@@ -275,7 +303,7 @@ document.querySelector("#removeSelected").onclick = async () => {
   if (!response.ok) return notify(result.detail || "Those prompts could not be removed.");
   selectedIds.clear();
   await load();
-  notify(`${result.deleted} ${result.deleted === 1 ? "prompt" : "prompts"} removed.`);
+  notify(`${result.trashed} ${result.trashed === 1 ? "prompt" : "prompts"} moved to Trash.`);
 };
 document.querySelector("#clearSelection").onclick = () => { selectedIds.clear(); render(); };
 document.querySelector("#menuButton").onclick = () => document.querySelector("#sidebar").classList.toggle("open");
