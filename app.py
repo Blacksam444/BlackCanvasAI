@@ -935,7 +935,8 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
             cursor = db.execute(
                 "INSERT OR IGNORE INTO prompts(title, category, text, favorite, source, reviewed, trashed) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (
-                    prompt.get("title", "Restored prompt"), prompt.get("category", "Unsorted"), prompt.get("text", ""),
+                    prompt.get("title", "Restored prompt"), prompt.get("category", "Unsorted"),
+                    repair_midjourney_syntax(str(prompt.get("text", "")).strip()),
                     int(bool(prompt.get("favorite"))), prompt.get("source", "backup"), int(bool(prompt.get("reviewed", True))),
                     int(bool(prompt.get("trashed", False))),
                 ),
