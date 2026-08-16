@@ -11,6 +11,10 @@ const empty = document.querySelector("#empty");
 const toast = document.querySelector("#toast");
 const dialog = document.querySelector("#promptDialog");
 const canonicalCategories = ["AfroNova", "Quiet Nova", "GraffitiX", "Content", "Business", "Unsorted"];
+document.querySelectorAll("#filters button").forEach(button => {
+  button.dataset.label = button.textContent;
+  button.insertAdjacentHTML("beforeend", '<span class="filter-count">0</span>');
+});
 
 const notify = message => {
   toast.textContent = message;
@@ -149,6 +153,22 @@ function render() {
   empty.hidden = shown.length > 0;
   document.querySelector("#promptCount").textContent = prompts.filter(prompt => !prompt.trashed).length;
   document.querySelector("#unreviewedCount").textContent = prompts.filter(prompt => !prompt.trashed && !prompt.reviewed).length;
+  const activePrompts = prompts.filter(prompt => !prompt.trashed);
+  const filterCounts = {
+    "All": activePrompts.length,
+    "Unreviewed": activePrompts.filter(prompt => !prompt.reviewed).length,
+    "Duplicates": duplicates.size,
+    "Syntax issues": activePrompts.filter(prompt => prompt.syntax_issues?.length).length,
+    "Favorites": activePrompts.filter(prompt => prompt.favorite).length,
+    "ChatGPT": activePrompts.filter(prompt => prompt.source === "chatgpt").length,
+    "Trash": prompts.filter(prompt => prompt.trashed).length,
+  };
+  canonicalCategories.forEach(category => {
+    filterCounts[category] = activePrompts.filter(prompt => prompt.category === category).length;
+  });
+  document.querySelectorAll("#filters button").forEach(button => {
+    button.querySelector(".filter-count").textContent = filterCounts[button.dataset.filter] || 0;
+  });
   const groups = duplicateGroups();
   const duplicateTools = document.querySelector("#duplicateTools");
   duplicateTools.hidden = filter !== "Duplicates";
