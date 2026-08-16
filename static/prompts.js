@@ -205,6 +205,28 @@ document.querySelector("#applyCategory").onclick = () => {
   bulkUpdate({category, reviewed:true}, "prompts organized.");
 };
 document.querySelector("#markReviewed").onclick = () => bulkUpdate({reviewed:true}, "prompts marked reviewed.");
+document.querySelector("#downloadPack").onclick = async () => {
+  const response = await fetch("/api/prompts/export", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({prompt_ids:[...selectedIds]}),
+  });
+  if (!response.ok) {
+    const result = await response.json();
+    return notify(result.detail || "The prompt pack could not be created.");
+  }
+  const blob = await response.blob();
+  const disposition = response.headers.get("Content-Disposition") || "";
+  const filename = disposition.match(/filename="([^"]+)"/)?.[1] || "black-canvas-prompt-pack.txt";
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(link.href);
+  notify(`${selectedIds.size} ${selectedIds.size === 1 ? "prompt" : "prompts"} exported.`);
+};
 document.querySelector("#selectDuplicateExtras").onclick = () => {
   selectedIds.clear();
   duplicateExtraIds().forEach(id => selectedIds.add(id));

@@ -54,6 +54,22 @@ def repair_midjourney_syntax(prompt: str) -> str:
     ):
         repaired = re.sub(r"(?=--v\s+8\.2\b)", "--raw ", repaired, count=1, flags=re.IGNORECASE)
     return repaired
+
+
+def format_prompt_pack(prompts: list[dict]) -> str:
+    created = datetime.now().astimezone().strftime("%B %d, %Y")
+    sections = [
+        "BLACK CANVAS AI — PROMPT PACK",
+        f"Created {created}",
+        f"{len(prompts)} prompt{'s' if len(prompts) != 1 else ''}",
+    ]
+    for index, prompt in enumerate(prompts, start=1):
+        issues = midjourney_syntax_issues(prompt["text"])
+        heading = f"{index}. {prompt['title']} [{prompt['category']}]"
+        if issues:
+            heading += f"\nSYNTAX CHECK: {'; '.join(issues)}"
+        sections.extend((heading, prompt["text"].strip()))
+    return "\n\n".join(sections) + "\n"
 initialize()
 app = FastAPI(title="Black Canvas AI")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
@@ -431,6 +447,28 @@ def bulk_delete_prompts(payload: PromptIdsPayload) -> dict[str, int]:
     with connect() as db:
         cursor = db.execute(f"DELETE FROM prompts WHERE id IN ({placeholders})", prompt_ids)
     return {"deleted": cursor.rowcount}
+
+
+@app.post("/api/prompts/export")
+def export_prompts(payload: PromptIdsPayload) -> Response:
+    prompt_ids = list(dict.fromkeys(payload.prompt_ids))[:500]
+    if not prompt_ids:
+        raise HTTPException(status_code=400, detail="Select at least one prompt")
+    placeholders = ",".join("?" for _ in prompt_ids)
+    selected = rows(
+        f"SELECT id, title, category, text FROM prompts WHERE id IN ({placeholders})",
+        tuple(prompt_ids),
+    )
+    by_id = {prompt["id"]: prompt for prompt in selected}
+    ordered = [by_id[prompt_id] for prompt_id in prompt_ids if prompt_id in by_id]
+    if not ordered:
+        raise HTTPException(status_code=404, detail="No selected prompts were found")
+    filename = f"black-canvas-prompt-pack-{datetime.now().strftime('%Y-%m-%d')}.txt"
+    return Response(
+        format_prompt_pack(ordered),
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.delete("/api/prompts/{prompt_id}")

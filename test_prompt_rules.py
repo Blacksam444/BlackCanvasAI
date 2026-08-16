@@ -8,6 +8,7 @@ from app import (
     PromptIdsPayload,
     bulk_delete_prompts,
     create_image_prompt,
+    format_prompt_pack,
     midjourney_syntax_issues,
     repair_midjourney_syntax,
 )
@@ -73,6 +74,16 @@ class PromptRuleTests(unittest.TestCase):
             repair_midjourney_syntax(legacy),
             "A mixed-media portrait --ar 4:5 --raw --v 8.2",
         )
+
+    def test_prompt_pack_preserves_order_and_flags_syntax(self):
+        pack = format_prompt_pack([
+            {"title": "Second Idea", "category": "GraffitiX", "text": "Portrait --style raw --v 8.2"},
+            {"title": "First Idea", "category": "AfroNova", "text": "Cosmic queen --raw --v 8.2"},
+        ])
+        self.assertIn("2 prompts", pack)
+        self.assertLess(pack.index("1. Second Idea [GraffitiX]"), pack.index("2. First Idea [AfroNova]"))
+        self.assertIn("SYNTAX CHECK: Legacy --style raw syntax", pack)
+        self.assertEqual(pack.count("SYNTAX CHECK:"), 1)
 
 
 class PromptBulkDeleteTests(unittest.TestCase):
