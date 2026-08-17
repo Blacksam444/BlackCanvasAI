@@ -77,6 +77,8 @@ def format_version_test_report(comparison: dict) -> str:
     verdict = verdicts.get(comparison["migrated"].get("version_test_result"), "Not tested")
     notes = comparison["migrated"].get("version_test_notes") or "No notes recorded."
     tested_at = comparison["migrated"].get("version_tested_at") or "Not recorded"
+    rules_verified_at = comparison.get("rules_verified_at") or MIDJOURNEY_RULES.get("verified_at", "Not recorded")
+    retest_recommended = "Yes" if comparison["migrated"].get("retest_recommended") else "No"
     changes = comparison["parameter_changes"]
     change_lines = "\n".join(
         f"- {change['parameter']}: {change['original']} -> {change['migrated']}" for change in changes
@@ -88,6 +90,8 @@ def format_version_test_report(comparison: dict) -> str:
         f"Creative direction preserved: {preserved}\n"
         f"Test verdict: {verdict}\n\n"
         f"Verdict recorded: {tested_at}\n\n"
+        f"MidJourney rules verified: {rules_verified_at}\n"
+        f"Retest recommended: {retest_recommended}\n\n"
         f"PARAMETER CHANGES\n{change_lines}\n\n"
         f"TEST NOTES\n{notes}\n\n"
         f"ORIGINAL — MIDJOURNEY V{comparison['original']['version']}\n"
@@ -842,6 +846,7 @@ def prompt_version_comparison(prompt_id: int) -> dict:
         "test_pair": format_version_test_pair(
             original, migrated, str(migrated["migrated_from_version"]), MIDJOURNEY_RULES["version"]
         ),
+        "rules_verified_at": MIDJOURNEY_RULES.get("verified_at"),
     }
 
 
