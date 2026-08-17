@@ -304,6 +304,7 @@ document.querySelector("#sortPrompts").onchange = event => {
   render();
 };
 document.querySelectorAll("#filters button").forEach(button => button.onclick = () => {
+  activeMigrationBatchIds = null;
   document.querySelectorAll("#filters button").forEach(item => item.classList.remove("active"));
   button.classList.add("active");
   filter = button.dataset.filter;
@@ -322,6 +323,7 @@ document.querySelector("#selectVisible").onclick = () => {
   notify(allVisibleSelected ? `${shown.length} visible selections cleared.` : `${shown.length} visible prompts selected.`);
 };
 document.querySelector("#startVersionQueue").onclick = () => {
+  activeMigrationBatchIds = null;
   const first = visiblePrompts().find(prompt => prompt.parent_prompt_id);
   if (first) openVersionComparison(first.id);
 };
@@ -365,28 +367,31 @@ async function restorePrompts(promptIds) {
 }
 const versionCompareDialog = document.querySelector("#versionCompareDialog");
 let activeVersionComparison = null;
+let activeMigrationBatchIds = null;
 function nextVersionTestCopy(currentId) {
   const migrated = prompts.filter(prompt => prompt.parent_prompt_id && !prompt.trashed);
+  const scoped = activeMigrationBatchIds ? migrated.filter(prompt => activeMigrationBatchIds.has(prompt.id)) : migrated;
   const queue = filter === "Retest recommended"
-    ? migrated.filter(prompt => prompt.retest_recommended)
-    : migrated.filter(prompt => !prompt.version_test_result);
+    ? scoped.filter(prompt => prompt.retest_recommended)
+    : scoped.filter(prompt => !prompt.version_test_result);
   if (sortMode === "test-age") queue.sort((a, b) => testAgeValue(a) - testAgeValue(b) || a.id - b.id);
   return queue.find(prompt => prompt.id !== currentId) || null;
 }
 function updateNextUntestedButton() {
   const button = document.querySelector("#nextUntestedVersion");
   const migrated = prompts.filter(prompt => prompt.parent_prompt_id && !prompt.trashed);
-  const remaining = migrated.filter(prompt => !prompt.version_test_result).length;
-  const tested = migrated.length - remaining;
+  const scoped = activeMigrationBatchIds ? migrated.filter(prompt => activeMigrationBatchIds.has(prompt.id)) : migrated;
+  const remaining = scoped.filter(prompt => !prompt.version_test_result).length;
+  const tested = scoped.length - remaining;
   const retestMode = filter === "Retest recommended";
   const retestRemaining = migrated.filter(prompt => prompt.retest_recommended).length;
   const next = nextVersionTestCopy(activeVersionComparison?.migrated.id);
   button.disabled = !next;
   button.textContent = next
     ? (retestMode ? "Next recommended retest →" : "Next untested copy →")
-    : (retestMode ? "Retest queue complete" : "Testing queue complete");
-  document.querySelector("#versionQueueProgress").textContent = migrated.length
-    ? `${retestMode ? `${retestRemaining} recommended retests remaining` : `${tested} of ${migrated.length} tested · ${remaining} remaining`}${activeVersionComparison?.migrated.version_tested_at ? ` · Last verdict ${new Date(activeVersionComparison.migrated.version_tested_at).toLocaleDateString()}` : ""}${activeVersionComparison?.migrated.retest_reason ? ` · ${activeVersionComparison.migrated.retest_reason}` : ""}`
+    : (retestMode ? "Retest queue complete" : (activeMigrationBatchIds ? "Migration batch complete" : "Testing queue complete"));
+  document.querySelector("#versionQueueProgress").textContent = scoped.length
+    ? `${activeMigrationBatchIds ? "New batch · " : ""}${retestMode ? `${retestRemaining} recommended retests remaining` : `${tested} of ${scoped.length} tested · ${remaining} remaining`}${activeVersionComparison?.migrated.version_tested_at ? ` · Last verdict ${new Date(activeVersionComparison.migrated.version_tested_at).toLocaleDateString()}` : ""}${activeVersionComparison?.migrated.retest_reason ? ` · ${activeVersionComparison.migrated.retest_reason}` : ""}`
     : "No migrated copies to test";
 }
 async function openVersionComparison(promptId) {
@@ -568,9 +573,10 @@ async function copyPromptsToActiveVersion(promptIds, scopeLabel, openTestingQueu
   notify(`${result.copied} active-version ${result.copied === 1 ? "copy" : "copies"} created. ${result.skipped} skipped.${nextStep}`);
   if (openTestingQueue && result.copied) {
     const migratedParentIds = new Set(mismatchIds);
-    const firstNewComparison = prompts.find(prompt =>
-      prompt.parent_prompt_id && migratedParentIds.has(prompt.parent_prompt_id) && !prompt.version_test_result
-    );
+    activeMigrationBatchIds = new Set(prompts.filter(prompt =>
+      prompt.parent_prompt_id && migratedParentIds.has(prompt.parent_prompt_id)
+    ).map(prompt => prompt.id));
+    const firstNewComparison = prompts.find(prompt => activeMigrationBatchIds.has(prompt.id) && !prompt.version_test_result);
     if (firstNewComparison) await openVersionComparison(firstNewComparison.id);
   }
 }
