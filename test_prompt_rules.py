@@ -39,11 +39,25 @@ from app import (
     save_prompt_version_test_result,
     save_prompt_version_test_notes,
     summarize_version_tests,
+    version_test_needs_retest,
 )
 from storage import backup_data
 
 
 class PromptRuleTests(unittest.TestCase):
+    def test_version_test_retest_recommendation_uses_rules_verification_date(self):
+        self.assertTrue(version_test_needs_retest(
+            {"version_test_result": "active", "version_tested_at": "2026-08-01T12:00:00+00:00"},
+            "2026-08-17",
+        ))
+        self.assertFalse(version_test_needs_retest(
+            {"version_test_result": "active", "version_tested_at": "2026-08-17T12:00:00+00:00"},
+            "2026-08-17",
+        ))
+        self.assertFalse(version_test_needs_retest(
+            {"version_test_result": None, "version_tested_at": None}, "2026-08-17"
+        ))
+
     def test_version_test_summary_counts_outcomes_and_progress(self):
         summary = summarize_version_tests([
             {"parent_prompt_id": 1, "version_test_result": "active"},

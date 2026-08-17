@@ -12,6 +12,8 @@ const empty = document.querySelector("#empty");
 const toast = document.querySelector("#toast");
 const dialog = document.querySelector("#promptDialog");
 const canonicalCategories = ["AfroNova", "Quiet Nova", "GraffitiX", "Content", "Business", "Unsorted"];
+document.querySelector('#filters button[data-filter="Untested copies"]')
+  .insertAdjacentHTML("afterend", '<button data-filter="Retest recommended">Retest recommended</button>');
 document.querySelectorAll("#filters button").forEach(button => {
   button.dataset.label = button.textContent;
   button.insertAdjacentHTML("beforeend", '<span class="filter-count">0</span>');
@@ -71,6 +73,7 @@ function visiblePrompts() {
       || (filter === "Syntax issues" && prompt.syntax_issues?.length)
       || (filter === "Version copies" && prompt.parent_prompt_id)
       || (filter === "Untested copies" && prompt.parent_prompt_id && !prompt.version_test_result)
+      || (filter === "Retest recommended" && prompt.retest_recommended)
       || (filter === "Active preferred" && prompt.version_test_result === "active")
       || (filter === "Original preferred" && prompt.version_test_result === "original")
       || (filter === "No clear winner" && prompt.version_test_result === "tie")
@@ -149,6 +152,7 @@ function render() {
     const cardActions = prompt.trashed ? '<button class="restore">Restore prompt</button>' : `<button class="view">Review & edit</button>${prompt.parent_prompt_id ? '<button class="compare">Compare versions</button>' : ''}<button class="copy">Copy prompt</button>`;
     const verdictLabel = {original:"Original preferred",active:"Active preferred",tie:"No clear winner"}[prompt.version_test_result];
     card.innerHTML = `<div class="card-top"><label class="select-prompt"><input type="checkbox" ${selectedIds.has(prompt.id) ? "checked" : ""}><span></span></label><div class="card-badges"><span class="category">${escape(prompt.category)}</span><span class="source ${escape(prompt.source)}">${sourceLabel(prompt.source)}</span>${prompt.trashed ? '<span class="trash-badge">Trash</span>' : ""}${!prompt.reviewed ? '<span class="review-badge">Unreviewed</span>' : ""}${prompt.parent_prompt_id ? `<span class="migration-badge">From MJ v${escape(prompt.migrated_from_version || "older")}</span>` : ""}${verdictLabel ? `<span class="verdict-badge ${escape(prompt.version_test_result)}">${verdictLabel}</span>` : ""}${duplicates.has(prompt.id) ? '<span class="duplicate-badge">Duplicate</span>' : ""}${prompt.version_mismatch ? '<span class="syntax-badge">Version review</span>' : prompt.syntax_issues?.length ? '<span class="syntax-badge">Syntax issue</span>' : ""}</div><button class="favorite ${prompt.favorite ? "on" : ""}" title="Favorite">★</button></div><h2>${escape(prompt.title)}</h2><p class="prompt-preview">${escape(prompt.text)}</p><div class="card-bottom">${cardActions}</div>`;
+    if (prompt.retest_recommended) card.querySelector(".card-badges").insertAdjacentHTML("beforeend", '<span class="retest-badge">Retest recommended</span>');
     const checkbox = card.querySelector('input[type="checkbox"]');
     checkbox.onchange = () => {
       if (checkbox.checked) selectedIds.add(prompt.id);
@@ -184,6 +188,7 @@ function render() {
     "Syntax issues": activePrompts.filter(prompt => prompt.syntax_issues?.length).length,
     "Version copies": activePrompts.filter(prompt => prompt.parent_prompt_id).length,
     "Untested copies": activePrompts.filter(prompt => prompt.parent_prompt_id && !prompt.version_test_result).length,
+    "Retest recommended": activePrompts.filter(prompt => prompt.retest_recommended).length,
     "Active preferred": activePrompts.filter(prompt => prompt.version_test_result === "active").length,
     "Original preferred": activePrompts.filter(prompt => prompt.version_test_result === "original").length,
     "No clear winner": activePrompts.filter(prompt => prompt.version_test_result === "tie").length,
@@ -307,7 +312,7 @@ function updateNextUntestedButton() {
   button.disabled = !next;
   button.textContent = next ? "Next untested copy →" : "Testing queue complete";
   document.querySelector("#versionQueueProgress").textContent = migrated.length
-    ? `${tested} of ${migrated.length} tested · ${remaining} remaining${activeVersionComparison?.migrated.version_tested_at ? ` · Last verdict ${new Date(activeVersionComparison.migrated.version_tested_at).toLocaleDateString()}` : ""}`
+    ? `${tested} of ${migrated.length} tested · ${remaining} remaining${activeVersionComparison?.migrated.version_tested_at ? ` · Last verdict ${new Date(activeVersionComparison.migrated.version_tested_at).toLocaleDateString()}` : ""}${activeVersionComparison?.migrated.retest_recommended ? " · Retest recommended" : ""}`
     : "No migrated copies to test";
 }
 async function openVersionComparison(promptId) {
@@ -382,6 +387,7 @@ document.querySelectorAll(".test-verdict button").forEach(button => button.oncli
   if (!response.ok) return notify(result.detail || "That test result could not be saved.");
   activeVersionComparison.migrated.version_test_result = result.result;
   activeVersionComparison.migrated.version_tested_at = result.tested_at;
+  activeVersionComparison.migrated.retest_recommended = false;
   renderTestVerdict(result.result);
   await load();
   updateNextUntestedButton();
