@@ -96,6 +96,9 @@
 .verdict-badge { background:#27232f; color:#c8b8e8; }
 .verdict-badge.active { background:#173025; color:#a8dfbd; }
 .verdict-badge.original { background:#35251b; color:#e4bd95; }
+.test-notes { display:grid; grid-template-columns:1fr auto; gap:8px; color:#8e8994; font-size:10px; font-weight:700; margin-bottom:14px; }
+.test-notes textarea { grid-column:1 / -1; width:100%; resize:vertical; border:1px solid #3a3840; border-radius:9px; background:#1a191e; color:#d5d1da; padding:10px; font:11px/1.5 "DM Sans"; }
+.test-notes button { grid-column:2; border:1px solid #51456e; border-radius:8px; background:#241d33; color:#d5c8ff; padding:7px 10px; font-size:9px; cursor:pointer; }
 @media(max-width:700px){.test-verdict{align-items:flex-start;flex-direction:column}}
 .version-comparison { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
 .version-comparison section { min-width:0; border:1px solid #33323a; border-radius:12px; background:#18171c; padding:15px; }

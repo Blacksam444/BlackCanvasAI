@@ -42,6 +42,7 @@ def initialize() -> None:
                 parent_prompt_id INTEGER,
                 migrated_from_version TEXT,
                 version_test_result TEXT,
+                version_test_notes TEXT NOT NULL DEFAULT '',
                 UNIQUE(title, text)
             );
             CREATE TABLE IF NOT EXISTS styles (
@@ -72,6 +73,8 @@ def initialize() -> None:
             db.execute("ALTER TABLE prompts ADD COLUMN migrated_from_version TEXT")
         if "version_test_result" not in prompt_columns:
             db.execute("ALTER TABLE prompts ADD COLUMN version_test_result TEXT")
+        if "version_test_notes" not in prompt_columns:
+            db.execute("ALTER TABLE prompts ADD COLUMN version_test_notes TEXT NOT NULL DEFAULT ''")
         db.execute("UPDATE prompts SET source = 'chatgpt', reviewed = 0 WHERE category = 'ChatGPT Import' AND source = 'manual'")
         db.execute("UPDATE prompts SET source = 'drive', reviewed = 0 WHERE category = 'Imported' AND source = 'manual'")
         if db.execute("SELECT COUNT(*) FROM prompts").fetchone()[0] == 0:
@@ -92,8 +95,8 @@ def execute(query: str, values: tuple[Any, ...] = ()) -> int:
 def backup_data() -> dict[str, Any]:
     styles = rows("SELECT name, content FROM styles ORDER BY name")
     return {
-        "version": 4,
-        "prompts": rows("SELECT id, title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result FROM prompts ORDER BY id"),
+        "version": 5,
+        "prompts": rows("SELECT id, title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result, version_test_notes FROM prompts ORDER BY id"),
         "styles": {item["name"]: json.loads(item["content"]) for item in styles},
         "midjourney_rules": json.loads(MIDJOURNEY_RULES_PATH.read_text(encoding="utf-8")),
         "artworks": rows("SELECT id, title, collection, tags, notes, favorite, filename, created_at FROM artworks ORDER BY id"),
