@@ -7,6 +7,7 @@ BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 UPLOAD_DIR = DATA_DIR / "uploads"
 DB_PATH = DATA_DIR / "blackcanvas.db"
+MIDJOURNEY_RULES_PATH = BASE_DIR / "midjourney_rules.json"
 
 DEFAULT_PROMPTS = [
     ("Cosmic Royalty Portrait", "AfroNova", "Create a bold portrait where cosmic elegance meets street-art energy. Feature a regal Black subject, luminous celestial textures, deep violet and gold tones, and gallery-quality detail.", 1),
@@ -82,8 +83,9 @@ def execute(query: str, values: tuple[Any, ...] = ()) -> int:
 def backup_data() -> dict[str, Any]:
     styles = rows("SELECT name, content FROM styles ORDER BY name")
     return {
-        "version": 1,
+        "version": 2,
         "prompts": rows("SELECT id, title, category, text, favorite, source, reviewed, trashed FROM prompts ORDER BY id"),
         "styles": {item["name"]: json.loads(item["content"]) for item in styles},
+        "midjourney_rules": json.loads(MIDJOURNEY_RULES_PATH.read_text(encoding="utf-8")),
         "artworks": rows("SELECT id, title, collection, tags, notes, favorite, filename, created_at FROM artworks ORDER BY id"),
     }
