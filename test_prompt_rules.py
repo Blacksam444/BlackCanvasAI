@@ -18,6 +18,7 @@ from app import (
     bulk_repair_prompt_syntax,
     create_image_prompt,
     create_prompt,
+    copy_prompt_to_active_midjourney_version,
     format_prompt_pack,
     get_midjourney_rules,
     import_chatgpt_prompts,
@@ -32,6 +33,19 @@ from storage import backup_data
 
 
 class PromptRuleTests(unittest.TestCase):
+    def test_active_version_migration_creates_copy_and_keeps_original(self):
+        original = {"id": 7, "title": "Archive Guardian", "category": "GraffitiX",
+                    "text": "Guardian --style raw --v 8.1"}
+        with patch("app.rows", return_value=[original]), patch("app.execute", return_value=44) as execute_mock:
+            result = copy_prompt_to_active_midjourney_version(7)
+
+        saved_values = execute_mock.call_args.args[1]
+        self.assertEqual(saved_values[0], "Archive Guardian (MJ v8.2)")
+        self.assertEqual(saved_values[2], "Guardian --raw --v 8.2")
+        self.assertEqual(original["text"], "Guardian --style raw --v 8.1")
+        self.assertEqual(result["id"], 44)
+        self.assertEqual(result["syntax_issues"], [])
+
     def test_prompts_using_another_midjourney_version_are_flagged_without_rewrite(self):
         prompt = "Archive portrait --ar 4:5 --raw --v 8.1"
 
