@@ -294,6 +294,16 @@ async function restorePrompts(promptIds) {
 }
 const versionCompareDialog = document.querySelector("#versionCompareDialog");
 let activeVersionComparison = null;
+function nextUntestedVersionCopy(currentId) {
+  const queue = prompts.filter(prompt => prompt.parent_prompt_id && !prompt.trashed && !prompt.version_test_result);
+  return queue.find(prompt => prompt.id !== currentId) || null;
+}
+function updateNextUntestedButton() {
+  const button = document.querySelector("#nextUntestedVersion");
+  const next = nextUntestedVersionCopy(activeVersionComparison?.migrated.id);
+  button.disabled = !next;
+  button.textContent = next ? "Next untested copy →" : "Testing queue complete";
+}
 async function openVersionComparison(promptId) {
   const response = await fetch(`/api/prompts/${promptId}/version-comparison`);
   const result = await response.json();
@@ -316,6 +326,7 @@ async function openVersionComparison(promptId) {
   summary.textContent = `${directionStatus} ${changes}`;
   renderTestVerdict(result.migrated.version_test_result);
   document.querySelector("#versionTestNotes").value = result.migrated.version_test_notes || "";
+  updateNextUntestedButton();
   versionCompareDialog.showModal();
 }
 document.querySelector("#closeVersionCompare").onclick = () => versionCompareDialog.close();
@@ -330,6 +341,10 @@ document.querySelector("#copyVersionPair").onclick = () => copyComparisonText(ac
 document.querySelector("#downloadVersionReport").onclick = () => {
   if (activeVersionComparison) window.location.href = `/api/prompts/${activeVersionComparison.migrated.id}/version-report`;
 };
+document.querySelector("#nextUntestedVersion").onclick = () => {
+  const next = nextUntestedVersionCopy(activeVersionComparison?.migrated.id);
+  if (next) openVersionComparison(next.id);
+};
 function renderTestVerdict(result) {
   document.querySelectorAll(".test-verdict button").forEach(button => button.classList.toggle("selected", button.dataset.result === result));
 }
@@ -343,6 +358,7 @@ document.querySelectorAll(".test-verdict button").forEach(button => button.oncli
   activeVersionComparison.migrated.version_test_result = result.result;
   renderTestVerdict(result.result);
   await load();
+  updateNextUntestedButton();
   notify("MidJourney test result saved.");
 });
 document.querySelector("#saveVersionTestNotes").onclick = async () => {
