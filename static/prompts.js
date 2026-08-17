@@ -1,6 +1,7 @@
 let prompts = [];
 let filter = "All";
 let query = "";
+const requestedFilter = new URLSearchParams(window.location.search).get("filter");
 const supportedSorts = new Set(["newest", "oldest", "title", "collection", "favorites"]);
 let sortMode = localStorage.getItem("blackCanvasPromptSort") || "newest";
 if (!supportedSorts.has(sortMode)) sortMode = "newest";
@@ -15,6 +16,12 @@ document.querySelectorAll("#filters button").forEach(button => {
   button.dataset.label = button.textContent;
   button.insertAdjacentHTML("beforeend", '<span class="filter-count">0</span>');
 });
+const requestedFilterButton = [...document.querySelectorAll("#filters button")]
+  .find(button => button.dataset.filter === requestedFilter);
+if (requestedFilterButton) {
+  filter = requestedFilter;
+  document.querySelectorAll("#filters button").forEach(button => button.classList.toggle("active", button === requestedFilterButton));
+}
 
 const notify = message => {
   toast.textContent = message;
@@ -236,6 +243,10 @@ document.querySelectorAll("#filters button").forEach(button => button.onclick = 
   document.querySelectorAll("#filters button").forEach(item => item.classList.remove("active"));
   button.classList.add("active");
   filter = button.dataset.filter;
+  const url = new URL(window.location.href);
+  if (filter === "All") url.searchParams.delete("filter");
+  else url.searchParams.set("filter", filter);
+  window.history.replaceState({}, "", url);
   render();
 });
 document.querySelector("#addPrompt").onclick = () => openEditor();
