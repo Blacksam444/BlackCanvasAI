@@ -18,6 +18,8 @@ const canonicalCategories = ["AfroNova", "Quiet Nova", "GraffitiX", "Content", "
 document.querySelector("#sortPrompts").insertAdjacentHTML("beforeend", '<option value="test-age">Oldest tests first</option>');
 document.querySelector('#filters button[data-filter="Untested copies"]')
   .insertAdjacentHTML("afterend", '<button data-filter="Retest recommended">Retest recommended</button>');
+document.querySelector('#filters button[data-filter="Syntax issues"]')
+  .insertAdjacentHTML("afterend", '<button data-filter="Older MJ version">Older MJ version</button>');
 document.querySelectorAll("#filters button").forEach(button => {
   button.dataset.label = button.textContent;
   button.insertAdjacentHTML("beforeend", '<span class="filter-count">0</span>');
@@ -82,6 +84,7 @@ function visiblePrompts() {
       || (filter === "Unreviewed" && !prompt.reviewed)
       || (filter === "Duplicates" && duplicates.has(prompt.id))
       || (filter === "Syntax issues" && prompt.syntax_issues?.length)
+      || (filter === "Older MJ version" && prompt.version_mismatch)
       || (filter === "Version copies" && prompt.parent_prompt_id)
       || (filter === "Untested copies" && prompt.parent_prompt_id && !prompt.version_test_result)
       || (filter === "Retest recommended" && prompt.retest_recommended)
@@ -208,6 +211,7 @@ function render() {
     "Unreviewed": activePrompts.filter(prompt => !prompt.reviewed).length,
     "Duplicates": duplicates.size,
     "Syntax issues": activePrompts.filter(prompt => prompt.syntax_issues?.length).length,
+    "Older MJ version": activePrompts.filter(prompt => prompt.version_mismatch).length,
     "Version copies": activePrompts.filter(prompt => prompt.parent_prompt_id).length,
     "Untested copies": activePrompts.filter(prompt => prompt.parent_prompt_id && !prompt.version_test_result).length,
     "Retest recommended": activePrompts.filter(prompt => prompt.retest_recommended).length,
