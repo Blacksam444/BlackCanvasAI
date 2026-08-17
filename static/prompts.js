@@ -245,6 +245,9 @@ function render() {
     const startQueue = document.querySelector("#startVersionQueue");
     startQueue.disabled = shown.length === 0;
     startQueue.textContent = shown.length ? "Start queue" : (query ? "No matches" : "Queue complete");
+    const downloadQueue = document.querySelector("#downloadVersionQueue");
+    downloadQueue.disabled = shown.length === 0;
+    downloadQueue.textContent = shown.length ? `Download reports (${shown.length})` : "No reports";
   }
   const selectVisible = document.querySelector("#selectVisible");
   const allVisibleSelected = shown.length > 0 && shown.every(prompt => selectedIds.has(prompt.id));
@@ -306,6 +309,9 @@ document.querySelector("#selectVisible").onclick = () => {
 document.querySelector("#startVersionQueue").onclick = () => {
   const first = visiblePrompts().find(prompt => prompt.parent_prompt_id);
   if (first) openVersionComparison(first.id);
+};
+document.querySelector("#downloadVersionQueue").onclick = () => {
+  downloadVersionReportBundle(visiblePrompts().filter(prompt => prompt.parent_prompt_id).map(prompt => prompt.id));
 };
 document.querySelector("#savePrompt").onclick = async event => {
   event.preventDefault();
@@ -537,9 +543,9 @@ document.querySelector("#copyVersionSelected").onclick = async () => {
   await load();
   notify(`${result.copied} active-version ${result.copied === 1 ? "copy" : "copies"} created. ${result.skipped} skipped.`);
 };
-document.querySelector("#downloadVersionReports").onclick = async () => {
+async function downloadVersionReportBundle(promptIds) {
   const response = await fetch("/api/prompts/version-reports/export", {
-    method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({prompt_ids:[...selectedIds]}),
+    method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({prompt_ids:promptIds}),
   });
   if (!response.ok) {
     const result = await response.json();
@@ -552,7 +558,8 @@ document.querySelector("#downloadVersionReports").onclick = async () => {
   link.click();
   URL.revokeObjectURL(link.href);
   notify("Version-test report bundle downloaded.");
-};
+}
+document.querySelector("#downloadVersionReports").onclick = () => downloadVersionReportBundle([...selectedIds]);
 document.querySelector("#downloadPack").onclick = async () => {
   const response = await fetch("/api/prompts/export", {
     method:"POST",
