@@ -838,11 +838,12 @@ def download_prompt_version_report(prompt_id: int) -> Response:
 
 
 @app.patch("/api/prompts/{prompt_id}/version-test-result")
-def save_prompt_version_test_result(prompt_id: int, payload: VersionTestResultPayload) -> dict[str, str]:
+def save_prompt_version_test_result(prompt_id: int, payload: VersionTestResultPayload) -> dict[str, str | None]:
     allowed = {"original", "active", "tie"}
-    result = payload.result.strip().lower()
-    if result not in allowed:
-        raise HTTPException(status_code=400, detail="Choose original, active, or tie")
+    requested = payload.result.strip().lower()
+    if requested not in allowed | {"clear"}:
+        raise HTTPException(status_code=400, detail="Choose original, active, tie, or clear")
+    result = None if requested == "clear" else requested
     matching = rows("SELECT id FROM prompts WHERE id = ? AND parent_prompt_id IS NOT NULL", (prompt_id,))
     if not matching:
         raise HTTPException(status_code=404, detail="That prompt is not a migrated version copy")

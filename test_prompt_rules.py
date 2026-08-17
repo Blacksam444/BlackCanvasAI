@@ -93,6 +93,13 @@ class PromptRuleTests(unittest.TestCase):
         self.assertEqual(result, {"result": "active"})
         execute_mock.assert_called_once_with("UPDATE prompts SET version_test_result = ? WHERE id = ?", ("active", 9))
 
+    def test_version_test_result_can_be_cleared_without_removing_notes(self):
+        with patch("app.rows", return_value=[{"id": 9}]), patch("app.execute", return_value=0) as execute_mock:
+            result = save_prompt_version_test_result(9, VersionTestResultPayload(result="clear"))
+
+        self.assertEqual(result, {"result": None})
+        execute_mock.assert_called_once_with("UPDATE prompts SET version_test_result = ? WHERE id = ?", (None, 9))
+
     def test_version_comparison_returns_original_and_migrated_copy(self):
         migrated = {"id": 9, "title": "Guardian (MJ v8.2)", "category": "GraffitiX",
                     "text": "Guardian --raw --v 8.2", "parent_prompt_id": 4, "migrated_from_version": "8.1"}

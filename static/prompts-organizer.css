@@ -95,6 +95,7 @@
 .test-verdict>div { display:flex; flex-wrap:wrap; gap:7px; }
 .test-verdict button { border:1px solid #44414a; border-radius:8px; background:#201f24; color:#aaa6b0; padding:7px 9px; font-size:9px; cursor:pointer; }
 .test-verdict button.selected { border-color:#6b55a1; background:#2a2140; color:#dfd2ff; }
+.test-verdict button[data-result="clear"] { color:#908b95; border-style:dashed; }
 .verdict-badge { background:#27232f; color:#c8b8e8; }
 .verdict-badge.active { background:#173025; color:#a8dfbd; }
 .verdict-badge.original { background:#35251b; color:#e4bd95; }
