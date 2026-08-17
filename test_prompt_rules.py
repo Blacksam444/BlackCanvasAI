@@ -265,6 +265,12 @@ class PromptRuleTests(unittest.TestCase):
         self.assertEqual(rules["deprecated_parameters"]["--style raw"], "--raw")
         self.assertIn(rules["default_aspect_ratio"], rules["supported_aspect_ratios"])
 
+    def test_style_bible_recipe_label_uses_active_version(self):
+        script = (Path(__file__).parent / "static" / "style-bible.js").read_text(encoding="utf-8")
+        self.assertIn("MIDJOURNEY V${midjourneyRules.version} RECIPE", script)
+        self.assertIn("s.dos.map(activeRuleText)", script)
+        self.assertIn("s.donts.map(activeRuleText)", script)
+
     def test_manual_prompt_save_normalizes_legacy_v82_syntax(self):
         payload = PromptPayload(
             title="Legacy recipe",
