@@ -196,17 +196,23 @@ class PromptRuleTests(unittest.TestCase):
 
     def test_outdated_midjourney_prompt_count_ignores_active_and_unversioned_text(self):
         self.assertEqual(count_outdated_midjourney_prompts([
-            "Older prompt --raw --v 8.1",
-            "Active prompt --raw --v 8.2",
-            "Business planning notes",
+            {"id": 1, "text": "Older prompt --raw --v 8.1", "parent_prompt_id": None, "trashed": 0},
+            {"id": 2, "text": "Active prompt --raw --v 8.2", "parent_prompt_id": None, "trashed": 0},
+            {"id": 3, "text": "Business planning notes", "parent_prompt_id": None, "trashed": 0},
         ]), 1)
+
+    def test_outdated_prompt_leaves_queue_when_active_copy_exists(self):
+        self.assertEqual(count_outdated_midjourney_prompts([
+            {"id": 1, "text": "Older prompt --raw --v 8.1", "parent_prompt_id": None, "trashed": 0},
+            {"id": 2, "text": "Active copy --raw --v 8.2", "parent_prompt_id": 1, "trashed": 0},
+        ]), 0)
 
     def test_prompt_library_has_visible_outdated_copy_action(self):
         root = Path(__file__).parent
         template = (root / "templates" / "prompts.html").read_text(encoding="utf-8")
         script = (root / "static" / "prompts.js").read_text(encoding="utf-8")
         self.assertIn('id="copyVisibleOutdated"', template)
-        self.assertIn("visiblePrompts().filter(prompt => prompt.version_mismatch)", script)
+        self.assertIn("visiblePrompts().filter(prompt => prompt.version_mismatch && !prompt.active_version_copy_exists)", script)
 
     def test_midjourney_verification_status_has_review_thresholds(self):
         with patch.dict("app.MIDJOURNEY_RULES", {"version": "8.2", "verified_at": "2026-01-01"}, clear=True):

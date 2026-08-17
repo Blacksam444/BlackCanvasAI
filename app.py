@@ -133,10 +133,15 @@ def midjourney_syntax_issues(prompt: str) -> list[str]:
     return issues
 
 
-def count_outdated_midjourney_prompts(prompt_texts: list[str]) -> int:
+def count_outdated_midjourney_prompts(items: list[dict]) -> int:
+    copied_parent_ids = {
+        item.get("parent_prompt_id") for item in items
+        if item.get("parent_prompt_id") and not item.get("trashed")
+    }
     return sum(
-        any(issue.startswith("Uses MidJourney v") for issue in midjourney_syntax_issues(text))
-        for text in prompt_texts
+        item.get("id") not in copied_parent_ids
+        and any(issue.startswith("Uses MidJourney v") for issue in midjourney_syntax_issues(item.get("text", "")))
+        for item in items if not item.get("trashed")
     )
 
 
@@ -479,9 +484,14 @@ def chat_reply(payload: ChatMessage) -> dict[str, str]:
 @app.get("/api/prompts")
 def list_prompts() -> list[dict]:
     items = rows("SELECT id, title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result, version_tested_at FROM prompts ORDER BY id DESC")
+    copied_parent_ids = {
+        item["parent_prompt_id"] for item in items
+        if item.get("parent_prompt_id") and not item.get("trashed")
+    }
     for item in items:
         item["syntax_issues"] = midjourney_syntax_issues(item["text"])
         item["version_mismatch"] = any(issue.startswith("Uses MidJourney v") for issue in item["syntax_issues"])
+        item["active_version_copy_exists"] = item["id"] in copied_parent_ids
         item["syntax_repairable"] = repair_midjourney_syntax(item["text"]) != item["text"]
         item["retest_reason"] = version_test_retest_reason(item)
         item["retest_recommended"] = bool(item["retest_reason"])
@@ -536,7 +546,9 @@ def dashboard_summary() -> dict:
         ).fetchone()[0]
         review_count = db.execute("SELECT COUNT(*) FROM prompts WHERE reviewed = 0 AND trashed = 0").fetchone()[0]
         outdated_prompt_count = count_outdated_midjourney_prompts([
-            item[0] for item in db.execute("SELECT text FROM prompts WHERE trashed = 0").fetchall()
+            dict(item) for item in db.execute(
+                "SELECT id, text, trashed, parent_prompt_id FROM prompts"
+            ).fetchall()
         ])
         prompt_rows = [dict(item) for item in db.execute(
             "SELECT id, title, category, text FROM prompts WHERE trashed = 0 ORDER BY id DESC LIMIT 3"
