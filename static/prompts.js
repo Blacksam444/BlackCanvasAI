@@ -347,9 +347,15 @@ document.querySelector("#copyVersionPair").onclick = () => copyComparisonText(ac
 document.querySelector("#downloadVersionReport").onclick = () => {
   if (activeVersionComparison) window.location.href = `/api/prompts/${activeVersionComparison.migrated.id}/version-report`;
 };
-document.querySelector("#nextUntestedVersion").onclick = () => {
+document.querySelector("#nextUntestedVersion").onclick = async () => {
   const next = nextUntestedVersionCopy(activeVersionComparison?.migrated.id);
-  if (next) openVersionComparison(next.id);
+  if (!next) return;
+  const button = document.querySelector("#nextUntestedVersion");
+  button.disabled = true;
+  button.textContent = "Saving notes…";
+  const saved = await saveVersionTestNotes(false);
+  if (saved) return openVersionComparison(next.id);
+  updateNextUntestedButton();
 };
 function renderTestVerdict(result) {
   document.querySelectorAll(".test-verdict button").forEach(button => button.classList.toggle("selected", button.dataset.result === result));
@@ -367,17 +373,23 @@ document.querySelectorAll(".test-verdict button").forEach(button => button.oncli
   updateNextUntestedButton();
   notify("MidJourney test result saved.");
 });
-document.querySelector("#saveVersionTestNotes").onclick = async () => {
-  if (!activeVersionComparison) return;
+async function saveVersionTestNotes(showSuccess = true) {
+  if (!activeVersionComparison) return false;
   const notes = document.querySelector("#versionTestNotes").value.trim();
+  if (notes === (activeVersionComparison.migrated.version_test_notes || "")) return true;
   const response = await fetch(`/api/prompts/${activeVersionComparison.migrated.id}/version-test-notes`, {
     method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({notes}),
   });
   const result = await response.json();
-  if (!response.ok) return notify(result.detail || "Those test notes could not be saved.");
+  if (!response.ok) {
+    notify(result.detail || "Those test notes could not be saved.");
+    return false;
+  }
   activeVersionComparison.migrated.version_test_notes = result.notes;
-  notify("MidJourney test notes saved.");
-};
+  if (showSuccess) notify("MidJourney test notes saved.");
+  return true;
+}
+document.querySelector("#saveVersionTestNotes").onclick = () => saveVersionTestNotes();
 document.querySelector("#repairSyntax").onclick = async () => {
   if (!editingId) return;
   const response = await fetch(`/api/prompts/${editingId}/repair-midjourney-syntax`, {method:"PATCH"});
