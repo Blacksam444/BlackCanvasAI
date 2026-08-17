@@ -397,7 +397,7 @@ def chat_reply(payload: ChatMessage) -> dict[str, str]:
 
 @app.get("/api/prompts")
 def list_prompts() -> list[dict]:
-    items = rows("SELECT id, title, category, text, favorite, source, reviewed, trashed FROM prompts ORDER BY id DESC")
+    items = rows("SELECT id, title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version FROM prompts ORDER BY id DESC")
     for item in items:
         item["syntax_issues"] = midjourney_syntax_issues(item["text"])
         item["version_mismatch"] = any(issue.startswith("Uses MidJourney v") for issue in item["syntax_issues"])
@@ -630,15 +630,18 @@ def copy_prompt_to_active_midjourney_version(prompt_id: int) -> dict:
     )
     migrated_text = repair_midjourney_syntax(migrated_text)
     title = f"{original['title']} (MJ v{MIDJOURNEY_RULES['version']})"[:120]
+    source_version = re.search(r"--v\s+([0-9]+(?:\.[0-9]+)?)\b", original["text"], flags=re.IGNORECASE).group(1)
     try:
         prompt_id = execute(
-            "INSERT INTO prompts(title, category, text, favorite, source, reviewed) VALUES (?, ?, ?, 0, 'manual', 0)",
-            (title, original["category"], migrated_text),
+            "INSERT INTO prompts(title, category, text, favorite, source, reviewed, parent_prompt_id, migrated_from_version) "
+            "VALUES (?, ?, ?, 0, 'manual', 0, ?, ?)",
+            (title, original["category"], migrated_text, original["id"], source_version),
         )
     except sqlite3.IntegrityError:
         raise HTTPException(status_code=409, detail="That active-version copy already exists")
     return {"id": prompt_id, "title": title, "category": original["category"], "text": migrated_text,
-            "favorite": 0, "source": "manual", "reviewed": 0, "syntax_issues": midjourney_syntax_issues(migrated_text)}
+            "favorite": 0, "source": "manual", "reviewed": 0, "parent_prompt_id": original["id"],
+            "migrated_from_version": source_version, "syntax_issues": midjourney_syntax_issues(migrated_text)}
 
 
 @app.post("/api/prompts/bulk-copy-to-active-midjourney-version")
@@ -670,10 +673,12 @@ def bulk_copy_prompts_to_active_midjourney_version(payload: PromptIdsPayload) ->
             )
             migrated_text = repair_midjourney_syntax(migrated_text)
             title = f"{original['title']} (MJ v{MIDJOURNEY_RULES['version']})"[:120]
+            source_version = re.search(r"--v\s+([0-9]+(?:\.[0-9]+)?)\b", original["text"], flags=re.IGNORECASE).group(1)
             try:
                 db.execute(
-                    "INSERT INTO prompts(title, category, text, favorite, source, reviewed) VALUES (?, ?, ?, 0, 'manual', 0)",
-                    (title, original["category"], migrated_text),
+                    "INSERT INTO prompts(title, category, text, favorite, source, reviewed, parent_prompt_id, migrated_from_version) "
+                    "VALUES (?, ?, ?, 0, 'manual', 0, ?, ?)",
+                    (title, original["category"], migrated_text, original["id"], source_version),
                 )
                 copied += 1
             except sqlite3.IntegrityError:
@@ -1029,7 +1034,7 @@ def backup_to_google_drive() -> dict:
         fields="id,name,webViewLink",
     ).execute()
     manifest = backup_data()
-    manifest.update({"backup_format": 3, "created_at": created_at.isoformat(), "artwork_file_count": 0})
+    manifest.update({"backup_format": 4, "created_at": created_at.isoformat(), "artwork_file_count": 0})
     uploaded_images = 0
     mime_types = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif"}
     for artwork in manifest.get("artworks", []):
@@ -1141,12 +1146,14 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
     with connect() as db:
         for prompt in manifest.get("prompts", []):
             cursor = db.execute(
-                "INSERT OR IGNORE INTO prompts(title, category, text, favorite, source, reviewed, trashed) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO prompts(title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     prompt.get("title", "Restored prompt"), prompt.get("category", "Unsorted"),
                     repair_midjourney_syntax(str(prompt.get("text", "")).strip()),
                     int(bool(prompt.get("favorite"))), prompt.get("source", "backup"), int(bool(prompt.get("reviewed", True))),
                     int(bool(prompt.get("trashed", False))),
+                    prompt.get("parent_prompt_id"), prompt.get("migrated_from_version"),
                 ),
             )
             restored_prompts += max(cursor.rowcount, 0)
