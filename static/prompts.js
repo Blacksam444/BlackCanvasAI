@@ -253,6 +253,17 @@ function render() {
     downloadQueue.disabled = shown.length === 0;
     downloadQueue.textContent = shown.length ? `Download reports (${shown.length})` : "No reports";
   }
+  const outdatedMode = filter === "Older MJ version";
+  const outdatedTools = document.querySelector("#outdatedVersionTools");
+  outdatedTools.hidden = !outdatedMode;
+  if (outdatedMode) {
+    document.querySelector("#outdatedVersionSummary").textContent = shown.length
+      ? `${shown.length} older-version ${shown.length === 1 ? "prompt" : "prompts"} visible`
+      : (query ? "No matching older-version prompts" : "Every prompt uses the active version");
+    const copyVisible = document.querySelector("#copyVisibleOutdated");
+    copyVisible.disabled = shown.length === 0;
+    copyVisible.textContent = shown.length ? `Create active copies (${shown.length})` : "Nothing to update";
+  }
   const selectVisible = document.querySelector("#selectVisible");
   const allVisibleSelected = shown.length > 0 && shown.every(prompt => selectedIds.has(prompt.id));
   selectVisible.disabled = shown.length === 0;
@@ -533,20 +544,25 @@ document.querySelector("#repairSelected").onclick = async () => {
   const skipped = result.skipped ? ` ${result.skipped} skipped because no change was needed or a duplicate would result.` : "";
   notify(`${result.repaired} ${result.repaired === 1 ? "prompt" : "prompts"} repaired.${skipped}`);
 };
-document.querySelector("#copyVersionSelected").onclick = async () => {
-  const mismatchCount = prompts.filter(prompt => selectedIds.has(prompt.id) && prompt.version_mismatch).length;
-  if (!mismatchCount || !window.confirm(`Create active-version copies of ${mismatchCount} selected ${mismatchCount === 1 ? "prompt" : "prompts"}? Originals will be kept.`)) return;
+async function copyPromptsToActiveVersion(promptIds, scopeLabel) {
+  const mismatchIds = promptIds.filter(id => prompts.some(prompt => prompt.id === id && prompt.version_mismatch));
+  const mismatchCount = mismatchIds.length;
+  if (!mismatchCount || !window.confirm(`Create active-version copies of ${mismatchCount} ${scopeLabel} ${mismatchCount === 1 ? "prompt" : "prompts"}? Originals will be kept.`)) return;
   const response = await fetch("/api/prompts/bulk-copy-to-active-midjourney-version", {
     method:"POST",
     headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({prompt_ids:[...selectedIds]}),
+    body:JSON.stringify({prompt_ids:mismatchIds}),
   });
   const result = await response.json();
   if (!response.ok) return notify(result.detail || "Those active-version copies could not be created.");
   selectedIds.clear();
   await load();
   notify(`${result.copied} active-version ${result.copied === 1 ? "copy" : "copies"} created. ${result.skipped} skipped.`);
-};
+}
+document.querySelector("#copyVersionSelected").onclick = () => copyPromptsToActiveVersion([...selectedIds], "selected");
+document.querySelector("#copyVisibleOutdated").onclick = () => copyPromptsToActiveVersion(
+  visiblePrompts().filter(prompt => prompt.version_mismatch).map(prompt => prompt.id), "visible"
+);
 async function downloadVersionReportBundle(promptIds) {
   const response = await fetch("/api/prompts/version-reports/export", {
     method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({prompt_ids:promptIds}),

@@ -201,6 +201,13 @@ class PromptRuleTests(unittest.TestCase):
             "Business planning notes",
         ]), 1)
 
+    def test_prompt_library_has_visible_outdated_copy_action(self):
+        root = Path(__file__).parent
+        template = (root / "templates" / "prompts.html").read_text(encoding="utf-8")
+        script = (root / "static" / "prompts.js").read_text(encoding="utf-8")
+        self.assertIn('id="copyVisibleOutdated"', template)
+        self.assertIn("visiblePrompts().filter(prompt => prompt.version_mismatch)", script)
+
     def test_midjourney_verification_status_has_review_thresholds(self):
         with patch.dict("app.MIDJOURNEY_RULES", {"version": "8.2", "verified_at": "2026-01-01"}, clear=True):
             current = midjourney_verification_status(date(2026, 3, 1))
