@@ -519,6 +519,7 @@ def summarize_version_tests(items: list[dict]) -> dict[str, int]:
 
 @app.get("/api/dashboard")
 def dashboard_summary() -> dict:
+    verification = midjourney_verification_status()
     with connect() as db:
         prompt_count = db.execute("SELECT COUNT(*) FROM prompts WHERE trashed = 0").fetchone()[0]
         artwork_count = db.execute("SELECT COUNT(*) FROM artworks").fetchone()[0]
@@ -556,6 +557,13 @@ def dashboard_summary() -> dict:
         "counts": {"prompts": prompt_count, "artworks": artwork_count,
                    "favorites": favorite_count, "to_review": review_count},
         "version_testing": version_testing,
+        "midjourney_rules": {
+            "version": MIDJOURNEY_RULES["version"],
+            "verified_at": MIDJOURNEY_RULES.get("verified_at"),
+            "verification_status": verification["status"],
+            "verification_label": verification["label"],
+            "next_review": verification["next_review"],
+        },
         "prompt_of_day": dict(prompt_of_day) if prompt_of_day else None,
         "recent": activity[:3],
     }

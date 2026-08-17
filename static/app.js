@@ -53,6 +53,14 @@ async function loadDashboard() {
     document.querySelector("#favoriteCount").textContent = data.counts.favorites;
     document.querySelector("#reviewCount").textContent = data.counts.to_review ? `${data.counts.to_review} to review` : "All organized";
     const testing = data.version_testing;
+    const rules = data.midjourney_rules;
+    const rulesStatus = document.querySelector("#midjourneyRulesStatus");
+    const verifiedDate = rules.verified_at
+      ? new Date(`${rules.verified_at}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+      : "not recorded";
+    rulesStatus.textContent = `MidJourney v${rules.version} · ${rules.verification_label} ${verifiedDate}`;
+    rulesStatus.dataset.status = rules.verification_status;
+    rulesStatus.title = rules.next_review ? `Next rules review: ${rules.next_review}` : "Open the Style Bible to verify these rules";
     document.querySelector("#versionTestProgress").textContent = testing.total ? `${testing.completion_percent}% tested` : "No copies yet";
     document.querySelector("#versionTestBar").style.width = `${testing.completion_percent}%`;
     document.querySelector("#versionTestTotal").textContent = testing.total;
