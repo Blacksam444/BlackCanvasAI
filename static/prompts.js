@@ -386,8 +386,14 @@ function updateNextUntestedButton() {
   const retestMode = filter === "Retest recommended";
   const retestRemaining = migrated.filter(prompt => prompt.retest_recommended).length;
   const next = nextVersionTestCopy(activeVersionComparison?.migrated.id);
-  button.disabled = !next;
-  button.textContent = next
+  const fullQueueRemaining = migrated.filter(prompt =>
+    !prompt.version_test_result && prompt.id !== activeVersionComparison?.migrated.id && !activeMigrationBatchIds?.has(prompt.id)
+  ).length;
+  const canContinueFullQueue = Boolean(activeMigrationBatchIds && !next && fullQueueRemaining);
+  button.disabled = !next && !canContinueFullQueue;
+  button.textContent = canContinueFullQueue
+    ? `Continue with full queue (${fullQueueRemaining}) →`
+    : next
     ? (retestMode ? "Next recommended retest →" : "Next untested copy →")
     : (retestMode ? "Retest queue complete" : (activeMigrationBatchIds ? "Migration batch complete" : "Testing queue complete"));
   document.querySelector("#versionQueueProgress").textContent = scoped.length
@@ -444,7 +450,11 @@ document.querySelector("#downloadVersionReport").onclick = () => {
   if (activeVersionComparison) window.location.href = `/api/prompts/${activeVersionComparison.migrated.id}/version-report`;
 };
 document.querySelector("#nextUntestedVersion").onclick = async () => {
-  const next = nextVersionTestCopy(activeVersionComparison?.migrated.id);
+  let next = nextVersionTestCopy(activeVersionComparison?.migrated.id);
+  if (!next && activeMigrationBatchIds) {
+    activeMigrationBatchIds = null;
+    next = nextVersionTestCopy(activeVersionComparison?.migrated.id);
+  }
   if (!next) return;
   const button = document.querySelector("#nextUntestedVersion");
   button.disabled = true;
