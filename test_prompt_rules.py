@@ -83,12 +83,17 @@ class PromptRuleTests(unittest.TestCase):
             "parameter_changes": [{"parameter": "Version", "original": "8.1", "migrated": "8.2"}],
             "original": {"version": "8.1", "title": "Original", "text": "Prompt one"},
             "migrated": {"version": "8.2", "title": "Copy", "text": "Prompt two",
-                         "version_test_result": "active", "version_test_notes": "Better anatomy."},
+                         "version_test_result": "active", "version_test_notes": "Better anatomy.",
+                         "version_tested_at": "2026-08-01T12:00:00+00:00", "retest_recommended": True},
+            "rules_verified_at": "2026-08-17",
         })
         self.assertIn("Creative direction preserved: Yes", report)
         self.assertIn("Test verdict: Active copy preferred", report)
         self.assertIn("- Version: 8.1 -> 8.2", report)
         self.assertIn("Better anatomy.", report)
+        self.assertIn("Verdict recorded: 2026-08-01T12:00:00+00:00", report)
+        self.assertIn("MidJourney rules verified: 2026-08-17", report)
+        self.assertIn("Retest recommended: Yes", report)
         self.assertLess(report.index("Prompt one"), report.index("Prompt two"))
 
     def test_version_test_notes_are_trimmed_and_saved_on_migrated_copy(self):
