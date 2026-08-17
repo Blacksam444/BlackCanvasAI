@@ -29,6 +29,7 @@
 }
 .duplicate-tools button:disabled { cursor:default; opacity:.45; }
 .version-queue-tools strong { color:#c5b8ff; }.version-queue-tools button { border-color:#51456e; background:#241d33; color:#d5c8ff; }
+.queue-actions { display:flex; gap:8px; }
 
 .bulk-toolbar {
   position:sticky; top:82px; z-index:3; display:flex; align-items:center; gap:9px;
@@ -124,7 +125,7 @@
   .search-row .search, .select-visible, .sort-prompts, .sort-prompts select { max-width:none; width:100%; }
   .sort-prompts { align-items:stretch; flex-direction:column; }
   .duplicate-tools, .bulk-toolbar { align-items:stretch; flex-direction:column; }
-  .duplicate-tools button, .bulk-toolbar strong { margin:0; }
+  .duplicate-tools button, .bulk-toolbar strong { margin:0; }.queue-actions { flex-direction:column; }
   .duplicate-tools button, .bulk-toolbar select, .bulk-toolbar button { width:100%; }
   .card-badges { gap:3px; }
   .source, .review-badge, .duplicate-badge, .syntax-badge, .trash-badge { font-size:7px; }
