@@ -307,7 +307,7 @@ function updateNextUntestedButton() {
   button.disabled = !next;
   button.textContent = next ? "Next untested copy →" : "Testing queue complete";
   document.querySelector("#versionQueueProgress").textContent = migrated.length
-    ? `${tested} of ${migrated.length} tested · ${remaining} remaining`
+    ? `${tested} of ${migrated.length} tested · ${remaining} remaining${activeVersionComparison?.migrated.version_tested_at ? ` · Last verdict ${new Date(activeVersionComparison.migrated.version_tested_at).toLocaleDateString()}` : ""}`
     : "No migrated copies to test";
 }
 async function openVersionComparison(promptId) {
@@ -381,6 +381,7 @@ document.querySelectorAll(".test-verdict button").forEach(button => button.oncli
   const result = await response.json();
   if (!response.ok) return notify(result.detail || "That test result could not be saved.");
   activeVersionComparison.migrated.version_test_result = result.result;
+  activeVersionComparison.migrated.version_tested_at = result.tested_at;
   renderTestVerdict(result.result);
   await load();
   updateNextUntestedButton();

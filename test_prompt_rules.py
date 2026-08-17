@@ -90,15 +90,21 @@ class PromptRuleTests(unittest.TestCase):
         with patch("app.rows", return_value=[{"id": 9}]), patch("app.execute", return_value=0) as execute_mock:
             result = save_prompt_version_test_result(9, VersionTestResultPayload(result="ACTIVE"))
 
-        self.assertEqual(result, {"result": "active"})
-        execute_mock.assert_called_once_with("UPDATE prompts SET version_test_result = ? WHERE id = ?", ("active", 9))
+        self.assertEqual(result["result"], "active")
+        self.assertTrue(result["tested_at"].endswith("+00:00"))
+        execute_mock.assert_called_once_with(
+            "UPDATE prompts SET version_test_result = ?, version_tested_at = ? WHERE id = ?",
+            ("active", result["tested_at"], 9),
+        )
 
     def test_version_test_result_can_be_cleared_without_removing_notes(self):
         with patch("app.rows", return_value=[{"id": 9}]), patch("app.execute", return_value=0) as execute_mock:
             result = save_prompt_version_test_result(9, VersionTestResultPayload(result="clear"))
 
-        self.assertEqual(result, {"result": None})
-        execute_mock.assert_called_once_with("UPDATE prompts SET version_test_result = ? WHERE id = ?", (None, 9))
+        self.assertEqual(result, {"result": None, "tested_at": None})
+        execute_mock.assert_called_once_with(
+            "UPDATE prompts SET version_test_result = ?, version_tested_at = ? WHERE id = ?", (None, None, 9)
+        )
 
     def test_version_comparison_returns_original_and_migrated_copy(self):
         migrated = {"id": 9, "title": "Guardian (MJ v8.2)", "category": "GraffitiX",
@@ -171,7 +177,7 @@ class PromptRuleTests(unittest.TestCase):
             rules_path.write_text(json.dumps(original_rules), encoding="utf-8")
             with patch("storage.MIDJOURNEY_RULES_PATH", rules_path), patch("storage.rows", return_value=[]):
                 backup = backup_data()
-            self.assertEqual(backup["version"], 5)
+            self.assertEqual(backup["version"], 6)
             self.assertEqual(backup["midjourney_rules"]["version"], original_rules["version"])
             with patch("app.MIDJOURNEY_RULES_PATH", rules_path):
                 try:
@@ -470,7 +476,7 @@ class PromptBulkRepairTests(unittest.TestCase):
                 "CREATE TABLE prompts (id INTEGER PRIMARY KEY, title TEXT, category TEXT, text TEXT, favorite INTEGER DEFAULT 0, "
                 "source TEXT DEFAULT 'manual', reviewed INTEGER DEFAULT 1, trashed INTEGER DEFAULT 0, "
                 "parent_prompt_id INTEGER, migrated_from_version TEXT, version_test_result TEXT, "
-                "version_test_notes TEXT DEFAULT '', UNIQUE(title, text))"
+                "version_test_notes TEXT DEFAULT '', version_tested_at TEXT, UNIQUE(title, text))"
             )
             connection.executemany("INSERT INTO prompts(id, title, category, text) VALUES (?, ?, ?, ?)", [
                 (1, "Old Guardian", "GraffitiX", "Guardian --style raw --v 8.1"),
