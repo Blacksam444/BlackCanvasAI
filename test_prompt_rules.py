@@ -38,11 +38,25 @@ from app import (
     save_midjourney_rules,
     save_prompt_version_test_result,
     save_prompt_version_test_notes,
+    summarize_version_tests,
 )
 from storage import backup_data
 
 
 class PromptRuleTests(unittest.TestCase):
+    def test_version_test_summary_counts_outcomes_and_progress(self):
+        summary = summarize_version_tests([
+            {"parent_prompt_id": 1, "version_test_result": "active"},
+            {"parent_prompt_id": 2, "version_test_result": "original"},
+            {"parent_prompt_id": 3, "version_test_result": "tie"},
+            {"parent_prompt_id": 4, "version_test_result": None},
+            {"parent_prompt_id": None, "version_test_result": "active"},
+        ])
+        self.assertEqual(summary, {
+            "total": 4, "untested": 1, "active": 1, "original": 1,
+            "tie": 1, "tested": 3, "completion_percent": 75,
+        })
+
     def test_version_report_collection_keeps_selected_report_order(self):
         bundle = format_version_test_report_collection(["FIRST REPORT\nOriginal one", "SECOND REPORT\nOriginal two"])
         self.assertIn("2 version test reports", bundle)

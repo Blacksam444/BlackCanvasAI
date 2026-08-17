@@ -52,6 +52,14 @@ async function loadDashboard() {
     document.querySelector("#artworkCount").textContent = data.counts.artworks;
     document.querySelector("#favoriteCount").textContent = data.counts.favorites;
     document.querySelector("#reviewCount").textContent = data.counts.to_review ? `${data.counts.to_review} to review` : "All organized";
+    const testing = data.version_testing;
+    document.querySelector("#versionTestProgress").textContent = testing.total ? `${testing.completion_percent}% tested` : "No copies yet";
+    document.querySelector("#versionTestBar").style.width = `${testing.completion_percent}%`;
+    document.querySelector("#versionTestTotal").textContent = testing.total;
+    document.querySelector("#versionTestUntested").textContent = testing.untested;
+    document.querySelector("#versionTestActive").textContent = testing.active;
+    document.querySelector("#versionTestOriginal").textContent = testing.original;
+    document.querySelector("#versionTestTie").textContent = testing.tie;
     if (data.prompt_of_day) {
       document.querySelector("#dailyPrompt").textContent = data.prompt_of_day.text;
       document.querySelector("#dailyCategory").textContent = data.prompt_of_day.category;

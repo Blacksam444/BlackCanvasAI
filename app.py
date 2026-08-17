@@ -471,6 +471,20 @@ def list_prompts() -> list[dict]:
     return items
 
 
+def summarize_version_tests(items: list[dict]) -> dict[str, int]:
+    migrated = [item for item in items if item.get("parent_prompt_id")]
+    counts = {"total": len(migrated), "untested": 0, "active": 0, "original": 0, "tie": 0}
+    for item in migrated:
+        result = item.get("version_test_result")
+        if result in ("active", "original", "tie"):
+            counts[result] += 1
+        else:
+            counts["untested"] += 1
+    counts["tested"] = counts["total"] - counts["untested"]
+    counts["completion_percent"] = round(counts["tested"] / counts["total"] * 100) if counts["total"] else 0
+    return counts
+
+
 @app.get("/api/dashboard")
 def dashboard_summary() -> dict:
     with connect() as db:
@@ -487,6 +501,9 @@ def dashboard_summary() -> dict:
         artwork_rows = [dict(item) for item in db.execute(
             "SELECT id, title, collection, notes FROM artworks ORDER BY id DESC LIMIT 3"
         ).fetchall()]
+        version_testing = summarize_version_tests([dict(item) for item in db.execute(
+            "SELECT parent_prompt_id, version_test_result FROM prompts WHERE trashed = 0 AND parent_prompt_id IS NOT NULL"
+        ).fetchall()])
         prompt_of_day = db.execute(
             "SELECT id, title, category, text FROM prompts WHERE trashed = 0 "
             "ORDER BY favorite DESC, id DESC LIMIT 1 OFFSET ?",
@@ -506,6 +523,7 @@ def dashboard_summary() -> dict:
     return {
         "counts": {"prompts": prompt_count, "artworks": artwork_count,
                    "favorites": favorite_count, "to_review": review_count},
+        "version_testing": version_testing,
         "prompt_of_day": dict(prompt_of_day) if prompt_of_day else None,
         "recent": activity[:3],
     }
