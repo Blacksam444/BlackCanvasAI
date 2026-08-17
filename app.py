@@ -611,6 +611,36 @@ def repair_prompt_syntax(prompt_id: int) -> dict:
     return prompt
 
 
+@app.post("/api/prompts/{prompt_id}/copy-to-active-midjourney-version")
+def copy_prompt_to_active_midjourney_version(prompt_id: int) -> dict:
+    matching = rows(
+        "SELECT id, title, category, text FROM prompts WHERE trashed = 0 AND id = ?",
+        (prompt_id,),
+    )
+    if not matching:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    original = matching[0]
+    if not any(issue.startswith("Uses MidJourney v") for issue in midjourney_syntax_issues(original["text"])):
+        raise HTTPException(status_code=400, detail="This prompt already uses the active MidJourney version")
+    migrated_text = re.sub(
+        r"--v\s+[0-9]+(?:\.[0-9]+)?\b",
+        f"--v {MIDJOURNEY_RULES['version']}",
+        original["text"],
+        flags=re.IGNORECASE,
+    )
+    migrated_text = repair_midjourney_syntax(migrated_text)
+    title = f"{original['title']} (MJ v{MIDJOURNEY_RULES['version']})"[:120]
+    try:
+        prompt_id = execute(
+            "INSERT INTO prompts(title, category, text, favorite, source, reviewed) VALUES (?, ?, ?, 0, 'manual', 0)",
+            (title, original["category"], migrated_text),
+        )
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=409, detail="That active-version copy already exists")
+    return {"id": prompt_id, "title": title, "category": original["category"], "text": migrated_text,
+            "favorite": 0, "source": "manual", "reviewed": 0, "syntax_issues": midjourney_syntax_issues(migrated_text)}
+
+
 @app.get("/api/styles")
 def list_styles() -> dict:
     return {item["name"]: json.loads(item["content"]) for item in rows("SELECT name, content FROM styles")}

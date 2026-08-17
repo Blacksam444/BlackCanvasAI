@@ -195,6 +195,7 @@ function openEditor(prompt = null) {
   syntaxRepair.hidden = !prompt?.syntax_issues?.length;
   document.querySelector("#syntaxRepairMessage").textContent = prompt?.syntax_issues?.join(" · ") || "";
   document.querySelector("#repairSyntax").hidden = !prompt?.syntax_repairable;
+  document.querySelector("#copyActiveVersion").hidden = !prompt?.version_mismatch;
   if (prompt) {
     document.querySelector("#promptTitle").value = prompt.title;
     document.querySelector("#promptCategory").value = canonicalCategories.includes(prompt.category) ? prompt.category : "Unsorted";
@@ -268,6 +269,16 @@ document.querySelector("#repairSyntax").onclick = async () => {
   document.querySelector("#syntaxRepair").hidden = true;
   await load();
   notify("MidJourney syntax repaired with --raw.");
+};
+
+document.querySelector("#copyActiveVersion").onclick = async () => {
+  if (!editingId) return;
+  const response = await fetch(`/api/prompts/${editingId}/copy-to-active-midjourney-version`, {method:"POST"});
+  const result = await response.json();
+  if (!response.ok) return notify(result.detail || "The active-version copy could not be created.");
+  dialog.close();
+  await load();
+  notify("Active-version copy created. The original was kept.");
 };
 
 async function bulkUpdate(changes, successMessage) {
