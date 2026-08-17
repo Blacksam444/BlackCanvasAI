@@ -277,6 +277,15 @@ async function openVersionComparison(promptId) {
   document.querySelector("#migratedVersionLabel").textContent = `Active copy · MJ v${result.migrated.version}`;
   document.querySelector("#migratedVersionTitle").textContent = result.migrated.title;
   document.querySelector("#migratedVersionText").textContent = result.migrated.text;
+  const summary = document.querySelector("#comparisonSummary");
+  summary.className = `comparison-summary ${result.creative_body_preserved ? "preserved" : "changed"}`;
+  const directionStatus = result.creative_body_preserved
+    ? "Creative direction preserved."
+    : "Creative prompt text changed—review carefully.";
+  const changes = result.parameter_changes.length
+    ? result.parameter_changes.map(change => `${change.parameter}: ${change.original} → ${change.migrated}`).join(" · ")
+    : "No technical parameter changes detected.";
+  summary.textContent = `${directionStatus} ${changes}`;
   versionCompareDialog.showModal();
 }
 document.querySelector("#closeVersionCompare").onclick = () => versionCompareDialog.close();

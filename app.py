@@ -47,6 +47,22 @@ def strip_midjourney_parameters(text: str) -> str:
     return re.sub(r"\s{2,}", " ", cleaned).strip()
 
 
+def midjourney_parameter_summary(prompt: str) -> dict[str, str]:
+    aspect = re.search(r"--ar\s+([0-9]+:[0-9]+)\b", prompt, flags=re.IGNORECASE)
+    version = re.search(r"--v\s+([0-9]+(?:\.[0-9]+)?)\b", prompt, flags=re.IGNORECASE)
+    if re.search(r"--style\s+raw\b", prompt, flags=re.IGNORECASE):
+        raw_mode = "--style raw"
+    elif re.search(r"--raw\b", prompt, flags=re.IGNORECASE):
+        raw_mode = "--raw"
+    else:
+        raw_mode = "not set"
+    return {
+        "Aspect ratio": aspect.group(1) if aspect else "not set",
+        "Raw mode": raw_mode,
+        "Version": version.group(1) if version else "not set",
+    }
+
+
 def midjourney_syntax_issues(prompt: str) -> list[str]:
     issues: list[str] = []
     has_legacy_raw = bool(re.search(r"--style\s+raw\b", prompt, flags=re.IGNORECASE))
@@ -702,9 +718,19 @@ def prompt_version_comparison(prompt_id: int) -> dict:
     )
     if not originals:
         raise HTTPException(status_code=404, detail="The original prompt is no longer available")
+    original = originals[0]
+    original_parameters = midjourney_parameter_summary(original["text"])
+    migrated_parameters = midjourney_parameter_summary(migrated["text"])
+    parameter_changes = [
+        {"parameter": name, "original": original_parameters[name], "migrated": migrated_parameters[name]}
+        for name in original_parameters
+        if original_parameters[name] != migrated_parameters[name]
+    ]
     return {
-        "original": {**originals[0], "version": migrated["migrated_from_version"]},
+        "original": {**original, "version": migrated["migrated_from_version"]},
         "migrated": {**migrated, "version": MIDJOURNEY_RULES["version"]},
+        "creative_body_preserved": strip_midjourney_parameters(original["text"]) == strip_midjourney_parameters(migrated["text"]),
+        "parameter_changes": parameter_changes,
     }
 
 
