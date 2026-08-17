@@ -52,6 +52,12 @@ def midjourney_syntax_issues(prompt: str) -> list[str]:
     has_legacy_raw = bool(re.search(r"--style\s+raw\b", prompt, flags=re.IGNORECASE))
     if has_legacy_raw:
         issues.append("Legacy --style raw syntax")
+    prompt_versions = re.findall(r"--v\s+([0-9]+(?:\.[0-9]+)?)\b", prompt, flags=re.IGNORECASE)
+    mismatched_versions = list(dict.fromkeys(version for version in prompt_versions if version != MIDJOURNEY_RULES["version"]))
+    if mismatched_versions:
+        issues.append(
+            f"Uses MidJourney v{', '.join(mismatched_versions)}; active verified rules are v{MIDJOURNEY_RULES['version']}"
+        )
     version_pattern = re.escape(MIDJOURNEY_RULES["version"])
     raw_pattern = rf"{re.escape(MIDJOURNEY_RULES['raw_parameter'])}\b"
     if not has_legacy_raw and re.search(rf"--v\s+{version_pattern}\b", prompt, flags=re.IGNORECASE) and not re.search(
@@ -394,6 +400,8 @@ def list_prompts() -> list[dict]:
     items = rows("SELECT id, title, category, text, favorite, source, reviewed, trashed FROM prompts ORDER BY id DESC")
     for item in items:
         item["syntax_issues"] = midjourney_syntax_issues(item["text"])
+        item["version_mismatch"] = any(issue.startswith("Uses MidJourney v") for issue in item["syntax_issues"])
+        item["syntax_repairable"] = repair_midjourney_syntax(item["text"]) != item["text"]
     return items
 
 
