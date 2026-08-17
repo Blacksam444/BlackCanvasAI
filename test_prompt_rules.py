@@ -45,6 +45,9 @@ class PromptRuleTests(unittest.TestCase):
         self.assertEqual(saved_values[2], "Guardian --raw --v 8.2")
         self.assertEqual(original["text"], "Guardian --style raw --v 8.1")
         self.assertEqual(result["id"], 44)
+        self.assertEqual(saved_values[3:], (7, "8.1"))
+        self.assertEqual(result["parent_prompt_id"], 7)
+        self.assertEqual(result["migrated_from_version"], "8.1")
         self.assertEqual(result["syntax_issues"], [])
 
     def test_prompts_using_another_midjourney_version_are_flagged_without_rewrite(self):
@@ -69,7 +72,7 @@ class PromptRuleTests(unittest.TestCase):
             rules_path.write_text(json.dumps(original_rules), encoding="utf-8")
             with patch("storage.MIDJOURNEY_RULES_PATH", rules_path), patch("storage.rows", return_value=[]):
                 backup = backup_data()
-            self.assertEqual(backup["version"], 2)
+            self.assertEqual(backup["version"], 3)
             self.assertEqual(backup["midjourney_rules"]["version"], original_rules["version"])
             with patch("app.MIDJOURNEY_RULES_PATH", rules_path):
                 try:
@@ -366,7 +369,8 @@ class PromptBulkRepairTests(unittest.TestCase):
             connection = sqlite3.connect(database)
             connection.execute(
                 "CREATE TABLE prompts (id INTEGER PRIMARY KEY, title TEXT, category TEXT, text TEXT, favorite INTEGER DEFAULT 0, "
-                "source TEXT DEFAULT 'manual', reviewed INTEGER DEFAULT 1, trashed INTEGER DEFAULT 0, UNIQUE(title, text))"
+                "source TEXT DEFAULT 'manual', reviewed INTEGER DEFAULT 1, trashed INTEGER DEFAULT 0, "
+                "parent_prompt_id INTEGER, migrated_from_version TEXT, UNIQUE(title, text))"
             )
             connection.executemany("INSERT INTO prompts(id, title, category, text) VALUES (?, ?, ?, ?)", [
                 (1, "Old Guardian", "GraffitiX", "Guardian --style raw --v 8.1"),
@@ -396,6 +400,8 @@ class PromptBulkRepairTests(unittest.TestCase):
                                  "Guardian --style raw --v 8.1")
                 self.assertEqual(check.execute("SELECT text FROM prompts WHERE id = 3").fetchone()[0],
                                  "Guardian --raw --v 8.2")
+                self.assertEqual(check.execute("SELECT parent_prompt_id, migrated_from_version FROM prompts WHERE id = 3").fetchone(),
+                                 (1, "8.1"))
             finally:
                 check.close()
 

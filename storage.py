@@ -39,6 +39,8 @@ def initialize() -> None:
                 source TEXT NOT NULL DEFAULT 'manual',
                 reviewed INTEGER NOT NULL DEFAULT 1,
                 trashed INTEGER NOT NULL DEFAULT 0,
+                parent_prompt_id INTEGER,
+                migrated_from_version TEXT,
                 UNIQUE(title, text)
             );
             CREATE TABLE IF NOT EXISTS styles (
@@ -63,6 +65,10 @@ def initialize() -> None:
             db.execute("ALTER TABLE prompts ADD COLUMN reviewed INTEGER NOT NULL DEFAULT 1")
         if "trashed" not in prompt_columns:
             db.execute("ALTER TABLE prompts ADD COLUMN trashed INTEGER NOT NULL DEFAULT 0")
+        if "parent_prompt_id" not in prompt_columns:
+            db.execute("ALTER TABLE prompts ADD COLUMN parent_prompt_id INTEGER")
+        if "migrated_from_version" not in prompt_columns:
+            db.execute("ALTER TABLE prompts ADD COLUMN migrated_from_version TEXT")
         db.execute("UPDATE prompts SET source = 'chatgpt', reviewed = 0 WHERE category = 'ChatGPT Import' AND source = 'manual'")
         db.execute("UPDATE prompts SET source = 'drive', reviewed = 0 WHERE category = 'Imported' AND source = 'manual'")
         if db.execute("SELECT COUNT(*) FROM prompts").fetchone()[0] == 0:
@@ -83,8 +89,8 @@ def execute(query: str, values: tuple[Any, ...] = ()) -> int:
 def backup_data() -> dict[str, Any]:
     styles = rows("SELECT name, content FROM styles ORDER BY name")
     return {
-        "version": 2,
-        "prompts": rows("SELECT id, title, category, text, favorite, source, reviewed, trashed FROM prompts ORDER BY id"),
+        "version": 3,
+        "prompts": rows("SELECT id, title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version FROM prompts ORDER BY id"),
         "styles": {item["name"]: json.loads(item["content"]) for item in styles},
         "midjourney_rules": json.loads(MIDJOURNEY_RULES_PATH.read_text(encoding="utf-8")),
         "artworks": rows("SELECT id, title, collection, tags, notes, favorite, filename, created_at FROM artworks ORDER BY id"),
