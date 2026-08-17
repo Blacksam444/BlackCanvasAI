@@ -544,7 +544,7 @@ document.querySelector("#repairSelected").onclick = async () => {
   const skipped = result.skipped ? ` ${result.skipped} skipped because no change was needed or a duplicate would result.` : "";
   notify(`${result.repaired} ${result.repaired === 1 ? "prompt" : "prompts"} repaired.${skipped}`);
 };
-async function copyPromptsToActiveVersion(promptIds, scopeLabel) {
+async function copyPromptsToActiveVersion(promptIds, scopeLabel, openTestingQueue = false) {
   const mismatchIds = promptIds.filter(id => prompts.some(prompt => prompt.id === id && prompt.version_mismatch && !prompt.active_version_copy_exists));
   const mismatchCount = mismatchIds.length;
   if (!mismatchCount || !window.confirm(`Create active-version copies of ${mismatchCount} ${scopeLabel} ${mismatchCount === 1 ? "prompt" : "prompts"}? Originals will be kept.`)) return;
@@ -556,12 +556,20 @@ async function copyPromptsToActiveVersion(promptIds, scopeLabel) {
   const result = await response.json();
   if (!response.ok) return notify(result.detail || "Those active-version copies could not be created.");
   selectedIds.clear();
+  if (openTestingQueue && result.copied) {
+    filter = "Untested copies";
+    document.querySelectorAll("#filters button").forEach(button => button.classList.toggle("active", button.dataset.filter === filter));
+    const url = new URL(window.location.href);
+    url.searchParams.set("filter", filter);
+    window.history.replaceState({}, "", url);
+  }
   await load();
-  notify(`${result.copied} active-version ${result.copied === 1 ? "copy" : "copies"} created. ${result.skipped} skipped.`);
+  const nextStep = openTestingQueue && result.copied ? " Testing queue ready." : "";
+  notify(`${result.copied} active-version ${result.copied === 1 ? "copy" : "copies"} created. ${result.skipped} skipped.${nextStep}`);
 }
 document.querySelector("#copyVersionSelected").onclick = () => copyPromptsToActiveVersion([...selectedIds], "selected");
 document.querySelector("#copyVisibleOutdated").onclick = () => copyPromptsToActiveVersion(
-  visiblePrompts().filter(prompt => prompt.version_mismatch && !prompt.active_version_copy_exists).map(prompt => prompt.id), "visible"
+  visiblePrompts().filter(prompt => prompt.version_mismatch && !prompt.active_version_copy_exists).map(prompt => prompt.id), "visible", true
 );
 async function downloadVersionReportBundle(promptIds) {
   const response = await fetch("/api/prompts/version-reports/export", {
