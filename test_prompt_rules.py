@@ -23,11 +23,38 @@ from app import (
     midjourney_syntax_issues,
     repair_midjourney_syntax,
     restore_previous_midjourney_rules,
+    restore_midjourney_rules_from_manifest,
     save_midjourney_rules,
 )
+from storage import backup_data
 
 
 class PromptRuleTests(unittest.TestCase):
+    def test_backups_include_and_restore_midjourney_rules(self):
+        original_rules = get_midjourney_rules().copy()
+        with tempfile.TemporaryDirectory() as directory:
+            rules_path = Path(directory) / "midjourney_rules.json"
+            rules_path.write_text(json.dumps(original_rules), encoding="utf-8")
+            with patch("storage.MIDJOURNEY_RULES_PATH", rules_path), patch("storage.rows", return_value=[]):
+                backup = backup_data()
+            self.assertEqual(backup["version"], 2)
+            self.assertEqual(backup["midjourney_rules"]["version"], original_rules["version"])
+            with patch("app.MIDJOURNEY_RULES_PATH", rules_path):
+                try:
+                    restored = restore_midjourney_rules_from_manifest({"midjourney_rules": {
+                        **original_rules,
+                        "version": "8.3",
+                        "verified_at": "2026-08-17",
+                    }})
+                    self.assertTrue(restored)
+                    self.assertEqual(get_midjourney_rules()["version"], "8.3")
+                finally:
+                    import app
+                    app.MIDJOURNEY_RULES.clear()
+                    app.MIDJOURNEY_RULES.update(original_rules)
+                    app.DEFAULT_ASPECT_RATIO = original_rules["default_aspect_ratio"]
+                    app.SUPPORTED_ASPECT_RATIOS = set(original_rules["supported_aspect_ratios"])
+
     def test_midjourney_rules_editor_validates_and_persists(self):
         original_rules = get_midjourney_rules().copy()
         with tempfile.TemporaryDirectory() as directory, patch("app.MIDJOURNEY_RULES_PATH", Path(directory) / "rules.json"):

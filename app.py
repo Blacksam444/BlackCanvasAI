@@ -670,6 +670,22 @@ def restore_previous_midjourney_rules() -> dict:
     return restored
 
 
+def restore_midjourney_rules_from_manifest(manifest: dict) -> bool:
+    saved_rules = manifest.get("midjourney_rules")
+    if not isinstance(saved_rules, dict):
+        return False
+    save_midjourney_rules(MidJourneyRulesPayload(
+        version=str(saved_rules.get("version", "")),
+        default_aspect_ratio=str(saved_rules.get("default_aspect_ratio", "")),
+        supported_aspect_ratios=saved_rules.get("supported_aspect_ratios") or [],
+        raw_parameter=str(saved_rules.get("raw_parameter", "")),
+        verified_at=str(saved_rules.get("verified_at", "")),
+        verification_source=str(saved_rules.get("verification_source", "")),
+        update_note=str(saved_rules.get("update_note", "Restored from backup")),
+    ))
+    return True
+
+
 @app.put("/api/styles/{name}")
 def save_style(name: str, payload: StylePayload) -> dict[str, str]:
     execute("INSERT OR REPLACE INTO styles(name, content) VALUES (?, ?)", (name, json.dumps(payload.content)))
@@ -905,7 +921,7 @@ def backup_to_google_drive() -> dict:
         fields="id,name,webViewLink",
     ).execute()
     manifest = backup_data()
-    manifest.update({"backup_format": 2, "created_at": created_at.isoformat(), "artwork_file_count": 0})
+    manifest.update({"backup_format": 3, "created_at": created_at.isoformat(), "artwork_file_count": 0})
     uploaded_images = 0
     mime_types = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif"}
     for artwork in manifest.get("artworks", []):
@@ -1006,6 +1022,7 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
     snapshot_dir.mkdir(parents=True, exist_ok=False)
     with connect() as source_db, sqlite3.connect(snapshot_dir / "blackcanvas.db") as snapshot_db:
         source_db.backup(snapshot_db)
+    shutil.copy2(MIDJOURNEY_RULES_PATH, snapshot_dir / "midjourney_rules.json")
     if UPLOAD_DIR.exists():
         shutil.copytree(UPLOAD_DIR, snapshot_dir / "uploads")
 
@@ -1048,11 +1065,13 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
                 ),
             )
             restored_artworks += 1
+    restored_rules = restore_midjourney_rules_from_manifest(manifest)
     return {
         "status": "restored",
         "prompts": restored_prompts,
         "artworks": restored_artworks,
         "images": restored_images,
+        "midjourney_rules": int(restored_rules),
         "safety_snapshot": snapshot_dir.name,
     }
 
