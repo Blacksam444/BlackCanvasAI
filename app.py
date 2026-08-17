@@ -79,6 +79,7 @@ def format_version_test_report(comparison: dict) -> str:
     tested_at = comparison["migrated"].get("version_tested_at") or "Not recorded"
     rules_verified_at = comparison.get("rules_verified_at") or MIDJOURNEY_RULES.get("verified_at", "Not recorded")
     retest_recommended = "Yes" if comparison["migrated"].get("retest_recommended") else "No"
+    retest_reason = comparison["migrated"].get("retest_reason") or "Current with verified rules"
     changes = comparison["parameter_changes"]
     change_lines = "\n".join(
         f"- {change['parameter']}: {change['original']} -> {change['migrated']}" for change in changes
@@ -92,6 +93,7 @@ def format_version_test_report(comparison: dict) -> str:
         f"Verdict recorded: {tested_at}\n\n"
         f"MidJourney rules verified: {rules_verified_at}\n"
         f"Retest recommended: {retest_recommended}\n\n"
+        f"Retest status: {retest_reason}\n\n"
         f"PARAMETER CHANGES\n{change_lines}\n\n"
         f"TEST NOTES\n{notes}\n\n"
         f"ORIGINAL — MIDJOURNEY V{comparison['original']['version']}\n"
@@ -474,21 +476,30 @@ def list_prompts() -> list[dict]:
         item["syntax_issues"] = midjourney_syntax_issues(item["text"])
         item["version_mismatch"] = any(issue.startswith("Uses MidJourney v") for issue in item["syntax_issues"])
         item["syntax_repairable"] = repair_midjourney_syntax(item["text"]) != item["text"]
-        item["retest_recommended"] = version_test_needs_retest(item)
+        item["retest_reason"] = version_test_retest_reason(item)
+        item["retest_recommended"] = bool(item["retest_reason"])
     return items
 
 
-def version_test_needs_retest(item: dict, verified_at: str | None = None) -> bool:
+def version_test_retest_reason(item: dict, verified_at: str | None = None) -> str | None:
     if not item.get("version_test_result"):
-        return False
+        return None
     tested_at = item.get("version_tested_at")
     verified_at = verified_at or MIDJOURNEY_RULES.get("verified_at")
-    if not tested_at or not verified_at:
-        return True
+    if not tested_at:
+        return "This legacy verdict has no recorded test date."
+    if not verified_at:
+        return "The MidJourney rules verification date is unavailable."
     try:
-        return datetime.fromisoformat(str(tested_at).replace("Z", "+00:00")).date() < date.fromisoformat(verified_at)
+        if datetime.fromisoformat(str(tested_at).replace("Z", "+00:00")).date() < date.fromisoformat(verified_at):
+            return f"MidJourney rules were verified on {verified_at} after this verdict."
+        return None
     except ValueError:
-        return True
+        return "The recorded test or rules verification date is invalid."
+
+
+def version_test_needs_retest(item: dict, verified_at: str | None = None) -> bool:
+    return bool(version_test_retest_reason(item, verified_at))
 
 
 def summarize_version_tests(items: list[dict]) -> dict[str, int]:
@@ -823,7 +834,8 @@ def prompt_version_comparison(prompt_id: int) -> dict:
     if not copies:
         raise HTTPException(status_code=404, detail="That prompt is not a migrated version copy")
     migrated = copies[0]
-    migrated["retest_recommended"] = version_test_needs_retest(migrated)
+    migrated["retest_reason"] = version_test_retest_reason(migrated)
+    migrated["retest_recommended"] = bool(migrated["retest_reason"])
     originals = rows(
         "SELECT id, title, category, text FROM prompts WHERE id = ?",
         (migrated["parent_prompt_id"],),
