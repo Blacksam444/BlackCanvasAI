@@ -14,8 +14,8 @@ function renderMidjourneyMetadata() {
   const verified = midjourneyRules.verified_at || "Not recorded";
   const source = midjourneyRules.verification_source;
   $("#verificationStatus").innerHTML = source
-    ? `${midjourneyReviewStatus?.label || "Verified"} ${verified} · <a href="${source}" target="_blank" rel="noopener">Open source ↗</a>`
-    : `Verified ${verified}`;
+    ? `${midjourneyReviewStatus?.label || "Verified"} ${verified} · ${midjourneyReviewStatus?.review_message || "Review schedule unavailable"} · <a href="${source}" target="_blank" rel="noopener">Open source ↗</a>`
+    : `Verified ${verified} · ${midjourneyReviewStatus?.review_message || "Review schedule unavailable"}`;
   const previous = midjourneyRules.previous_rules;
   $("#previousRules").hidden = !previous;
   if (previous) {

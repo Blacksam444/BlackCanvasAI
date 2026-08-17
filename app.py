@@ -562,6 +562,7 @@ def dashboard_summary() -> dict:
             "verified_at": MIDJOURNEY_RULES.get("verified_at"),
             "verification_status": verification["status"],
             "verification_label": verification["label"],
+            "review_message": verification["review_message"],
             "next_review": verification["next_review"],
         },
         "prompt_of_day": dict(prompt_of_day) if prompt_of_day else None,
@@ -924,6 +925,7 @@ def midjourney_verification_status(today: date | None = None) -> dict:
         verified_at = date.fromisoformat(verified_text)
     except ValueError:
         return {"status": "unverified", "label": "Not verified", "today": today.isoformat(), "days_since": None,
+                "days_until_review": None, "review_message": "Verification required",
                 "next_review": None, "version": MIDJOURNEY_RULES["version"]}
     days_since = max((today - verified_at).days, 0)
     if days_since <= 60:
@@ -932,11 +934,23 @@ def midjourney_verification_status(today: date | None = None) -> dict:
         status, label = "due", "Review due"
     else:
         status, label = "overdue", "Review overdue"
+    days_until_review = 60 - days_since
+    if days_until_review > 0:
+        unit = "day" if days_until_review == 1 else "days"
+        review_message = f"Next review in {days_until_review} {unit}"
+    elif days_until_review == 0:
+        review_message = "Review due today"
+    else:
+        days_overdue = abs(days_until_review)
+        unit = "day" if days_overdue == 1 else "days"
+        review_message = f"Review due {days_overdue} {unit} ago"
     return {
         "status": status,
         "label": label,
         "today": today.isoformat(),
         "days_since": days_since,
+        "days_until_review": days_until_review,
+        "review_message": review_message,
         "next_review": (verified_at + timedelta(days=60)).isoformat(),
         "version": MIDJOURNEY_RULES["version"],
     }
