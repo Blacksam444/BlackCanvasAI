@@ -195,9 +195,14 @@ class PromptRuleTests(unittest.TestCase):
 
     def test_midjourney_verification_status_has_review_thresholds(self):
         with patch.dict("app.MIDJOURNEY_RULES", {"version": "8.2", "verified_at": "2026-01-01"}, clear=True):
-            self.assertEqual(midjourney_verification_status(date(2026, 3, 2))["status"], "current")
-            self.assertEqual(midjourney_verification_status(date(2026, 3, 3))["status"], "due")
-            self.assertEqual(midjourney_verification_status(date(2026, 4, 2))["status"], "overdue")
+            current = midjourney_verification_status(date(2026, 3, 1))
+            due_today = midjourney_verification_status(date(2026, 3, 2))
+            due = midjourney_verification_status(date(2026, 3, 3))
+            overdue = midjourney_verification_status(date(2026, 4, 2))
+            self.assertEqual((current["status"], current["review_message"]), ("current", "Next review in 1 day"))
+            self.assertEqual((due_today["status"], due_today["review_message"]), ("current", "Review due today"))
+            self.assertEqual((due["status"], due["review_message"]), ("due", "Review due 1 day ago"))
+            self.assertEqual(overdue["status"], "overdue")
 
     def test_backups_include_and_restore_midjourney_rules(self):
         original_rules = get_midjourney_rules().copy()

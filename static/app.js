@@ -58,7 +58,7 @@ async function loadDashboard() {
     const verifiedDate = rules.verified_at
       ? new Date(`${rules.verified_at}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
       : "not recorded";
-    rulesStatus.textContent = `MidJourney v${rules.version} · ${rules.verification_label} ${verifiedDate}`;
+    rulesStatus.textContent = `MidJourney v${rules.version} · ${rules.verification_label} ${verifiedDate} · ${rules.review_message}`;
     rulesStatus.dataset.status = rules.verification_status;
     rulesStatus.title = rules.next_review ? `Next rules review: ${rules.next_review}` : "Open the Style Bible to verify these rules";
     document.querySelector("#versionTestProgress").textContent = testing.total ? `${testing.completion_percent}% tested` : "No copies yet";
