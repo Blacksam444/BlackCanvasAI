@@ -215,6 +215,8 @@ class PromptRuleTests(unittest.TestCase):
         self.assertIn("visiblePrompts().filter(prompt => prompt.version_mismatch && !prompt.active_version_copy_exists)", script)
         self.assertIn('filter = "Untested copies"', script)
         self.assertIn('"visible", true', script)
+        self.assertIn("migratedParentIds.has(prompt.parent_prompt_id)", script)
+        self.assertIn("openVersionComparison(firstNewComparison.id)", script)
 
     def test_midjourney_verification_status_has_review_thresholds(self):
         with patch.dict("app.MIDJOURNEY_RULES", {"version": "8.2", "verified_at": "2026-01-01"}, clear=True):
