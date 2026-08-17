@@ -88,6 +88,7 @@
 .comparison-actions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:13px; }
 .comparison-actions button { border:1px solid #47434f; border-radius:8px; background:#242229; color:#d4d0d9; padding:8px 10px; font-size:10px; font-weight:700; cursor:pointer; }
 .comparison-actions button:last-child { border-color:#51456e; background:#241d33; color:#d5c8ff; }
+.comparison-actions button:disabled { border-color:#39363e; background:#1b1a1e; color:#6f6b74; cursor:default; }
 .test-verdict { display:flex; align-items:center; justify-content:space-between; gap:12px; border-top:1px solid #302e35; padding:12px 0; margin-bottom:12px; }
 .test-verdict>span { color:#8e8994; font-size:10px; font-weight:700; }
 .test-verdict>div { display:flex; flex-wrap:wrap; gap:7px; }
