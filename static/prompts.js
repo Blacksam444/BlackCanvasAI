@@ -335,7 +335,19 @@ async function openVersionComparison(promptId) {
   updateNextUntestedButton();
   versionCompareDialog.showModal();
 }
-document.querySelector("#closeVersionCompare").onclick = () => versionCompareDialog.close();
+async function closeVersionComparison() {
+  const button = document.querySelector("#closeVersionCompare");
+  if (button.disabled) return;
+  button.disabled = true;
+  const saved = await saveVersionTestNotes(false);
+  button.disabled = false;
+  if (saved) versionCompareDialog.close();
+}
+document.querySelector("#closeVersionCompare").onclick = closeVersionComparison;
+versionCompareDialog.addEventListener("cancel", event => {
+  event.preventDefault();
+  closeVersionComparison();
+});
 async function copyComparisonText(text, message) {
   if (!text) return;
   await navigator.clipboard.writeText(text);
