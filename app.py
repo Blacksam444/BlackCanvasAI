@@ -154,6 +154,10 @@ class PromptIdsPayload(BaseModel):
     prompt_ids: list[int]
 
 
+class VersionTestResultPayload(BaseModel):
+    result: str
+
+
 class StylePayload(BaseModel):
     content: dict
 
@@ -422,7 +426,7 @@ def chat_reply(payload: ChatMessage) -> dict[str, str]:
 
 @app.get("/api/prompts")
 def list_prompts() -> list[dict]:
-    items = rows("SELECT id, title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version FROM prompts ORDER BY id DESC")
+    items = rows("SELECT id, title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result FROM prompts ORDER BY id DESC")
     for item in items:
         item["syntax_issues"] = midjourney_syntax_issues(item["text"])
         item["version_mismatch"] = any(issue.startswith("Uses MidJourney v") for issue in item["syntax_issues"])
@@ -714,7 +718,7 @@ def bulk_copy_prompts_to_active_midjourney_version(payload: PromptIdsPayload) ->
 @app.get("/api/prompts/{prompt_id}/version-comparison")
 def prompt_version_comparison(prompt_id: int) -> dict:
     copies = rows(
-        "SELECT id, title, category, text, parent_prompt_id, migrated_from_version FROM prompts "
+        "SELECT id, title, category, text, parent_prompt_id, migrated_from_version, version_test_result FROM prompts "
         "WHERE id = ? AND parent_prompt_id IS NOT NULL",
         (prompt_id,),
     )
@@ -744,6 +748,19 @@ def prompt_version_comparison(prompt_id: int) -> dict:
             original, migrated, str(migrated["migrated_from_version"]), MIDJOURNEY_RULES["version"]
         ),
     }
+
+
+@app.patch("/api/prompts/{prompt_id}/version-test-result")
+def save_prompt_version_test_result(prompt_id: int, payload: VersionTestResultPayload) -> dict[str, str]:
+    allowed = {"original", "active", "tie"}
+    result = payload.result.strip().lower()
+    if result not in allowed:
+        raise HTTPException(status_code=400, detail="Choose original, active, or tie")
+    matching = rows("SELECT id FROM prompts WHERE id = ? AND parent_prompt_id IS NOT NULL", (prompt_id,))
+    if not matching:
+        raise HTTPException(status_code=404, detail="That prompt is not a migrated version copy")
+    execute("UPDATE prompts SET version_test_result = ? WHERE id = ?", (result, prompt_id))
+    return {"result": result}
 
 
 @app.get("/api/styles")
@@ -1094,7 +1111,7 @@ def backup_to_google_drive() -> dict:
         fields="id,name,webViewLink",
     ).execute()
     manifest = backup_data()
-    manifest.update({"backup_format": 4, "created_at": created_at.isoformat(), "artwork_file_count": 0})
+    manifest.update({"backup_format": 5, "created_at": created_at.isoformat(), "artwork_file_count": 0})
     uploaded_images = 0
     mime_types = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif"}
     for artwork in manifest.get("artworks", []):
@@ -1206,14 +1223,15 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
     with connect() as db:
         for prompt in manifest.get("prompts", []):
             cursor = db.execute(
-                "INSERT OR IGNORE INTO prompts(title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO prompts(title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     prompt.get("title", "Restored prompt"), prompt.get("category", "Unsorted"),
                     repair_midjourney_syntax(str(prompt.get("text", "")).strip()),
                     int(bool(prompt.get("favorite"))), prompt.get("source", "backup"), int(bool(prompt.get("reviewed", True))),
                     int(bool(prompt.get("trashed", False))),
                     prompt.get("parent_prompt_id"), prompt.get("migrated_from_version"),
+                    prompt.get("version_test_result"),
                 ),
             )
             restored_prompts += max(cursor.rowcount, 0)

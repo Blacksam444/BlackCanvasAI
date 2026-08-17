@@ -131,7 +131,8 @@ function render() {
     const card = document.createElement("article");
     card.className = `prompt-card${selectedIds.has(prompt.id) ? " selected" : ""}${!prompt.reviewed ? " unreviewed" : ""}${prompt.trashed ? " trashed" : ""}`;
     const cardActions = prompt.trashed ? '<button class="restore">Restore prompt</button>' : `<button class="view">Review & edit</button>${prompt.parent_prompt_id ? '<button class="compare">Compare versions</button>' : ''}<button class="copy">Copy prompt</button>`;
-    card.innerHTML = `<div class="card-top"><label class="select-prompt"><input type="checkbox" ${selectedIds.has(prompt.id) ? "checked" : ""}><span></span></label><div class="card-badges"><span class="category">${escape(prompt.category)}</span><span class="source ${escape(prompt.source)}">${sourceLabel(prompt.source)}</span>${prompt.trashed ? '<span class="trash-badge">Trash</span>' : ""}${!prompt.reviewed ? '<span class="review-badge">Unreviewed</span>' : ""}${prompt.parent_prompt_id ? `<span class="migration-badge">From MJ v${escape(prompt.migrated_from_version || "older")}</span>` : ""}${duplicates.has(prompt.id) ? '<span class="duplicate-badge">Duplicate</span>' : ""}${prompt.version_mismatch ? '<span class="syntax-badge">Version review</span>' : prompt.syntax_issues?.length ? '<span class="syntax-badge">Syntax issue</span>' : ""}</div><button class="favorite ${prompt.favorite ? "on" : ""}" title="Favorite">★</button></div><h2>${escape(prompt.title)}</h2><p class="prompt-preview">${escape(prompt.text)}</p><div class="card-bottom">${cardActions}</div>`;
+    const verdictLabel = {original:"Original preferred",active:"Active preferred",tie:"No clear winner"}[prompt.version_test_result];
+    card.innerHTML = `<div class="card-top"><label class="select-prompt"><input type="checkbox" ${selectedIds.has(prompt.id) ? "checked" : ""}><span></span></label><div class="card-badges"><span class="category">${escape(prompt.category)}</span><span class="source ${escape(prompt.source)}">${sourceLabel(prompt.source)}</span>${prompt.trashed ? '<span class="trash-badge">Trash</span>' : ""}${!prompt.reviewed ? '<span class="review-badge">Unreviewed</span>' : ""}${prompt.parent_prompt_id ? `<span class="migration-badge">From MJ v${escape(prompt.migrated_from_version || "older")}</span>` : ""}${verdictLabel ? `<span class="verdict-badge ${escape(prompt.version_test_result)}">${verdictLabel}</span>` : ""}${duplicates.has(prompt.id) ? '<span class="duplicate-badge">Duplicate</span>' : ""}${prompt.version_mismatch ? '<span class="syntax-badge">Version review</span>' : prompt.syntax_issues?.length ? '<span class="syntax-badge">Syntax issue</span>' : ""}</div><button class="favorite ${prompt.favorite ? "on" : ""}" title="Favorite">★</button></div><h2>${escape(prompt.title)}</h2><p class="prompt-preview">${escape(prompt.text)}</p><div class="card-bottom">${cardActions}</div>`;
     const checkbox = card.querySelector('input[type="checkbox"]');
     checkbox.onchange = () => {
       if (checkbox.checked) selectedIds.add(prompt.id);
@@ -288,6 +289,7 @@ async function openVersionComparison(promptId) {
     ? result.parameter_changes.map(change => `${change.parameter}: ${change.original} → ${change.migrated}`).join(" · ")
     : "No technical parameter changes detected.";
   summary.textContent = `${directionStatus} ${changes}`;
+  renderTestVerdict(result.migrated.version_test_result);
   versionCompareDialog.showModal();
 }
 document.querySelector("#closeVersionCompare").onclick = () => versionCompareDialog.close();
@@ -299,6 +301,21 @@ async function copyComparisonText(text, message) {
 document.querySelector("#copyOriginalVersion").onclick = () => copyComparisonText(activeVersionComparison?.original.text, "Original prompt copied.");
 document.querySelector("#copyMigratedVersion").onclick = () => copyComparisonText(activeVersionComparison?.migrated.text, "Active-version prompt copied.");
 document.querySelector("#copyVersionPair").onclick = () => copyComparisonText(activeVersionComparison?.test_pair, "Labeled version test pair copied.");
+function renderTestVerdict(result) {
+  document.querySelectorAll(".test-verdict button").forEach(button => button.classList.toggle("selected", button.dataset.result === result));
+}
+document.querySelectorAll(".test-verdict button").forEach(button => button.onclick = async () => {
+  if (!activeVersionComparison) return;
+  const response = await fetch(`/api/prompts/${activeVersionComparison.migrated.id}/version-test-result`, {
+    method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({result:button.dataset.result}),
+  });
+  const result = await response.json();
+  if (!response.ok) return notify(result.detail || "That test result could not be saved.");
+  activeVersionComparison.migrated.version_test_result = result.result;
+  renderTestVerdict(result.result);
+  await load();
+  notify("MidJourney test result saved.");
+});
 document.querySelector("#repairSyntax").onclick = async () => {
   if (!editingId) return;
   const response = await fetch(`/api/prompts/${editingId}/repair-midjourney-syntax`, {method:"PATCH"});
