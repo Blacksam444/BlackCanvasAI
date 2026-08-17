@@ -158,6 +158,10 @@ class VersionTestResultPayload(BaseModel):
     result: str
 
 
+class VersionTestNotesPayload(BaseModel):
+    notes: str = ""
+
+
 class StylePayload(BaseModel):
     content: dict
 
@@ -718,7 +722,7 @@ def bulk_copy_prompts_to_active_midjourney_version(payload: PromptIdsPayload) ->
 @app.get("/api/prompts/{prompt_id}/version-comparison")
 def prompt_version_comparison(prompt_id: int) -> dict:
     copies = rows(
-        "SELECT id, title, category, text, parent_prompt_id, migrated_from_version, version_test_result FROM prompts "
+        "SELECT id, title, category, text, parent_prompt_id, migrated_from_version, version_test_result, version_test_notes FROM prompts "
         "WHERE id = ? AND parent_prompt_id IS NOT NULL",
         (prompt_id,),
     )
@@ -761,6 +765,18 @@ def save_prompt_version_test_result(prompt_id: int, payload: VersionTestResultPa
         raise HTTPException(status_code=404, detail="That prompt is not a migrated version copy")
     execute("UPDATE prompts SET version_test_result = ? WHERE id = ?", (result, prompt_id))
     return {"result": result}
+
+
+@app.patch("/api/prompts/{prompt_id}/version-test-notes")
+def save_prompt_version_test_notes(prompt_id: int, payload: VersionTestNotesPayload) -> dict[str, str]:
+    notes = payload.notes.strip()
+    if len(notes) > 2000:
+        raise HTTPException(status_code=400, detail="Keep version-test notes under 2,000 characters")
+    matching = rows("SELECT id FROM prompts WHERE id = ? AND parent_prompt_id IS NOT NULL", (prompt_id,))
+    if not matching:
+        raise HTTPException(status_code=404, detail="That prompt is not a migrated version copy")
+    execute("UPDATE prompts SET version_test_notes = ? WHERE id = ?", (notes, prompt_id))
+    return {"notes": notes}
 
 
 @app.get("/api/styles")
@@ -1111,7 +1127,7 @@ def backup_to_google_drive() -> dict:
         fields="id,name,webViewLink",
     ).execute()
     manifest = backup_data()
-    manifest.update({"backup_format": 5, "created_at": created_at.isoformat(), "artwork_file_count": 0})
+    manifest.update({"backup_format": 6, "created_at": created_at.isoformat(), "artwork_file_count": 0})
     uploaded_images = 0
     mime_types = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif"}
     for artwork in manifest.get("artworks", []):
@@ -1223,8 +1239,8 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
     with connect() as db:
         for prompt in manifest.get("prompts", []):
             cursor = db.execute(
-                "INSERT OR IGNORE INTO prompts(title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO prompts(title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result, version_test_notes) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     prompt.get("title", "Restored prompt"), prompt.get("category", "Unsorted"),
                     repair_midjourney_syntax(str(prompt.get("text", "")).strip()),
@@ -1232,6 +1248,7 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
                     int(bool(prompt.get("trashed", False))),
                     prompt.get("parent_prompt_id"), prompt.get("migrated_from_version"),
                     prompt.get("version_test_result"),
+                    str(prompt.get("version_test_notes", ""))[:2000],
                 ),
             )
             restored_prompts += max(cursor.rowcount, 0)

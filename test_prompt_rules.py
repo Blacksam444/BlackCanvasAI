@@ -12,6 +12,7 @@ from app import (
     PromptBulkPayload,
     PromptPayload,
     VersionTestResultPayload,
+    VersionTestNotesPayload,
     MidJourneyRulesPayload,
     bulk_delete_prompts,
     bulk_update_prompts,
@@ -34,11 +35,21 @@ from app import (
     restore_midjourney_rules_from_manifest,
     save_midjourney_rules,
     save_prompt_version_test_result,
+    save_prompt_version_test_notes,
 )
 from storage import backup_data
 
 
 class PromptRuleTests(unittest.TestCase):
+    def test_version_test_notes_are_trimmed_and_saved_on_migrated_copy(self):
+        with patch("app.rows", return_value=[{"id": 9}]), patch("app.execute", return_value=0) as execute_mock:
+            result = save_prompt_version_test_notes(9, VersionTestNotesPayload(notes="  Better anatomy and texture.  "))
+
+        self.assertEqual(result, {"notes": "Better anatomy and texture."})
+        execute_mock.assert_called_once_with(
+            "UPDATE prompts SET version_test_notes = ? WHERE id = ?", ("Better anatomy and texture.", 9)
+        )
+
     def test_version_test_result_is_saved_only_on_migrated_copy(self):
         with patch("app.rows", return_value=[{"id": 9}]), patch("app.execute", return_value=0) as execute_mock:
             result = save_prompt_version_test_result(9, VersionTestResultPayload(result="ACTIVE"))
@@ -117,7 +128,7 @@ class PromptRuleTests(unittest.TestCase):
             rules_path.write_text(json.dumps(original_rules), encoding="utf-8")
             with patch("storage.MIDJOURNEY_RULES_PATH", rules_path), patch("storage.rows", return_value=[]):
                 backup = backup_data()
-            self.assertEqual(backup["version"], 4)
+            self.assertEqual(backup["version"], 5)
             self.assertEqual(backup["midjourney_rules"]["version"], original_rules["version"])
             with patch("app.MIDJOURNEY_RULES_PATH", rules_path):
                 try:
@@ -415,7 +426,8 @@ class PromptBulkRepairTests(unittest.TestCase):
             connection.execute(
                 "CREATE TABLE prompts (id INTEGER PRIMARY KEY, title TEXT, category TEXT, text TEXT, favorite INTEGER DEFAULT 0, "
                 "source TEXT DEFAULT 'manual', reviewed INTEGER DEFAULT 1, trashed INTEGER DEFAULT 0, "
-                "parent_prompt_id INTEGER, migrated_from_version TEXT, version_test_result TEXT, UNIQUE(title, text))"
+                "parent_prompt_id INTEGER, migrated_from_version TEXT, version_test_result TEXT, "
+                "version_test_notes TEXT DEFAULT '', UNIQUE(title, text))"
             )
             connection.executemany("INSERT INTO prompts(id, title, category, text) VALUES (?, ?, ?, ?)", [
                 (1, "Old Guardian", "GraffitiX", "Guardian --style raw --v 8.1"),

@@ -300,6 +300,7 @@ async function openVersionComparison(promptId) {
     : "No technical parameter changes detected.";
   summary.textContent = `${directionStatus} ${changes}`;
   renderTestVerdict(result.migrated.version_test_result);
+  document.querySelector("#versionTestNotes").value = result.migrated.version_test_notes || "";
   versionCompareDialog.showModal();
 }
 document.querySelector("#closeVersionCompare").onclick = () => versionCompareDialog.close();
@@ -326,6 +327,17 @@ document.querySelectorAll(".test-verdict button").forEach(button => button.oncli
   await load();
   notify("MidJourney test result saved.");
 });
+document.querySelector("#saveVersionTestNotes").onclick = async () => {
+  if (!activeVersionComparison) return;
+  const notes = document.querySelector("#versionTestNotes").value.trim();
+  const response = await fetch(`/api/prompts/${activeVersionComparison.migrated.id}/version-test-notes`, {
+    method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({notes}),
+  });
+  const result = await response.json();
+  if (!response.ok) return notify(result.detail || "Those test notes could not be saved.");
+  activeVersionComparison.migrated.version_test_notes = result.notes;
+  notify("MidJourney test notes saved.");
+};
 document.querySelector("#repairSyntax").onclick = async () => {
   if (!editingId) return;
   const response = await fetch(`/api/prompts/${editingId}/repair-midjourney-syntax`, {method:"PATCH"});
