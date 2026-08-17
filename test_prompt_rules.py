@@ -40,6 +40,7 @@ from app import (
     save_prompt_version_test_notes,
     summarize_version_tests,
     version_test_needs_retest,
+    version_test_retest_reason,
 )
 from storage import backup_data
 
@@ -57,6 +58,13 @@ class PromptRuleTests(unittest.TestCase):
         self.assertFalse(version_test_needs_retest(
             {"version_test_result": None, "version_tested_at": None}, "2026-08-17"
         ))
+        self.assertEqual(version_test_retest_reason(
+            {"version_test_result": "active", "version_tested_at": "2026-08-01T12:00:00+00:00"},
+            "2026-08-17",
+        ), "MidJourney rules were verified on 2026-08-17 after this verdict.")
+        self.assertEqual(version_test_retest_reason(
+            {"version_test_result": "active", "version_tested_at": None}, "2026-08-17"
+        ), "This legacy verdict has no recorded test date.")
 
     def test_version_test_summary_counts_outcomes_and_progress(self):
         summary = summarize_version_tests([
@@ -84,7 +92,8 @@ class PromptRuleTests(unittest.TestCase):
             "original": {"version": "8.1", "title": "Original", "text": "Prompt one"},
             "migrated": {"version": "8.2", "title": "Copy", "text": "Prompt two",
                          "version_test_result": "active", "version_test_notes": "Better anatomy.",
-                         "version_tested_at": "2026-08-01T12:00:00+00:00", "retest_recommended": True},
+                         "version_tested_at": "2026-08-01T12:00:00+00:00", "retest_recommended": True,
+                         "retest_reason": "Rules verified after this verdict."},
             "rules_verified_at": "2026-08-17",
         })
         self.assertIn("Creative direction preserved: Yes", report)
@@ -94,6 +103,7 @@ class PromptRuleTests(unittest.TestCase):
         self.assertIn("Verdict recorded: 2026-08-01T12:00:00+00:00", report)
         self.assertIn("MidJourney rules verified: 2026-08-17", report)
         self.assertIn("Retest recommended: Yes", report)
+        self.assertIn("Retest status: Rules verified after this verdict.", report)
         self.assertLess(report.index("Prompt one"), report.index("Prompt two"))
 
     def test_version_test_notes_are_trimmed_and_saved_on_migrated_copy(self):

@@ -152,7 +152,10 @@ function render() {
     const cardActions = prompt.trashed ? '<button class="restore">Restore prompt</button>' : `<button class="view">Review & edit</button>${prompt.parent_prompt_id ? '<button class="compare">Compare versions</button>' : ''}<button class="copy">Copy prompt</button>`;
     const verdictLabel = {original:"Original preferred",active:"Active preferred",tie:"No clear winner"}[prompt.version_test_result];
     card.innerHTML = `<div class="card-top"><label class="select-prompt"><input type="checkbox" ${selectedIds.has(prompt.id) ? "checked" : ""}><span></span></label><div class="card-badges"><span class="category">${escape(prompt.category)}</span><span class="source ${escape(prompt.source)}">${sourceLabel(prompt.source)}</span>${prompt.trashed ? '<span class="trash-badge">Trash</span>' : ""}${!prompt.reviewed ? '<span class="review-badge">Unreviewed</span>' : ""}${prompt.parent_prompt_id ? `<span class="migration-badge">From MJ v${escape(prompt.migrated_from_version || "older")}</span>` : ""}${verdictLabel ? `<span class="verdict-badge ${escape(prompt.version_test_result)}">${verdictLabel}</span>` : ""}${duplicates.has(prompt.id) ? '<span class="duplicate-badge">Duplicate</span>' : ""}${prompt.version_mismatch ? '<span class="syntax-badge">Version review</span>' : prompt.syntax_issues?.length ? '<span class="syntax-badge">Syntax issue</span>' : ""}</div><button class="favorite ${prompt.favorite ? "on" : ""}" title="Favorite">★</button></div><h2>${escape(prompt.title)}</h2><p class="prompt-preview">${escape(prompt.text)}</p><div class="card-bottom">${cardActions}</div>`;
-    if (prompt.retest_recommended) card.querySelector(".card-badges").insertAdjacentHTML("beforeend", '<span class="retest-badge">Retest recommended</span>');
+    if (prompt.retest_recommended) {
+      card.querySelector(".card-badges").insertAdjacentHTML("beforeend", '<span class="retest-badge">Retest recommended</span>');
+      card.querySelector(".retest-badge").title = prompt.retest_reason || "Retest this comparison with the verified rules.";
+    }
     const checkbox = card.querySelector('input[type="checkbox"]');
     checkbox.onchange = () => {
       if (checkbox.checked) selectedIds.add(prompt.id);
@@ -319,7 +322,7 @@ function updateNextUntestedButton() {
     ? (retestMode ? "Next recommended retest →" : "Next untested copy →")
     : (retestMode ? "Retest queue complete" : "Testing queue complete");
   document.querySelector("#versionQueueProgress").textContent = migrated.length
-    ? `${retestMode ? `${retestRemaining} recommended retests remaining` : `${tested} of ${migrated.length} tested · ${remaining} remaining`}${activeVersionComparison?.migrated.version_tested_at ? ` · Last verdict ${new Date(activeVersionComparison.migrated.version_tested_at).toLocaleDateString()}` : ""}${activeVersionComparison?.migrated.retest_recommended ? " · Retest recommended" : ""}`
+    ? `${retestMode ? `${retestRemaining} recommended retests remaining` : `${tested} of ${migrated.length} tested · ${remaining} remaining`}${activeVersionComparison?.migrated.version_tested_at ? ` · Last verdict ${new Date(activeVersionComparison.migrated.version_tested_at).toLocaleDateString()}` : ""}${activeVersionComparison?.migrated.retest_reason ? ` · ${activeVersionComparison.migrated.retest_reason}` : ""}`
     : "No migrated copies to test";
 }
 async function openVersionComparison(promptId) {
@@ -395,6 +398,7 @@ document.querySelectorAll(".test-verdict button").forEach(button => button.oncli
   activeVersionComparison.migrated.version_test_result = result.result;
   activeVersionComparison.migrated.version_tested_at = result.tested_at;
   activeVersionComparison.migrated.retest_recommended = false;
+  activeVersionComparison.migrated.retest_reason = null;
   renderTestVerdict(result.result);
   await load();
   updateNextUntestedButton();
