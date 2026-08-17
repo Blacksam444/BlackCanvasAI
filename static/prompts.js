@@ -267,10 +267,12 @@ async function restorePrompts(promptIds) {
   notify(`${result.restored} ${result.restored === 1 ? "prompt" : "prompts"} restored.`);
 }
 const versionCompareDialog = document.querySelector("#versionCompareDialog");
+let activeVersionComparison = null;
 async function openVersionComparison(promptId) {
   const response = await fetch(`/api/prompts/${promptId}/version-comparison`);
   const result = await response.json();
   if (!response.ok) return notify(result.detail || "That version comparison is unavailable.");
+  activeVersionComparison = result;
   document.querySelector("#originalVersionLabel").textContent = `Original · MJ v${result.original.version || "unknown"}`;
   document.querySelector("#originalVersionTitle").textContent = result.original.title;
   document.querySelector("#originalVersionText").textContent = result.original.text;
@@ -289,6 +291,14 @@ async function openVersionComparison(promptId) {
   versionCompareDialog.showModal();
 }
 document.querySelector("#closeVersionCompare").onclick = () => versionCompareDialog.close();
+async function copyComparisonText(text, message) {
+  if (!text) return;
+  await navigator.clipboard.writeText(text);
+  notify(message);
+}
+document.querySelector("#copyOriginalVersion").onclick = () => copyComparisonText(activeVersionComparison?.original.text, "Original prompt copied.");
+document.querySelector("#copyMigratedVersion").onclick = () => copyComparisonText(activeVersionComparison?.migrated.text, "Active-version prompt copied.");
+document.querySelector("#copyVersionPair").onclick = () => copyComparisonText(activeVersionComparison?.test_pair, "Labeled version test pair copied.");
 document.querySelector("#repairSyntax").onclick = async () => {
   if (!editingId) return;
   const response = await fetch(`/api/prompts/${editingId}/repair-midjourney-syntax`, {method:"PATCH"});

@@ -21,6 +21,7 @@ from app import (
     create_prompt,
     copy_prompt_to_active_midjourney_version,
     format_prompt_pack,
+    format_version_test_pair,
     get_midjourney_rules,
     import_chatgpt_prompts,
     midjourney_verification_status,
@@ -51,6 +52,18 @@ class PromptRuleTests(unittest.TestCase):
         self.assertEqual(result["parameter_changes"], [
             {"parameter": "Version", "original": "8.1", "migrated": "8.2"},
         ])
+        self.assertIn("ORIGINAL — MIDJOURNEY V8.1", result["test_pair"])
+        self.assertIn("ACTIVE COPY — MIDJOURNEY V8.2", result["test_pair"])
+
+    def test_version_test_pair_keeps_prompts_clearly_separated(self):
+        pair = format_version_test_pair(
+            {"title": "Original", "text": "Prompt one"},
+            {"title": "Copy", "text": "Prompt two"},
+            "8.1",
+            "8.2",
+        )
+        self.assertLess(pair.index("Prompt one"), pair.index("ACTIVE COPY"))
+        self.assertLess(pair.index("ACTIVE COPY"), pair.index("Prompt two"))
 
     def test_midjourney_parameter_summary_identifies_legacy_raw_mode(self):
         self.assertEqual(midjourney_parameter_summary("Guardian --ar 4:5 --style raw --v 8.1"), {
