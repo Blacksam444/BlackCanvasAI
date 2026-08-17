@@ -17,6 +17,7 @@ from app import (
     bulk_delete_prompts,
     bulk_update_prompts,
     bulk_restore_prompts,
+    count_outdated_midjourney_prompts,
     bulk_repair_prompt_syntax,
     bulk_copy_prompts_to_active_midjourney_version,
     create_image_prompt,
@@ -192,6 +193,13 @@ class PromptRuleTests(unittest.TestCase):
             ["Uses MidJourney v8.1; active verified rules are v8.2"],
         )
         self.assertEqual(repair_midjourney_syntax(prompt), prompt)
+
+    def test_outdated_midjourney_prompt_count_ignores_active_and_unversioned_text(self):
+        self.assertEqual(count_outdated_midjourney_prompts([
+            "Older prompt --raw --v 8.1",
+            "Active prompt --raw --v 8.2",
+            "Business planning notes",
+        ]), 1)
 
     def test_midjourney_verification_status_has_review_thresholds(self):
         with patch.dict("app.MIDJOURNEY_RULES", {"version": "8.2", "verified_at": "2026-01-01"}, clear=True):

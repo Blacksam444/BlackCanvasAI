@@ -70,6 +70,9 @@ async function loadDashboard() {
     document.querySelector("#versionTestTie").textContent = testing.tie;
     document.querySelector("#versionTestRetest").textContent = testing.retest_recommended;
     document.querySelector("#retestQueueLink").hidden = testing.retest_recommended === 0;
+    const outdatedLink = document.querySelector("#outdatedPromptLink");
+    outdatedLink.hidden = rules.outdated_prompts === 0;
+    outdatedLink.textContent = `Update ${rules.outdated_prompts} older-version ${rules.outdated_prompts === 1 ? "prompt" : "prompts"} →`;
     if (data.prompt_of_day) {
       document.querySelector("#dailyPrompt").textContent = data.prompt_of_day.text;
       document.querySelector("#dailyCategory").textContent = data.prompt_of_day.category;

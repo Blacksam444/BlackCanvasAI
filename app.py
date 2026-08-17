@@ -133,6 +133,13 @@ def midjourney_syntax_issues(prompt: str) -> list[str]:
     return issues
 
 
+def count_outdated_midjourney_prompts(prompt_texts: list[str]) -> int:
+    return sum(
+        any(issue.startswith("Uses MidJourney v") for issue in midjourney_syntax_issues(text))
+        for text in prompt_texts
+    )
+
+
 def repair_midjourney_syntax(prompt: str) -> str:
     repaired = prompt
     for deprecated, replacement in MIDJOURNEY_RULES["deprecated_parameters"].items():
@@ -528,6 +535,9 @@ def dashboard_summary() -> dict:
             "(SELECT COUNT(*) FROM artworks WHERE favorite = 1)"
         ).fetchone()[0]
         review_count = db.execute("SELECT COUNT(*) FROM prompts WHERE reviewed = 0 AND trashed = 0").fetchone()[0]
+        outdated_prompt_count = count_outdated_midjourney_prompts([
+            item[0] for item in db.execute("SELECT text FROM prompts WHERE trashed = 0").fetchall()
+        ])
         prompt_rows = [dict(item) for item in db.execute(
             "SELECT id, title, category, text FROM prompts WHERE trashed = 0 ORDER BY id DESC LIMIT 3"
         ).fetchall()]
@@ -564,6 +574,7 @@ def dashboard_summary() -> dict:
             "verification_label": verification["label"],
             "review_message": verification["review_message"],
             "next_review": verification["next_review"],
+            "outdated_prompts": outdated_prompt_count,
         },
         "prompt_of_day": dict(prompt_of_day) if prompt_of_day else None,
         "recent": activity[:3],
