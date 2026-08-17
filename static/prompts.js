@@ -37,6 +37,9 @@ const testAgeValue = prompt => {
   const value = prompt.version_tested_at ? Date.parse(prompt.version_tested_at) : Number.NaN;
   return Number.isFinite(value) ? value : Number.NEGATIVE_INFINITY;
 };
+const testDateLabel = prompt => Number.isFinite(testAgeValue(prompt))
+  ? `Tested ${new Date(prompt.version_tested_at).toLocaleDateString()}`
+  : "Test date missing";
 
 function duplicateGroups() {
   const groups = new Map();
@@ -161,6 +164,13 @@ function render() {
     if (prompt.retest_recommended) {
       card.querySelector(".card-badges").insertAdjacentHTML("beforeend", '<span class="retest-badge">Retest recommended</span>');
       card.querySelector(".retest-badge").title = prompt.retest_reason || "Retest this comparison with the verified rules.";
+    }
+    if (prompt.version_test_result) {
+      card.querySelector(".card-badges").insertAdjacentHTML(
+        "beforeend",
+        `<span class="test-date-badge${Number.isFinite(testAgeValue(prompt)) ? "" : " missing"}">${escape(testDateLabel(prompt))}</span>`,
+      );
+      card.querySelector(".test-date-badge").title = prompt.version_tested_at || "This legacy verdict has no recorded test date.";
     }
     const checkbox = card.querySelector('input[type="checkbox"]');
     checkbox.onchange = () => {
