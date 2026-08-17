@@ -25,6 +25,7 @@ from app import (
     format_prompt_pack,
     format_version_test_pair,
     format_version_test_report,
+    format_version_test_report_collection,
     get_midjourney_rules,
     import_chatgpt_prompts,
     midjourney_verification_status,
@@ -42,6 +43,12 @@ from storage import backup_data
 
 
 class PromptRuleTests(unittest.TestCase):
+    def test_version_report_collection_keeps_selected_report_order(self):
+        bundle = format_version_test_report_collection(["FIRST REPORT\nOriginal one", "SECOND REPORT\nOriginal two"])
+        self.assertIn("2 version test reports", bundle)
+        self.assertLess(bundle.index("FIRST REPORT"), bundle.index("SECOND REPORT"))
+        self.assertIn("=" * 72, bundle)
+
     def test_version_test_report_includes_changes_verdict_notes_and_prompts(self):
         report = format_version_test_report({
             "creative_body_preserved": True,

@@ -95,6 +95,16 @@ def format_version_test_report(comparison: dict) -> str:
     )
 
 
+def format_version_test_report_collection(reports: list[str]) -> str:
+    heading = (
+        "BLACK CANVAS AI — MIDJOURNEY VERSION TEST REPORT BUNDLE\n"
+        f"Created {datetime.now().astimezone().strftime('%B %d, %Y')}\n"
+        f"{len(reports)} version test {'report' if len(reports) == 1 else 'reports'}\n"
+    )
+    separator = "\n" + "=" * 72 + "\n\n"
+    return heading + separator + separator.join(report.strip() for report in reports) + "\n"
+
+
 def midjourney_syntax_issues(prompt: str) -> list[str]:
     issues: list[str] = []
     has_legacy_raw = bool(re.search(r"--style\s+raw\b", prompt, flags=re.IGNORECASE))
@@ -740,6 +750,28 @@ def bulk_copy_prompts_to_active_midjourney_version(payload: PromptIdsPayload) ->
             except sqlite3.IntegrityError:
                 skipped += 1
     return {"selected": len(prompt_ids), "copied": copied, "skipped": skipped}
+
+
+@app.post("/api/prompts/version-reports/export")
+def export_prompt_version_reports(payload: PromptIdsPayload) -> Response:
+    prompt_ids = list(dict.fromkeys(payload.prompt_ids))
+    if not prompt_ids:
+        raise HTTPException(status_code=400, detail="Select at least one prompt")
+    reports = []
+    for prompt_id in prompt_ids:
+        try:
+            reports.append(format_version_test_report(prompt_version_comparison(prompt_id)))
+        except HTTPException as error:
+            if error.status_code != 404:
+                raise
+    if not reports:
+        raise HTTPException(status_code=400, detail="Select at least one migrated version copy")
+    created = datetime.now().astimezone().strftime("%Y-%m-%d")
+    return Response(
+        format_version_test_report_collection(reports),
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="midjourney-version-tests-{created}.txt"'},
+    )
 
 
 @app.get("/api/prompts/{prompt_id}/version-comparison")
