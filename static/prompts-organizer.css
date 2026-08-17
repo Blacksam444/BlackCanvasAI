@@ -80,6 +80,14 @@
 .syntax-repair span { color:#aaa095; font-size:9px; margin-top:3px; }
 .syntax-repair button { border:1px solid #76572d; border-radius:8px; background:#3a2a17; color:#f0bd68; padding:8px 10px; font-size:10px; font-weight:700; cursor:pointer; }
 .migration-badge { background:#1c2a35; color:#8fc7ee; }
+#versionCompareDialog { width:min(1000px,calc(100% - 30px)); }
+.comparison-dialog { padding:24px; }
+.version-comparison { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.version-comparison section { min-width:0; border:1px solid #33323a; border-radius:12px; background:#18171c; padding:15px; }
+.version-comparison span { color:#8fc7ee; font-size:9px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; }
+.version-comparison h3 { margin:7px 0 12px; font:700 14px Manrope; }
+.version-comparison pre { margin:0; max-height:52vh; overflow:auto; white-space:pre-wrap; word-break:break-word; color:#b9b5bf; font:11px/1.65 "DM Sans"; }
+@media(max-width:700px){.version-comparison{grid-template-columns:1fr}.version-comparison pre{max-height:28vh}}
 .dialog-actions .dialog-spacer { flex:1; }
 .delete-prompt {
   border:1px solid #5b3038; background:#2a171b; color:#e98b98;
