@@ -1,0 +1,60 @@
+.topbar-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.topbar-actions button {
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: #fff;
+  border-radius: 9px;
+  padding: 9px 13px;
+  cursor: pointer;
+}
+
+#midjourneyForm {
+  padding: 25px;
+}
+
+#midjourneyForm label {
+  display: block;
+  color: #aaa7b1;
+  font-size: 11px;
+  font-weight: 600;
+  margin: 0 0 13px;
+}
+
+#midjourneyForm label small {
+  float: right;
+  color: #666;
+}
+
+#midjourneyForm input {
+  width: 100%;
+  margin-top: 6px;
+  border: 1px solid #33323a;
+  border-radius: 9px;
+  background: #1a191e;
+  color: #fff;
+  padding: 9px;
+  font: 12px "DM Sans";
+  outline: 0;
+}
+
+.rules-note {
+  color: #8f8b96;
+  font-size: 12px;
+  line-height: 1.55;
+  margin: -8px 0 18px;
+}
+
+@media (max-width: 700px) {
+  .topbar-actions #editMidjourney {
+    font-size: 0;
+  }
+
+  .topbar-actions #editMidjourney::before {
+    content: "⚙";
+    font-size: 14px;
+  }
+}
