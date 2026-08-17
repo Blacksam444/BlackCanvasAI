@@ -16,6 +16,7 @@ from app import (
     bulk_update_prompts,
     bulk_restore_prompts,
     bulk_repair_prompt_syntax,
+    bulk_copy_prompts_to_active_midjourney_version,
     create_image_prompt,
     create_prompt,
     copy_prompt_to_active_midjourney_version,
@@ -359,6 +360,45 @@ class PromptBulkUpdateTests(unittest.TestCase):
 
 
 class PromptBulkRepairTests(unittest.TestCase):
+    def test_bulk_active_version_copy_preserves_originals_and_skips_ineligible(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "prompts.db"
+            connection = sqlite3.connect(database)
+            connection.execute(
+                "CREATE TABLE prompts (id INTEGER PRIMARY KEY, title TEXT, category TEXT, text TEXT, favorite INTEGER DEFAULT 0, "
+                "source TEXT DEFAULT 'manual', reviewed INTEGER DEFAULT 1, trashed INTEGER DEFAULT 0, UNIQUE(title, text))"
+            )
+            connection.executemany("INSERT INTO prompts(id, title, category, text) VALUES (?, ?, ?, ?)", [
+                (1, "Old Guardian", "GraffitiX", "Guardian --style raw --v 8.1"),
+                (2, "Current Guardian", "GraffitiX", "Guardian --raw --v 8.2"),
+            ])
+            connection.commit()
+            connection.close()
+
+            opened_connections = []
+
+            def test_connect():
+                opened = sqlite3.connect(database)
+                opened.row_factory = sqlite3.Row
+                opened_connections.append(opened)
+                return opened
+
+            with patch("app.connect", test_connect):
+                result = bulk_copy_prompts_to_active_midjourney_version(PromptIdsPayload(prompt_ids=[1, 2, 1, 99]))
+            for opened in opened_connections:
+                opened.close()
+
+            self.assertEqual(result, {"selected": 3, "copied": 1, "skipped": 2})
+            check = sqlite3.connect(database)
+            try:
+                self.assertEqual(check.execute("SELECT COUNT(*) FROM prompts").fetchone()[0], 3)
+                self.assertEqual(check.execute("SELECT text FROM prompts WHERE id = 1").fetchone()[0],
+                                 "Guardian --style raw --v 8.1")
+                self.assertEqual(check.execute("SELECT text FROM prompts WHERE id = 3").fetchone()[0],
+                                 "Guardian --raw --v 8.2")
+            finally:
+                check.close()
+
     def test_bulk_repair_changes_only_supported_selected_prompts(self):
         with tempfile.TemporaryDirectory() as directory:
             database = Path(directory) / "prompts.db"
