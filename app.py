@@ -63,6 +63,15 @@ def midjourney_parameter_summary(prompt: str) -> dict[str, str]:
     }
 
 
+def format_version_test_pair(original: dict, migrated: dict, original_version: str, migrated_version: str) -> str:
+    return (
+        f"ORIGINAL — MIDJOURNEY V{original_version}\n"
+        f"{original['title']}\n\n{original['text'].strip()}\n\n"
+        f"ACTIVE COPY — MIDJOURNEY V{migrated_version}\n"
+        f"{migrated['title']}\n\n{migrated['text'].strip()}\n"
+    )
+
+
 def midjourney_syntax_issues(prompt: str) -> list[str]:
     issues: list[str] = []
     has_legacy_raw = bool(re.search(r"--style\s+raw\b", prompt, flags=re.IGNORECASE))
@@ -731,6 +740,9 @@ def prompt_version_comparison(prompt_id: int) -> dict:
         "migrated": {**migrated, "version": MIDJOURNEY_RULES["version"]},
         "creative_body_preserved": strip_midjourney_parameters(original["text"]) == strip_midjourney_parameters(migrated["text"]),
         "parameter_changes": parameter_changes,
+        "test_pair": format_version_test_pair(
+            original, migrated, str(migrated["migrated_from_version"]), MIDJOURNEY_RULES["version"]
+        ),
     }
 
 
