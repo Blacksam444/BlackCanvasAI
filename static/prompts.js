@@ -374,6 +374,7 @@ function renderTestVerdict(result) {
 }
 document.querySelectorAll(".test-verdict button").forEach(button => button.onclick = async () => {
   if (!activeVersionComparison) return;
+  const cleared = button.dataset.result === "clear";
   const response = await fetch(`/api/prompts/${activeVersionComparison.migrated.id}/version-test-result`, {
     method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({result:button.dataset.result}),
   });
@@ -383,7 +384,7 @@ document.querySelectorAll(".test-verdict button").forEach(button => button.oncli
   renderTestVerdict(result.result);
   await load();
   updateNextUntestedButton();
-  notify("MidJourney test result saved.");
+  notify(cleared ? "Test result cleared and returned to the queue." : "MidJourney test result saved.");
 });
 async function saveVersionTestNotes(showSuccess = true) {
   if (!activeVersionComparison) return false;
