@@ -106,6 +106,10 @@ function updateBulkToolbar() {
   const copyVersionSelected = document.querySelector("#copyVersionSelected");
   copyVersionSelected.disabled = mismatchCount === 0 || hasTrashed;
   copyVersionSelected.textContent = mismatchCount ? `Copy to active version (${mismatchCount})` : "Copy to active version";
+  const reportCount = selected.filter(prompt => prompt.parent_prompt_id).length;
+  const downloadVersionReports = document.querySelector("#downloadVersionReports");
+  downloadVersionReports.disabled = reportCount === 0 || hasTrashed;
+  downloadVersionReports.textContent = reportCount ? `Download test reports (${reportCount})` : "Download test reports";
 }
 
 async function load() {
@@ -413,6 +417,22 @@ document.querySelector("#copyVersionSelected").onclick = async () => {
   selectedIds.clear();
   await load();
   notify(`${result.copied} active-version ${result.copied === 1 ? "copy" : "copies"} created. ${result.skipped} skipped.`);
+};
+document.querySelector("#downloadVersionReports").onclick = async () => {
+  const response = await fetch("/api/prompts/version-reports/export", {
+    method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({prompt_ids:[...selectedIds]}),
+  });
+  if (!response.ok) {
+    const result = await response.json();
+    return notify(result.detail || "Those version-test reports could not be downloaded.");
+  }
+  const blob = await response.blob();
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `midjourney-version-tests-${new Date().toISOString().slice(0,10)}.txt`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+  notify("Version-test report bundle downloaded.");
 };
 document.querySelector("#downloadPack").onclick = async () => {
   const response = await fetch("/api/prompts/export", {
