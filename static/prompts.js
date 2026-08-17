@@ -1,9 +1,12 @@
 let prompts = [];
 let filter = "All";
 let query = "";
-const requestedFilter = new URLSearchParams(window.location.search).get("filter");
+const requestedParameters = new URLSearchParams(window.location.search);
+const requestedFilter = requestedParameters.get("filter");
+const requestedSort = requestedParameters.get("sort");
 const supportedSorts = new Set(["newest", "oldest", "title", "collection", "favorites", "test-age"]);
 let sortMode = localStorage.getItem("blackCanvasPromptSort") || "newest";
+if (supportedSorts.has(requestedSort)) sortMode = requestedSort;
 if (!supportedSorts.has(sortMode)) sortMode = "newest";
 let editingId = null;
 const selectedIds = new Set();
@@ -261,6 +264,10 @@ document.querySelector("#sortPrompts").value = sortMode;
 document.querySelector("#sortPrompts").onchange = event => {
   sortMode = event.target.value;
   localStorage.setItem("blackCanvasPromptSort", sortMode);
+  const url = new URL(window.location.href);
+  if (sortMode === "newest") url.searchParams.delete("sort");
+  else url.searchParams.set("sort", sortMode);
+  window.history.replaceState({}, "", url);
   render();
 };
 document.querySelectorAll("#filters button").forEach(button => button.onclick = () => {
