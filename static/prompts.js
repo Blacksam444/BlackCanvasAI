@@ -300,9 +300,15 @@ function nextUntestedVersionCopy(currentId) {
 }
 function updateNextUntestedButton() {
   const button = document.querySelector("#nextUntestedVersion");
+  const migrated = prompts.filter(prompt => prompt.parent_prompt_id && !prompt.trashed);
+  const remaining = migrated.filter(prompt => !prompt.version_test_result).length;
+  const tested = migrated.length - remaining;
   const next = nextUntestedVersionCopy(activeVersionComparison?.migrated.id);
   button.disabled = !next;
   button.textContent = next ? "Next untested copy →" : "Testing queue complete";
+  document.querySelector("#versionQueueProgress").textContent = migrated.length
+    ? `${tested} of ${migrated.length} tested · ${remaining} remaining`
+    : "No migrated copies to test";
 }
 async function openVersionComparison(promptId) {
   const response = await fetch(`/api/prompts/${promptId}/version-comparison`);

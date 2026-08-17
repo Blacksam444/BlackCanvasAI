@@ -85,6 +85,7 @@
 .comparison-summary { border:1px solid #3a3a42; border-radius:10px; padding:11px 13px; margin-bottom:13px; color:#aaa6b0; font-size:11px; line-height:1.5; }
 .comparison-summary.preserved { border-color:#315843; background:#15221b; color:#b9e1c8; }
 .comparison-summary.changed { border-color:#7b3e49; background:#25171b; color:#f1b1bb; }
+.version-queue-progress { display:block; margin:-3px 0 13px; color:#9f98a8; font-size:10px; font-weight:700; }
 .comparison-actions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:13px; }
 .comparison-actions button { border:1px solid #47434f; border-radius:8px; background:#242229; color:#d4d0d9; padding:8px 10px; font-size:10px; font-weight:700; cursor:pointer; }
 .comparison-actions button:last-child { border-color:#51456e; background:#241d33; color:#d5c8ff; }
