@@ -24,6 +24,7 @@ from app import (
     copy_prompt_to_active_midjourney_version,
     format_prompt_pack,
     format_version_test_pair,
+    format_version_test_report,
     get_midjourney_rules,
     import_chatgpt_prompts,
     midjourney_verification_status,
@@ -41,6 +42,20 @@ from storage import backup_data
 
 
 class PromptRuleTests(unittest.TestCase):
+    def test_version_test_report_includes_changes_verdict_notes_and_prompts(self):
+        report = format_version_test_report({
+            "creative_body_preserved": True,
+            "parameter_changes": [{"parameter": "Version", "original": "8.1", "migrated": "8.2"}],
+            "original": {"version": "8.1", "title": "Original", "text": "Prompt one"},
+            "migrated": {"version": "8.2", "title": "Copy", "text": "Prompt two",
+                         "version_test_result": "active", "version_test_notes": "Better anatomy."},
+        })
+        self.assertIn("Creative direction preserved: Yes", report)
+        self.assertIn("Test verdict: Active copy preferred", report)
+        self.assertIn("- Version: 8.1 -> 8.2", report)
+        self.assertIn("Better anatomy.", report)
+        self.assertLess(report.index("Prompt one"), report.index("Prompt two"))
+
     def test_version_test_notes_are_trimmed_and_saved_on_migrated_copy(self):
         with patch("app.rows", return_value=[{"id": 9}]), patch("app.execute", return_value=0) as execute_mock:
             result = save_prompt_version_test_notes(9, VersionTestNotesPayload(notes="  Better anatomy and texture.  "))
