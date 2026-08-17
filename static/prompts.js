@@ -62,6 +62,11 @@ function visiblePrompts() {
       || (filter === "Unreviewed" && !prompt.reviewed)
       || (filter === "Duplicates" && duplicates.has(prompt.id))
       || (filter === "Syntax issues" && prompt.syntax_issues?.length)
+      || (filter === "Version copies" && prompt.parent_prompt_id)
+      || (filter === "Untested copies" && prompt.parent_prompt_id && !prompt.version_test_result)
+      || (filter === "Active preferred" && prompt.version_test_result === "active")
+      || (filter === "Original preferred" && prompt.version_test_result === "original")
+      || (filter === "No clear winner" && prompt.version_test_result === "tie")
       || (filter === "Favorites" && prompt.favorite)
       || (filter === "ChatGPT" && prompt.source === "chatgpt")
       || prompt.category === filter));
@@ -166,6 +171,11 @@ function render() {
     "Unreviewed": activePrompts.filter(prompt => !prompt.reviewed).length,
     "Duplicates": duplicates.size,
     "Syntax issues": activePrompts.filter(prompt => prompt.syntax_issues?.length).length,
+    "Version copies": activePrompts.filter(prompt => prompt.parent_prompt_id).length,
+    "Untested copies": activePrompts.filter(prompt => prompt.parent_prompt_id && !prompt.version_test_result).length,
+    "Active preferred": activePrompts.filter(prompt => prompt.version_test_result === "active").length,
+    "Original preferred": activePrompts.filter(prompt => prompt.version_test_result === "original").length,
+    "No clear winner": activePrompts.filter(prompt => prompt.version_test_result === "tie").length,
     "Favorites": activePrompts.filter(prompt => prompt.favorite).length,
     "ChatGPT": activePrompts.filter(prompt => prompt.source === "chatgpt").length,
     "Trash": prompts.filter(prompt => prompt.trashed).length,
