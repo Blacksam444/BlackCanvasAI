@@ -28,6 +28,7 @@
   padding:8px 11px; font-size:10px; font-weight:700; cursor:pointer;
 }
 .duplicate-tools button:disabled { cursor:default; opacity:.45; }
+.version-queue-tools strong { color:#c5b8ff; }.version-queue-tools button { border-color:#51456e; background:#241d33; color:#d5c8ff; }
 
 .bulk-toolbar {
   position:sticky; top:82px; z-index:3; display:flex; align-items:center; gap:9px;

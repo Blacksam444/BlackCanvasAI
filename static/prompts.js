@@ -231,6 +231,21 @@ function render() {
     ? `${duplicateIds().size} prompts in ${groups.length} duplicate ${groups.length === 1 ? "group" : "groups"}`
     : "No duplicate prompts found";
   document.querySelector("#selectDuplicateExtras").disabled = groups.length === 0;
+  const queueMode = filter === "Untested copies" || filter === "Retest recommended";
+  const versionQueueTools = document.querySelector("#versionQueueTools");
+  versionQueueTools.hidden = !queueMode;
+  if (queueMode) {
+    const queueName = filter === "Retest recommended" ? "recommended retest" : "untested comparison";
+    document.querySelector("#versionQueueSummary").textContent = shown.length
+      ? `${shown.length} ${queueName}${shown.length === 1 ? "" : "s"} ready`
+      : (query ? "No matching comparisons" : `${queueName[0].toUpperCase()}${queueName.slice(1)} queue complete`);
+    document.querySelector("#versionQueueHint").textContent = shown.length
+      ? "Open the first comparison and continue through the queue."
+      : (query ? "Clear or change the search to see the rest of the queue." : "There are no remaining comparisons in this queue.");
+    const startQueue = document.querySelector("#startVersionQueue");
+    startQueue.disabled = shown.length === 0;
+    startQueue.textContent = shown.length ? "Start queue" : (query ? "No matches" : "Queue complete");
+  }
   const selectVisible = document.querySelector("#selectVisible");
   const allVisibleSelected = shown.length > 0 && shown.every(prompt => selectedIds.has(prompt.id));
   selectVisible.disabled = shown.length === 0;
@@ -287,6 +302,10 @@ document.querySelector("#selectVisible").onclick = () => {
   shown.forEach(prompt => allVisibleSelected ? selectedIds.delete(prompt.id) : selectedIds.add(prompt.id));
   render();
   notify(allVisibleSelected ? `${shown.length} visible selections cleared.` : `${shown.length} visible prompts selected.`);
+};
+document.querySelector("#startVersionQueue").onclick = () => {
+  const first = visiblePrompts().find(prompt => prompt.parent_prompt_id);
+  if (first) openVersionComparison(first.id);
 };
 document.querySelector("#savePrompt").onclick = async event => {
   event.preventDefault();
