@@ -32,6 +32,15 @@ from storage import backup_data
 
 
 class PromptRuleTests(unittest.TestCase):
+    def test_prompts_using_another_midjourney_version_are_flagged_without_rewrite(self):
+        prompt = "Archive portrait --ar 4:5 --raw --v 8.1"
+
+        self.assertEqual(
+            midjourney_syntax_issues(prompt),
+            ["Uses MidJourney v8.1; active verified rules are v8.2"],
+        )
+        self.assertEqual(repair_midjourney_syntax(prompt), prompt)
+
     def test_midjourney_verification_status_has_review_thresholds(self):
         with patch.dict("app.MIDJOURNEY_RULES", {"version": "8.2", "verified_at": "2026-01-01"}, clear=True):
             self.assertEqual(midjourney_verification_status(date(2026, 3, 2))["status"], "current")

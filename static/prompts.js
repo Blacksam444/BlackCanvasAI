@@ -93,7 +93,7 @@ function updateBulkToolbar() {
   favoriteSelected.disabled = hasTrashed;
   favoriteSelected.textContent = allFavorite ? "☆ Unfavorite selected" : "★ Favorite selected";
   document.querySelector("#downloadPack").disabled = hasTrashed;
-  const issueCount = prompts.filter(prompt => selectedIds.has(prompt.id) && prompt.syntax_issues?.length).length;
+  const issueCount = prompts.filter(prompt => selectedIds.has(prompt.id) && prompt.syntax_repairable).length;
   const repairSelected = document.querySelector("#repairSelected");
   repairSelected.disabled = issueCount === 0 || hasTrashed;
   repairSelected.textContent = issueCount ? `Repair syntax (${issueCount})` : "Repair syntax";
@@ -127,7 +127,7 @@ function render() {
     const card = document.createElement("article");
     card.className = `prompt-card${selectedIds.has(prompt.id) ? " selected" : ""}${!prompt.reviewed ? " unreviewed" : ""}${prompt.trashed ? " trashed" : ""}`;
     const cardActions = prompt.trashed ? '<button class="restore">Restore prompt</button>' : '<button class="view">Review & edit</button><button class="copy">Copy prompt</button>';
-    card.innerHTML = `<div class="card-top"><label class="select-prompt"><input type="checkbox" ${selectedIds.has(prompt.id) ? "checked" : ""}><span></span></label><div class="card-badges"><span class="category">${escape(prompt.category)}</span><span class="source ${escape(prompt.source)}">${sourceLabel(prompt.source)}</span>${prompt.trashed ? '<span class="trash-badge">Trash</span>' : ""}${!prompt.reviewed ? '<span class="review-badge">Unreviewed</span>' : ""}${duplicates.has(prompt.id) ? '<span class="duplicate-badge">Duplicate</span>' : ""}${prompt.syntax_issues?.length ? '<span class="syntax-badge">Syntax issue</span>' : ""}</div><button class="favorite ${prompt.favorite ? "on" : ""}" title="Favorite">★</button></div><h2>${escape(prompt.title)}</h2><p class="prompt-preview">${escape(prompt.text)}</p><div class="card-bottom">${cardActions}</div>`;
+    card.innerHTML = `<div class="card-top"><label class="select-prompt"><input type="checkbox" ${selectedIds.has(prompt.id) ? "checked" : ""}><span></span></label><div class="card-badges"><span class="category">${escape(prompt.category)}</span><span class="source ${escape(prompt.source)}">${sourceLabel(prompt.source)}</span>${prompt.trashed ? '<span class="trash-badge">Trash</span>' : ""}${!prompt.reviewed ? '<span class="review-badge">Unreviewed</span>' : ""}${duplicates.has(prompt.id) ? '<span class="duplicate-badge">Duplicate</span>' : ""}${prompt.version_mismatch ? '<span class="syntax-badge">Version review</span>' : prompt.syntax_issues?.length ? '<span class="syntax-badge">Syntax issue</span>' : ""}</div><button class="favorite ${prompt.favorite ? "on" : ""}" title="Favorite">★</button></div><h2>${escape(prompt.title)}</h2><p class="prompt-preview">${escape(prompt.text)}</p><div class="card-bottom">${cardActions}</div>`;
     const checkbox = card.querySelector('input[type="checkbox"]');
     checkbox.onchange = () => {
       if (checkbox.checked) selectedIds.add(prompt.id);
@@ -194,6 +194,7 @@ function openEditor(prompt = null) {
   const syntaxRepair = document.querySelector("#syntaxRepair");
   syntaxRepair.hidden = !prompt?.syntax_issues?.length;
   document.querySelector("#syntaxRepairMessage").textContent = prompt?.syntax_issues?.join(" · ") || "";
+  document.querySelector("#repairSyntax").hidden = !prompt?.syntax_repairable;
   if (prompt) {
     document.querySelector("#promptTitle").value = prompt.title;
     document.querySelector("#promptCategory").value = canonicalCategories.includes(prompt.category) ? prompt.category : "Unsorted";
@@ -293,7 +294,7 @@ document.querySelector("#favoriteSelected").onclick = () => {
   bulkUpdate({favorite:!allFavorite}, allFavorite ? "prompts unfavorited." : "prompts favorited.");
 };
 document.querySelector("#repairSelected").onclick = async () => {
-  const issueCount = prompts.filter(prompt => selectedIds.has(prompt.id) && prompt.syntax_issues?.length).length;
+  const issueCount = prompts.filter(prompt => selectedIds.has(prompt.id) && prompt.syntax_repairable).length;
   if (!issueCount || !window.confirm(`Repair supported MidJourney syntax in ${issueCount} selected ${issueCount === 1 ? "prompt" : "prompts"}?`)) return;
   const response = await fetch("/api/prompts/bulk-repair-midjourney-syntax", {
     method:"POST",
