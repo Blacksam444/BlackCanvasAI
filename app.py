@@ -132,6 +132,9 @@ class MidJourneyRulesPayload(BaseModel):
     default_aspect_ratio: str
     supported_aspect_ratios: list[str]
     raw_parameter: str
+    verified_at: str = ""
+    verification_source: str = ""
+    update_note: str = ""
 
 
 class ArtworkPayload(BaseModel):
@@ -616,6 +619,8 @@ def save_midjourney_rules(payload: MidJourneyRulesPayload) -> dict:
     raw_parameter = payload.raw_parameter.strip().lower()
     aspect_ratios = list(dict.fromkeys(ratio.strip() for ratio in payload.supported_aspect_ratios if ratio.strip()))
     default_ratio = payload.default_aspect_ratio.strip()
+    verified_at = payload.verified_at.strip()
+    verification_source = payload.verification_source.strip()
     if not re.fullmatch(r"[1-9][0-9]*(?:\.[0-9]+)?", version):
         raise HTTPException(status_code=400, detail="Use a numeric MidJourney version such as 8.2")
     if not re.fullmatch(r"--[a-z][a-z0-9-]*", raw_parameter):
@@ -624,21 +629,45 @@ def save_midjourney_rules(payload: MidJourneyRulesPayload) -> dict:
         raise HTTPException(status_code=400, detail="Aspect ratios must look like 4:5 or 16:9")
     if default_ratio not in aspect_ratios:
         raise HTTPException(status_code=400, detail="The default aspect ratio must be in the supported list")
+    if verified_at and not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", verified_at):
+        raise HTTPException(status_code=400, detail="The verification date must use YYYY-MM-DD")
+    if verification_source and not re.fullmatch(r"https://[^\s]+", verification_source):
+        raise HTTPException(status_code=400, detail="Use an https:// link for the verification source")
+    previous = {key: value for key, value in MIDJOURNEY_RULES.items() if key != "previous_rules"}
     updated = {
         "ruleset": f"midjourney-v{version}-custom",
         "version": version,
         "default_aspect_ratio": default_ratio,
         "supported_aspect_ratios": aspect_ratios,
         "raw_parameter": raw_parameter,
+        "verified_at": verified_at,
+        "verification_source": verification_source,
+        "update_note": payload.update_note.strip(),
         "deprecated_parameters": MIDJOURNEY_RULES["deprecated_parameters"],
+        "previous_rules": previous,
     }
+    apply_midjourney_rules(updated)
+    return updated
+
+
+def apply_midjourney_rules(updated: dict) -> None:
     MIDJOURNEY_RULES_PATH.write_text(json.dumps(updated, indent=2) + "\n", encoding="utf-8")
     MIDJOURNEY_RULES.clear()
     MIDJOURNEY_RULES.update(updated)
     global DEFAULT_ASPECT_RATIO, SUPPORTED_ASPECT_RATIOS
-    DEFAULT_ASPECT_RATIO = default_ratio
-    SUPPORTED_ASPECT_RATIOS = set(aspect_ratios)
-    return updated
+    DEFAULT_ASPECT_RATIO = updated["default_aspect_ratio"]
+    SUPPORTED_ASPECT_RATIOS = set(updated["supported_aspect_ratios"])
+
+
+@app.post("/api/midjourney-rules/restore-previous")
+def restore_previous_midjourney_rules() -> dict:
+    previous = MIDJOURNEY_RULES.get("previous_rules")
+    if not isinstance(previous, dict):
+        raise HTTPException(status_code=400, detail="There is no previous MidJourney ruleset to restore")
+    current = {key: value for key, value in MIDJOURNEY_RULES.items() if key != "previous_rules"}
+    restored = {**previous, "previous_rules": current}
+    apply_midjourney_rules(restored)
+    return restored
 
 
 @app.put("/api/styles/{name}")

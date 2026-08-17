@@ -48,6 +48,41 @@
   margin: -8px 0 18px;
 }
 
+.verification-status,
+.previous-rules {
+  border: 1px solid #33323a;
+  border-radius: 9px;
+  background: #19181d;
+  color: #9995a1;
+  font-size: 11px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+
+.verification-status a {
+  color: #bca8ff;
+}
+
+.previous-rules {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.previous-rules[hidden] {
+  display: none;
+}
+
+.previous-rules button {
+  border: 1px solid #51456e;
+  border-radius: 7px;
+  background: #241d33;
+  color: #d5c8ff;
+  padding: 7px 9px;
+  cursor: pointer;
+}
+
 @media (max-width: 700px) {
   .topbar-actions #editMidjourney {
     font-size: 0;

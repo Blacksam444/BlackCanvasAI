@@ -22,6 +22,7 @@ from app import (
     import_chatgpt_prompts,
     midjourney_syntax_issues,
     repair_midjourney_syntax,
+    restore_previous_midjourney_rules,
     save_midjourney_rules,
 )
 
@@ -36,10 +37,18 @@ class PromptRuleTests(unittest.TestCase):
                     default_aspect_ratio="4:5",
                     supported_aspect_ratios=["4:5", "1:1", "4:5"],
                     raw_parameter="--raw",
+                    verified_at="2026-08-17",
+                    verification_source="https://docs.midjourney.com/",
+                    update_note="Verified test update",
                 ))
                 self.assertEqual(result["version"], "8.3")
                 self.assertEqual(result["supported_aspect_ratios"], ["4:5", "1:1"])
+                self.assertEqual(result["verified_at"], "2026-08-17")
+                self.assertEqual(result["previous_rules"]["version"], original_rules["version"])
                 self.assertEqual(json.loads((Path(directory) / "rules.json").read_text())["version"], "8.3")
+                restored = restore_previous_midjourney_rules()
+                self.assertEqual(restored["version"], original_rules["version"])
+                self.assertEqual(restored["previous_rules"]["version"], "8.3")
             finally:
                 import app
                 app.MIDJOURNEY_RULES.clear()
