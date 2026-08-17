@@ -5,7 +5,7 @@ import shutil
 import sqlite3
 import uuid
 import zipfile
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -611,6 +611,36 @@ def list_styles() -> dict:
 @app.get("/api/midjourney-rules")
 def get_midjourney_rules() -> dict:
     return MIDJOURNEY_RULES
+
+
+def midjourney_verification_status(today: date | None = None) -> dict:
+    today = today or date.today()
+    verified_text = str(MIDJOURNEY_RULES.get("verified_at", ""))
+    try:
+        verified_at = date.fromisoformat(verified_text)
+    except ValueError:
+        return {"status": "unverified", "label": "Not verified", "today": today.isoformat(), "days_since": None,
+                "next_review": None, "version": MIDJOURNEY_RULES["version"]}
+    days_since = max((today - verified_at).days, 0)
+    if days_since <= 60:
+        status, label = "current", "Verified"
+    elif days_since <= 90:
+        status, label = "due", "Review due"
+    else:
+        status, label = "overdue", "Review overdue"
+    return {
+        "status": status,
+        "label": label,
+        "today": today.isoformat(),
+        "days_since": days_since,
+        "next_review": (verified_at + timedelta(days=60)).isoformat(),
+        "version": MIDJOURNEY_RULES["version"],
+    }
+
+
+@app.get("/api/midjourney-rules/status")
+def get_midjourney_verification_status() -> dict:
+    return midjourney_verification_status()
 
 
 @app.put("/api/midjourney-rules")
