@@ -641,6 +641,46 @@ def copy_prompt_to_active_midjourney_version(prompt_id: int) -> dict:
             "favorite": 0, "source": "manual", "reviewed": 0, "syntax_issues": midjourney_syntax_issues(migrated_text)}
 
 
+@app.post("/api/prompts/bulk-copy-to-active-midjourney-version")
+def bulk_copy_prompts_to_active_midjourney_version(payload: PromptIdsPayload) -> dict[str, int]:
+    prompt_ids = list(dict.fromkeys(payload.prompt_ids))
+    if not prompt_ids:
+        raise HTTPException(status_code=400, detail="Select at least one prompt")
+    placeholders = ",".join("?" for _ in prompt_ids)
+    copied = 0
+    skipped = 0
+    with connect() as db:
+        selected = db.execute(
+            f"SELECT id, title, category, text FROM prompts WHERE trashed = 0 AND id IN ({placeholders})",
+            prompt_ids,
+        ).fetchall()
+        selected_by_id = {prompt["id"]: prompt for prompt in selected}
+        for selected_id in prompt_ids:
+            original = selected_by_id.get(selected_id)
+            if not original or not any(
+                issue.startswith("Uses MidJourney v") for issue in midjourney_syntax_issues(original["text"])
+            ):
+                skipped += 1
+                continue
+            migrated_text = re.sub(
+                r"--v\s+[0-9]+(?:\.[0-9]+)?\b",
+                f"--v {MIDJOURNEY_RULES['version']}",
+                original["text"],
+                flags=re.IGNORECASE,
+            )
+            migrated_text = repair_midjourney_syntax(migrated_text)
+            title = f"{original['title']} (MJ v{MIDJOURNEY_RULES['version']})"[:120]
+            try:
+                db.execute(
+                    "INSERT INTO prompts(title, category, text, favorite, source, reviewed) VALUES (?, ?, ?, 0, 'manual', 0)",
+                    (title, original["category"], migrated_text),
+                )
+                copied += 1
+            except sqlite3.IntegrityError:
+                skipped += 1
+    return {"selected": len(prompt_ids), "copied": copied, "skipped": skipped}
+
+
 @app.get("/api/styles")
 def list_styles() -> dict:
     return {item["name"]: json.loads(item["content"]) for item in rows("SELECT name, content FROM styles")}

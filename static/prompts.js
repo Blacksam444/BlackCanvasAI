@@ -97,6 +97,10 @@ function updateBulkToolbar() {
   const repairSelected = document.querySelector("#repairSelected");
   repairSelected.disabled = issueCount === 0 || hasTrashed;
   repairSelected.textContent = issueCount ? `Repair syntax (${issueCount})` : "Repair syntax";
+  const mismatchCount = prompts.filter(prompt => selectedIds.has(prompt.id) && prompt.version_mismatch).length;
+  const copyVersionSelected = document.querySelector("#copyVersionSelected");
+  copyVersionSelected.disabled = mismatchCount === 0 || hasTrashed;
+  copyVersionSelected.textContent = mismatchCount ? `Copy to active version (${mismatchCount})` : "Copy to active version";
 }
 
 async function load() {
@@ -318,6 +322,20 @@ document.querySelector("#repairSelected").onclick = async () => {
   await load();
   const skipped = result.skipped ? ` ${result.skipped} skipped because no change was needed or a duplicate would result.` : "";
   notify(`${result.repaired} ${result.repaired === 1 ? "prompt" : "prompts"} repaired.${skipped}`);
+};
+document.querySelector("#copyVersionSelected").onclick = async () => {
+  const mismatchCount = prompts.filter(prompt => selectedIds.has(prompt.id) && prompt.version_mismatch).length;
+  if (!mismatchCount || !window.confirm(`Create active-version copies of ${mismatchCount} selected ${mismatchCount === 1 ? "prompt" : "prompts"}? Originals will be kept.`)) return;
+  const response = await fetch("/api/prompts/bulk-copy-to-active-midjourney-version", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({prompt_ids:[...selectedIds]}),
+  });
+  const result = await response.json();
+  if (!response.ok) return notify(result.detail || "Those active-version copies could not be created.");
+  selectedIds.clear();
+  await load();
+  notify(`${result.copied} active-version ${result.copied === 1 ? "copy" : "copies"} created. ${result.skipped} skipped.`);
 };
 document.querySelector("#downloadPack").onclick = async () => {
   const response = await fetch("/api/prompts/export", {
