@@ -312,6 +312,9 @@ async function copyComparisonText(text, message) {
 document.querySelector("#copyOriginalVersion").onclick = () => copyComparisonText(activeVersionComparison?.original.text, "Original prompt copied.");
 document.querySelector("#copyMigratedVersion").onclick = () => copyComparisonText(activeVersionComparison?.migrated.text, "Active-version prompt copied.");
 document.querySelector("#copyVersionPair").onclick = () => copyComparisonText(activeVersionComparison?.test_pair, "Labeled version test pair copied.");
+document.querySelector("#downloadVersionReport").onclick = () => {
+  if (activeVersionComparison) window.location.href = `/api/prompts/${activeVersionComparison.migrated.id}/version-report`;
+};
 function renderTestVerdict(result) {
   document.querySelectorAll(".test-verdict button").forEach(button => button.classList.toggle("selected", button.dataset.result === result));
 }

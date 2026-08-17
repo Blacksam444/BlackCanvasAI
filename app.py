@@ -72,6 +72,29 @@ def format_version_test_pair(original: dict, migrated: dict, original_version: s
     )
 
 
+def format_version_test_report(comparison: dict) -> str:
+    verdicts = {"original": "Original preferred", "active": "Active copy preferred", "tie": "No clear winner"}
+    verdict = verdicts.get(comparison["migrated"].get("version_test_result"), "Not tested")
+    notes = comparison["migrated"].get("version_test_notes") or "No notes recorded."
+    changes = comparison["parameter_changes"]
+    change_lines = "\n".join(
+        f"- {change['parameter']}: {change['original']} -> {change['migrated']}" for change in changes
+    ) or "- No technical parameter changes detected."
+    preserved = "Yes" if comparison["creative_body_preserved"] else "No — review creative text carefully"
+    return (
+        "BLACK CANVAS AI — MIDJOURNEY VERSION TEST REPORT\n"
+        f"Created {datetime.now().astimezone().strftime('%B %d, %Y')}\n\n"
+        f"Creative direction preserved: {preserved}\n"
+        f"Test verdict: {verdict}\n\n"
+        f"PARAMETER CHANGES\n{change_lines}\n\n"
+        f"TEST NOTES\n{notes}\n\n"
+        f"ORIGINAL — MIDJOURNEY V{comparison['original']['version']}\n"
+        f"{comparison['original']['title']}\n\n{comparison['original']['text'].strip()}\n\n"
+        f"ACTIVE COPY — MIDJOURNEY V{comparison['migrated']['version']}\n"
+        f"{comparison['migrated']['title']}\n\n{comparison['migrated']['text'].strip()}\n"
+    )
+
+
 def midjourney_syntax_issues(prompt: str) -> list[str]:
     issues: list[str] = []
     has_legacy_raw = bool(re.search(r"--style\s+raw\b", prompt, flags=re.IGNORECASE))
@@ -752,6 +775,16 @@ def prompt_version_comparison(prompt_id: int) -> dict:
             original, migrated, str(migrated["migrated_from_version"]), MIDJOURNEY_RULES["version"]
         ),
     }
+
+
+@app.get("/api/prompts/{prompt_id}/version-report")
+def download_prompt_version_report(prompt_id: int) -> Response:
+    report = format_version_test_report(prompt_version_comparison(prompt_id))
+    return Response(
+        report,
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="midjourney-version-test-{prompt_id}.txt"'},
+    )
 
 
 @app.patch("/api/prompts/{prompt_id}/version-test-result")
