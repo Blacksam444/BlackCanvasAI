@@ -68,7 +68,7 @@ class PromptRuleTests(unittest.TestCase):
         ])
         self.assertEqual(summary, {
             "total": 4, "untested": 1, "active": 1, "original": 1,
-            "tie": 1, "tested": 3, "completion_percent": 75,
+            "tie": 1, "retest_recommended": 3, "tested": 3, "completion_percent": 75,
         })
 
     def test_version_report_collection_keeps_selected_report_order(self):

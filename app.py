@@ -489,7 +489,8 @@ def version_test_needs_retest(item: dict, verified_at: str | None = None) -> boo
 
 def summarize_version_tests(items: list[dict]) -> dict[str, int]:
     migrated = [item for item in items if item.get("parent_prompt_id")]
-    counts = {"total": len(migrated), "untested": 0, "active": 0, "original": 0, "tie": 0}
+    counts = {"total": len(migrated), "untested": 0, "active": 0, "original": 0, "tie": 0,
+              "retest_recommended": sum(version_test_needs_retest(item) for item in migrated)}
     for item in migrated:
         result = item.get("version_test_result")
         if result in ("active", "original", "tie"):
@@ -518,7 +519,7 @@ def dashboard_summary() -> dict:
             "SELECT id, title, collection, notes FROM artworks ORDER BY id DESC LIMIT 3"
         ).fetchall()]
         version_testing = summarize_version_tests([dict(item) for item in db.execute(
-            "SELECT parent_prompt_id, version_test_result FROM prompts WHERE trashed = 0 AND parent_prompt_id IS NOT NULL"
+            "SELECT parent_prompt_id, version_test_result, version_tested_at FROM prompts WHERE trashed = 0 AND parent_prompt_id IS NOT NULL"
         ).fetchall()])
         prompt_of_day = db.execute(
             "SELECT id, title, category, text FROM prompts WHERE trashed = 0 "

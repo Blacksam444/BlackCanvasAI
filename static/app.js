@@ -60,6 +60,8 @@ async function loadDashboard() {
     document.querySelector("#versionTestActive").textContent = testing.active;
     document.querySelector("#versionTestOriginal").textContent = testing.original;
     document.querySelector("#versionTestTie").textContent = testing.tie;
+    document.querySelector("#versionTestRetest").textContent = testing.retest_recommended;
+    document.querySelector("#retestQueueLink").hidden = testing.retest_recommended === 0;
     if (data.prompt_of_day) {
       document.querySelector("#dailyPrompt").textContent = data.prompt_of_day.text;
       document.querySelector("#dailyCategory").textContent = data.prompt_of_day.category;

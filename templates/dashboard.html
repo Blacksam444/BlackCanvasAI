@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/styles.css">
-    <link rel="stylesheet" href="/static/dashboard-live.css?v=1">
+    <link rel="stylesheet" href="/static/dashboard-live.css?v=2">
 </head>
 <body>
     <div class="app-shell">
@@ -85,8 +85,10 @@
                         <div><strong id="versionTestActive">—</strong><span>Active version wins</span></div>
                         <div><strong id="versionTestOriginal">—</strong><span>Original wins</span></div>
                         <div><strong id="versionTestTie">—</strong><span>No clear winner</span></div>
+                        <div><strong id="versionTestRetest">—</strong><span>Retest recommended</span></div>
                     </div>
                     <a href="/prompts?filter=Untested%20copies">Open testing queue →</a>
+                    <a href="/prompts?filter=Retest%20recommended" id="retestQueueLink" hidden>Open recommended retests →</a>
                 </section>
 
                 <section class="recent">
@@ -101,6 +103,6 @@
         </main>
     </div>
     <div class="toast" id="toast" role="status"></div>
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=2"></script>
 </body>
 </html>
