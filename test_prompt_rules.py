@@ -271,6 +271,11 @@ class PromptRuleTests(unittest.TestCase):
         self.assertIn("s.dos.map(activeRuleText)", script)
         self.assertIn("s.donts.map(activeRuleText)", script)
 
+    def test_style_bible_aspect_ratios_use_active_rules(self):
+        script = (Path(__file__).parent / "static" / "style-bible.js").read_text(encoding="utf-8")
+        self.assertIn("midjourneyRules.supported_aspect_ratios", script)
+        self.assertIn("syncRecipeAspectOptions();", script)
+
     def test_manual_prompt_save_normalizes_legacy_v82_syntax(self):
         payload = PromptPayload(
             title="Legacy recipe",
