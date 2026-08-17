@@ -1,10 +1,20 @@
 const midjourneyDialog = $("#midjourneyDialog");
+let midjourneyReviewStatus = null;
+
+async function loadMidjourneyReviewStatus() {
+  const response = await fetch("/api/midjourney-rules/status");
+  if (!response.ok) return;
+  midjourneyReviewStatus = await response.json();
+  const button = $("#editMidjourney");
+  button.dataset.status = midjourneyReviewStatus.status;
+  button.textContent = `⚙ MJ v${midjourneyReviewStatus.version} · ${midjourneyReviewStatus.label}`;
+}
 
 function renderMidjourneyMetadata() {
   const verified = midjourneyRules.verified_at || "Not recorded";
   const source = midjourneyRules.verification_source;
   $("#verificationStatus").innerHTML = source
-    ? `Verified ${verified} · <a href="${source}" target="_blank" rel="noopener">Open source ↗</a>`
+    ? `${midjourneyReviewStatus?.label || "Verified"} ${verified} · <a href="${source}" target="_blank" rel="noopener">Open source ↗</a>`
     : `Verified ${verified}`;
   const previous = midjourneyRules.previous_rules;
   $("#previousRules").hidden = !previous;
@@ -50,6 +60,11 @@ $("#saveMidjourney").onclick = async event => {
   midjourneyDialog.close();
   render();
   notify(`MidJourney v${result.version} rules saved.`);
+  loadMidjourneyReviewStatus();
+};
+
+$("#markVerifiedToday").onclick = () => {
+  $("#midjourneyVerifiedAt").value = midjourneyReviewStatus?.today || new Date().toISOString().slice(0, 10);
 };
 
 $("#restorePrevious").onclick = async () => {
@@ -63,4 +78,7 @@ $("#restorePrevious").onclick = async () => {
   midjourneyDialog.close();
   render();
   notify(`Restored MidJourney v${result.version}.`);
+  loadMidjourneyReviewStatus();
 };
+
+loadMidjourneyReviewStatus();

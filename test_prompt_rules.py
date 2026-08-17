@@ -2,6 +2,7 @@ import unittest
 import json
 import sqlite3
 import tempfile
+from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
@@ -20,6 +21,7 @@ from app import (
     format_prompt_pack,
     get_midjourney_rules,
     import_chatgpt_prompts,
+    midjourney_verification_status,
     midjourney_syntax_issues,
     repair_midjourney_syntax,
     restore_previous_midjourney_rules,
@@ -30,6 +32,12 @@ from storage import backup_data
 
 
 class PromptRuleTests(unittest.TestCase):
+    def test_midjourney_verification_status_has_review_thresholds(self):
+        with patch.dict("app.MIDJOURNEY_RULES", {"version": "8.2", "verified_at": "2026-01-01"}, clear=True):
+            self.assertEqual(midjourney_verification_status(date(2026, 3, 2))["status"], "current")
+            self.assertEqual(midjourney_verification_status(date(2026, 3, 3))["status"], "due")
+            self.assertEqual(midjourney_verification_status(date(2026, 4, 2))["status"], "overdue")
+
     def test_backups_include_and_restore_midjourney_rules(self):
         original_rules = get_midjourney_rules().copy()
         with tempfile.TemporaryDirectory() as directory:

@@ -12,6 +12,11 @@
   cursor: pointer;
 }
 
+#editMidjourney[data-status="current"] { border-color: #315843; color: #b9e1c8; }
+#editMidjourney[data-status="due"] { border-color: #78602a; color: #f1d58d; }
+#editMidjourney[data-status="overdue"],
+#editMidjourney[data-status="unverified"] { border-color: #7b3e49; color: #f1b1bb; }
+
 #midjourneyForm {
   padding: 25px;
 }
@@ -46,6 +51,15 @@
   font-size: 12px;
   line-height: 1.55;
   margin: -8px 0 18px;
+}
+
+.mark-today {
+  float: right;
+  border: 0;
+  background: transparent;
+  color: #a78bfa;
+  font: inherit;
+  cursor: pointer;
 }
 
 .verification-status,
