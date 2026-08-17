@@ -465,12 +465,26 @@ def chat_reply(payload: ChatMessage) -> dict[str, str]:
 
 @app.get("/api/prompts")
 def list_prompts() -> list[dict]:
-    items = rows("SELECT id, title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result FROM prompts ORDER BY id DESC")
+    items = rows("SELECT id, title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result, version_tested_at FROM prompts ORDER BY id DESC")
     for item in items:
         item["syntax_issues"] = midjourney_syntax_issues(item["text"])
         item["version_mismatch"] = any(issue.startswith("Uses MidJourney v") for issue in item["syntax_issues"])
         item["syntax_repairable"] = repair_midjourney_syntax(item["text"]) != item["text"]
+        item["retest_recommended"] = version_test_needs_retest(item)
     return items
+
+
+def version_test_needs_retest(item: dict, verified_at: str | None = None) -> bool:
+    if not item.get("version_test_result"):
+        return False
+    tested_at = item.get("version_tested_at")
+    verified_at = verified_at or MIDJOURNEY_RULES.get("verified_at")
+    if not tested_at or not verified_at:
+        return True
+    try:
+        return datetime.fromisoformat(str(tested_at).replace("Z", "+00:00")).date() < date.fromisoformat(verified_at)
+    except ValueError:
+        return True
 
 
 def summarize_version_tests(items: list[dict]) -> dict[str, int]:
@@ -804,6 +818,7 @@ def prompt_version_comparison(prompt_id: int) -> dict:
     if not copies:
         raise HTTPException(status_code=404, detail="That prompt is not a migrated version copy")
     migrated = copies[0]
+    migrated["retest_recommended"] = version_test_needs_retest(migrated)
     originals = rows(
         "SELECT id, title, category, text FROM prompts WHERE id = ?",
         (migrated["parent_prompt_id"],),
