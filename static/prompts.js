@@ -566,6 +566,13 @@ async function copyPromptsToActiveVersion(promptIds, scopeLabel, openTestingQueu
   await load();
   const nextStep = openTestingQueue && result.copied ? " Testing queue ready." : "";
   notify(`${result.copied} active-version ${result.copied === 1 ? "copy" : "copies"} created. ${result.skipped} skipped.${nextStep}`);
+  if (openTestingQueue && result.copied) {
+    const migratedParentIds = new Set(mismatchIds);
+    const firstNewComparison = prompts.find(prompt =>
+      prompt.parent_prompt_id && migratedParentIds.has(prompt.parent_prompt_id) && !prompt.version_test_result
+    );
+    if (firstNewComparison) await openVersionComparison(firstNewComparison.id);
+  }
 }
 document.querySelector("#copyVersionSelected").onclick = () => copyPromptsToActiveVersion([...selectedIds], "selected");
 document.querySelector("#copyVisibleOutdated").onclick = () => copyPromptsToActiveVersion(
