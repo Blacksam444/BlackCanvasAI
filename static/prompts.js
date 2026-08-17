@@ -84,7 +84,7 @@ function visiblePrompts() {
       || (filter === "Unreviewed" && !prompt.reviewed)
       || (filter === "Duplicates" && duplicates.has(prompt.id))
       || (filter === "Syntax issues" && prompt.syntax_issues?.length)
-      || (filter === "Older MJ version" && prompt.version_mismatch)
+      || (filter === "Older MJ version" && prompt.version_mismatch && !prompt.active_version_copy_exists)
       || (filter === "Version copies" && prompt.parent_prompt_id)
       || (filter === "Untested copies" && prompt.parent_prompt_id && !prompt.version_test_result)
       || (filter === "Retest recommended" && prompt.retest_recommended)
@@ -127,7 +127,7 @@ function updateBulkToolbar() {
   const repairSelected = document.querySelector("#repairSelected");
   repairSelected.disabled = issueCount === 0 || hasTrashed;
   repairSelected.textContent = issueCount ? `Repair syntax (${issueCount})` : "Repair syntax";
-  const mismatchCount = prompts.filter(prompt => selectedIds.has(prompt.id) && prompt.version_mismatch).length;
+  const mismatchCount = prompts.filter(prompt => selectedIds.has(prompt.id) && prompt.version_mismatch && !prompt.active_version_copy_exists).length;
   const copyVersionSelected = document.querySelector("#copyVersionSelected");
   copyVersionSelected.disabled = mismatchCount === 0 || hasTrashed;
   copyVersionSelected.textContent = mismatchCount ? `Copy to active version (${mismatchCount})` : "Copy to active version";
@@ -211,7 +211,7 @@ function render() {
     "Unreviewed": activePrompts.filter(prompt => !prompt.reviewed).length,
     "Duplicates": duplicates.size,
     "Syntax issues": activePrompts.filter(prompt => prompt.syntax_issues?.length).length,
-    "Older MJ version": activePrompts.filter(prompt => prompt.version_mismatch).length,
+    "Older MJ version": activePrompts.filter(prompt => prompt.version_mismatch && !prompt.active_version_copy_exists).length,
     "Version copies": activePrompts.filter(prompt => prompt.parent_prompt_id).length,
     "Untested copies": activePrompts.filter(prompt => prompt.parent_prompt_id && !prompt.version_test_result).length,
     "Retest recommended": activePrompts.filter(prompt => prompt.retest_recommended).length,
@@ -283,7 +283,7 @@ function openEditor(prompt = null) {
   syntaxRepair.hidden = !prompt?.syntax_issues?.length;
   document.querySelector("#syntaxRepairMessage").textContent = prompt?.syntax_issues?.join(" · ") || "";
   document.querySelector("#repairSyntax").hidden = !prompt?.syntax_repairable;
-  document.querySelector("#copyActiveVersion").hidden = !prompt?.version_mismatch;
+  document.querySelector("#copyActiveVersion").hidden = !prompt?.version_mismatch || prompt.active_version_copy_exists;
   if (prompt) {
     document.querySelector("#promptTitle").value = prompt.title;
     document.querySelector("#promptCategory").value = canonicalCategories.includes(prompt.category) ? prompt.category : "Unsorted";
@@ -545,7 +545,7 @@ document.querySelector("#repairSelected").onclick = async () => {
   notify(`${result.repaired} ${result.repaired === 1 ? "prompt" : "prompts"} repaired.${skipped}`);
 };
 async function copyPromptsToActiveVersion(promptIds, scopeLabel) {
-  const mismatchIds = promptIds.filter(id => prompts.some(prompt => prompt.id === id && prompt.version_mismatch));
+  const mismatchIds = promptIds.filter(id => prompts.some(prompt => prompt.id === id && prompt.version_mismatch && !prompt.active_version_copy_exists));
   const mismatchCount = mismatchIds.length;
   if (!mismatchCount || !window.confirm(`Create active-version copies of ${mismatchCount} ${scopeLabel} ${mismatchCount === 1 ? "prompt" : "prompts"}? Originals will be kept.`)) return;
   const response = await fetch("/api/prompts/bulk-copy-to-active-midjourney-version", {
@@ -561,7 +561,7 @@ async function copyPromptsToActiveVersion(promptIds, scopeLabel) {
 }
 document.querySelector("#copyVersionSelected").onclick = () => copyPromptsToActiveVersion([...selectedIds], "selected");
 document.querySelector("#copyVisibleOutdated").onclick = () => copyPromptsToActiveVersion(
-  visiblePrompts().filter(prompt => prompt.version_mismatch).map(prompt => prompt.id), "visible"
+  visiblePrompts().filter(prompt => prompt.version_mismatch && !prompt.active_version_copy_exists).map(prompt => prompt.id), "visible"
 );
 async function downloadVersionReportBundle(promptIds) {
   const response = await fetch("/api/prompts/version-reports/export", {
