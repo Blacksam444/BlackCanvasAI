@@ -2,7 +2,7 @@ let prompts = [];
 let filter = "All";
 let query = "";
 const requestedFilter = new URLSearchParams(window.location.search).get("filter");
-const supportedSorts = new Set(["newest", "oldest", "title", "collection", "favorites"]);
+const supportedSorts = new Set(["newest", "oldest", "title", "collection", "favorites", "test-age"]);
 let sortMode = localStorage.getItem("blackCanvasPromptSort") || "newest";
 if (!supportedSorts.has(sortMode)) sortMode = "newest";
 let editingId = null;
@@ -12,6 +12,7 @@ const empty = document.querySelector("#empty");
 const toast = document.querySelector("#toast");
 const dialog = document.querySelector("#promptDialog");
 const canonicalCategories = ["AfroNova", "Quiet Nova", "GraffitiX", "Content", "Business", "Unsorted"];
+document.querySelector("#sortPrompts").insertAdjacentHTML("beforeend", '<option value="test-age">Oldest tests first</option>');
 document.querySelector('#filters button[data-filter="Untested copies"]')
   .insertAdjacentHTML("afterend", '<button data-filter="Retest recommended">Retest recommended</button>');
 document.querySelectorAll("#filters button").forEach(button => {
@@ -32,6 +33,10 @@ const notify = message => {
 };
 const escape = text => (text || "").replace(/[&<>"']/g, character => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"})[character]);
 const normalizedText = text => (text || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const testAgeValue = prompt => {
+  const value = prompt.version_tested_at ? Date.parse(prompt.version_tested_at) : Number.NaN;
+  return Number.isFinite(value) ? value : Number.NEGATIVE_INFINITY;
+};
 
 function duplicateGroups() {
   const groups = new Map();
@@ -88,6 +93,7 @@ function visiblePrompts() {
   if (sortMode === "title") return visible.sort(byTitle);
   if (sortMode === "collection") return visible.sort((a, b) => a.category.localeCompare(b.category, undefined, {sensitivity:"base"}) || byTitle(a, b));
   if (sortMode === "favorites") return visible.sort((a, b) => Number(b.favorite) - Number(a.favorite) || b.id - a.id);
+  if (sortMode === "test-age") return visible.sort((a, b) => testAgeValue(a) - testAgeValue(b) || a.id - b.id);
   return visible.sort((a, b) => b.id - a.id);
 }
 
@@ -307,6 +313,7 @@ function nextVersionTestCopy(currentId) {
   const queue = filter === "Retest recommended"
     ? migrated.filter(prompt => prompt.retest_recommended)
     : migrated.filter(prompt => !prompt.version_test_result);
+  if (sortMode === "test-age") queue.sort((a, b) => testAgeValue(a) - testAgeValue(b) || a.id - b.id);
   return queue.find(prompt => prompt.id !== currentId) || null;
 }
 function updateNextUntestedButton() {
