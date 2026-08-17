@@ -76,6 +76,7 @@ def format_version_test_report(comparison: dict) -> str:
     verdicts = {"original": "Original preferred", "active": "Active copy preferred", "tie": "No clear winner"}
     verdict = verdicts.get(comparison["migrated"].get("version_test_result"), "Not tested")
     notes = comparison["migrated"].get("version_test_notes") or "No notes recorded."
+    tested_at = comparison["migrated"].get("version_tested_at") or "Not recorded"
     changes = comparison["parameter_changes"]
     change_lines = "\n".join(
         f"- {change['parameter']}: {change['original']} -> {change['migrated']}" for change in changes
@@ -86,6 +87,7 @@ def format_version_test_report(comparison: dict) -> str:
         f"Created {datetime.now().astimezone().strftime('%B %d, %Y')}\n\n"
         f"Creative direction preserved: {preserved}\n"
         f"Test verdict: {verdict}\n\n"
+        f"Verdict recorded: {tested_at}\n\n"
         f"PARAMETER CHANGES\n{change_lines}\n\n"
         f"TEST NOTES\n{notes}\n\n"
         f"ORIGINAL — MIDJOURNEY V{comparison['original']['version']}\n"
@@ -795,7 +797,7 @@ def export_prompt_version_reports(payload: PromptIdsPayload) -> Response:
 @app.get("/api/prompts/{prompt_id}/version-comparison")
 def prompt_version_comparison(prompt_id: int) -> dict:
     copies = rows(
-        "SELECT id, title, category, text, parent_prompt_id, migrated_from_version, version_test_result, version_test_notes FROM prompts "
+        "SELECT id, title, category, text, parent_prompt_id, migrated_from_version, version_test_result, version_test_notes, version_tested_at FROM prompts "
         "WHERE id = ? AND parent_prompt_id IS NOT NULL",
         (prompt_id,),
     )
@@ -844,11 +846,12 @@ def save_prompt_version_test_result(prompt_id: int, payload: VersionTestResultPa
     if requested not in allowed | {"clear"}:
         raise HTTPException(status_code=400, detail="Choose original, active, tie, or clear")
     result = None if requested == "clear" else requested
+    tested_at = datetime.now(timezone.utc).isoformat(timespec="seconds") if result else None
     matching = rows("SELECT id FROM prompts WHERE id = ? AND parent_prompt_id IS NOT NULL", (prompt_id,))
     if not matching:
         raise HTTPException(status_code=404, detail="That prompt is not a migrated version copy")
-    execute("UPDATE prompts SET version_test_result = ? WHERE id = ?", (result, prompt_id))
-    return {"result": result}
+    execute("UPDATE prompts SET version_test_result = ?, version_tested_at = ? WHERE id = ?", (result, tested_at, prompt_id))
+    return {"result": result, "tested_at": tested_at}
 
 
 @app.patch("/api/prompts/{prompt_id}/version-test-notes")
@@ -1323,8 +1326,8 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
     with connect() as db:
         for prompt in manifest.get("prompts", []):
             cursor = db.execute(
-                "INSERT OR IGNORE INTO prompts(title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result, version_test_notes) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO prompts(title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result, version_test_notes, version_tested_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     prompt.get("title", "Restored prompt"), prompt.get("category", "Unsorted"),
                     repair_midjourney_syntax(str(prompt.get("text", "")).strip()),
@@ -1333,6 +1336,7 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
                     prompt.get("parent_prompt_id"), prompt.get("migrated_from_version"),
                     prompt.get("version_test_result"),
                     str(prompt.get("version_test_notes", ""))[:2000],
+                    prompt.get("version_tested_at"),
                 ),
             )
             restored_prompts += max(cursor.rowcount, 0)
