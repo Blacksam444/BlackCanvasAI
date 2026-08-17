@@ -299,8 +299,11 @@ async function restorePrompts(promptIds) {
 }
 const versionCompareDialog = document.querySelector("#versionCompareDialog");
 let activeVersionComparison = null;
-function nextUntestedVersionCopy(currentId) {
-  const queue = prompts.filter(prompt => prompt.parent_prompt_id && !prompt.trashed && !prompt.version_test_result);
+function nextVersionTestCopy(currentId) {
+  const migrated = prompts.filter(prompt => prompt.parent_prompt_id && !prompt.trashed);
+  const queue = filter === "Retest recommended"
+    ? migrated.filter(prompt => prompt.retest_recommended)
+    : migrated.filter(prompt => !prompt.version_test_result);
   return queue.find(prompt => prompt.id !== currentId) || null;
 }
 function updateNextUntestedButton() {
@@ -308,11 +311,15 @@ function updateNextUntestedButton() {
   const migrated = prompts.filter(prompt => prompt.parent_prompt_id && !prompt.trashed);
   const remaining = migrated.filter(prompt => !prompt.version_test_result).length;
   const tested = migrated.length - remaining;
-  const next = nextUntestedVersionCopy(activeVersionComparison?.migrated.id);
+  const retestMode = filter === "Retest recommended";
+  const retestRemaining = migrated.filter(prompt => prompt.retest_recommended).length;
+  const next = nextVersionTestCopy(activeVersionComparison?.migrated.id);
   button.disabled = !next;
-  button.textContent = next ? "Next untested copy →" : "Testing queue complete";
+  button.textContent = next
+    ? (retestMode ? "Next recommended retest →" : "Next untested copy →")
+    : (retestMode ? "Retest queue complete" : "Testing queue complete");
   document.querySelector("#versionQueueProgress").textContent = migrated.length
-    ? `${tested} of ${migrated.length} tested · ${remaining} remaining${activeVersionComparison?.migrated.version_tested_at ? ` · Last verdict ${new Date(activeVersionComparison.migrated.version_tested_at).toLocaleDateString()}` : ""}${activeVersionComparison?.migrated.retest_recommended ? " · Retest recommended" : ""}`
+    ? `${retestMode ? `${retestRemaining} recommended retests remaining` : `${tested} of ${migrated.length} tested · ${remaining} remaining`}${activeVersionComparison?.migrated.version_tested_at ? ` · Last verdict ${new Date(activeVersionComparison.migrated.version_tested_at).toLocaleDateString()}` : ""}${activeVersionComparison?.migrated.retest_recommended ? " · Retest recommended" : ""}`
     : "No migrated copies to test";
 }
 async function openVersionComparison(promptId) {
@@ -365,7 +372,7 @@ document.querySelector("#downloadVersionReport").onclick = () => {
   if (activeVersionComparison) window.location.href = `/api/prompts/${activeVersionComparison.migrated.id}/version-report`;
 };
 document.querySelector("#nextUntestedVersion").onclick = async () => {
-  const next = nextUntestedVersionCopy(activeVersionComparison?.migrated.id);
+  const next = nextVersionTestCopy(activeVersionComparison?.migrated.id);
   if (!next) return;
   const button = document.querySelector("#nextUntestedVersion");
   button.disabled = true;
