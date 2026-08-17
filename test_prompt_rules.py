@@ -25,6 +25,7 @@ from app import (
     import_chatgpt_prompts,
     midjourney_verification_status,
     midjourney_syntax_issues,
+    midjourney_parameter_summary,
     prompt_version_comparison,
     repair_midjourney_syntax,
     restore_previous_midjourney_rules,
@@ -46,6 +47,15 @@ class PromptRuleTests(unittest.TestCase):
         self.assertEqual(result["original"]["text"], original["text"])
         self.assertEqual(result["migrated"]["version"], "8.2")
         self.assertEqual(result["migrated"]["text"], migrated["text"])
+        self.assertTrue(result["creative_body_preserved"])
+        self.assertEqual(result["parameter_changes"], [
+            {"parameter": "Version", "original": "8.1", "migrated": "8.2"},
+        ])
+
+    def test_midjourney_parameter_summary_identifies_legacy_raw_mode(self):
+        self.assertEqual(midjourney_parameter_summary("Guardian --ar 4:5 --style raw --v 8.1"), {
+            "Aspect ratio": "4:5", "Raw mode": "--style raw", "Version": "8.1",
+        })
 
     def test_active_version_migration_creates_copy_and_keeps_original(self):
         original = {"id": 7, "title": "Archive Guardian", "category": "GraffitiX",
