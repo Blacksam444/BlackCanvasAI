@@ -686,6 +686,28 @@ def bulk_copy_prompts_to_active_midjourney_version(payload: PromptIdsPayload) ->
     return {"selected": len(prompt_ids), "copied": copied, "skipped": skipped}
 
 
+@app.get("/api/prompts/{prompt_id}/version-comparison")
+def prompt_version_comparison(prompt_id: int) -> dict:
+    copies = rows(
+        "SELECT id, title, category, text, parent_prompt_id, migrated_from_version FROM prompts "
+        "WHERE id = ? AND parent_prompt_id IS NOT NULL",
+        (prompt_id,),
+    )
+    if not copies:
+        raise HTTPException(status_code=404, detail="That prompt is not a migrated version copy")
+    migrated = copies[0]
+    originals = rows(
+        "SELECT id, title, category, text FROM prompts WHERE id = ?",
+        (migrated["parent_prompt_id"],),
+    )
+    if not originals:
+        raise HTTPException(status_code=404, detail="The original prompt is no longer available")
+    return {
+        "original": {**originals[0], "version": migrated["migrated_from_version"]},
+        "migrated": {**migrated, "version": MIDJOURNEY_RULES["version"]},
+    }
+
+
 @app.get("/api/styles")
 def list_styles() -> dict:
     return {item["name"]: json.loads(item["content"]) for item in rows("SELECT name, content FROM styles")}

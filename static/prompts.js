@@ -130,7 +130,7 @@ function render() {
   shown.forEach(prompt => {
     const card = document.createElement("article");
     card.className = `prompt-card${selectedIds.has(prompt.id) ? " selected" : ""}${!prompt.reviewed ? " unreviewed" : ""}${prompt.trashed ? " trashed" : ""}`;
-    const cardActions = prompt.trashed ? '<button class="restore">Restore prompt</button>' : '<button class="view">Review & edit</button><button class="copy">Copy prompt</button>';
+    const cardActions = prompt.trashed ? '<button class="restore">Restore prompt</button>' : `<button class="view">Review & edit</button>${prompt.parent_prompt_id ? '<button class="compare">Compare versions</button>' : ''}<button class="copy">Copy prompt</button>`;
     card.innerHTML = `<div class="card-top"><label class="select-prompt"><input type="checkbox" ${selectedIds.has(prompt.id) ? "checked" : ""}><span></span></label><div class="card-badges"><span class="category">${escape(prompt.category)}</span><span class="source ${escape(prompt.source)}">${sourceLabel(prompt.source)}</span>${prompt.trashed ? '<span class="trash-badge">Trash</span>' : ""}${!prompt.reviewed ? '<span class="review-badge">Unreviewed</span>' : ""}${prompt.parent_prompt_id ? `<span class="migration-badge">From MJ v${escape(prompt.migrated_from_version || "older")}</span>` : ""}${duplicates.has(prompt.id) ? '<span class="duplicate-badge">Duplicate</span>' : ""}${prompt.version_mismatch ? '<span class="syntax-badge">Version review</span>' : prompt.syntax_issues?.length ? '<span class="syntax-badge">Syntax issue</span>' : ""}</div><button class="favorite ${prompt.favorite ? "on" : ""}" title="Favorite">★</button></div><h2>${escape(prompt.title)}</h2><p class="prompt-preview">${escape(prompt.text)}</p><div class="card-bottom">${cardActions}</div>`;
     const checkbox = card.querySelector('input[type="checkbox"]');
     checkbox.onchange = () => {
@@ -151,6 +151,8 @@ function render() {
         notify("Prompt copied.");
       };
       card.querySelector(".view").onclick = () => openEditor(prompt);
+      const compareButton = card.querySelector(".compare");
+      if (compareButton) compareButton.onclick = () => openVersionComparison(prompt.id);
     }
     grid.appendChild(card);
   });
@@ -264,6 +266,20 @@ async function restorePrompts(promptIds) {
   await load();
   notify(`${result.restored} ${result.restored === 1 ? "prompt" : "prompts"} restored.`);
 }
+const versionCompareDialog = document.querySelector("#versionCompareDialog");
+async function openVersionComparison(promptId) {
+  const response = await fetch(`/api/prompts/${promptId}/version-comparison`);
+  const result = await response.json();
+  if (!response.ok) return notify(result.detail || "That version comparison is unavailable.");
+  document.querySelector("#originalVersionLabel").textContent = `Original · MJ v${result.original.version || "unknown"}`;
+  document.querySelector("#originalVersionTitle").textContent = result.original.title;
+  document.querySelector("#originalVersionText").textContent = result.original.text;
+  document.querySelector("#migratedVersionLabel").textContent = `Active copy · MJ v${result.migrated.version}`;
+  document.querySelector("#migratedVersionTitle").textContent = result.migrated.title;
+  document.querySelector("#migratedVersionText").textContent = result.migrated.text;
+  versionCompareDialog.showModal();
+}
+document.querySelector("#closeVersionCompare").onclick = () => versionCompareDialog.close();
 document.querySelector("#repairSyntax").onclick = async () => {
   if (!editingId) return;
   const response = await fetch(`/api/prompts/${editingId}/repair-midjourney-syntax`, {method:"PATCH"});

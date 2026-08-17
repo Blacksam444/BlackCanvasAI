@@ -25,6 +25,7 @@ from app import (
     import_chatgpt_prompts,
     midjourney_verification_status,
     midjourney_syntax_issues,
+    prompt_version_comparison,
     repair_midjourney_syntax,
     restore_previous_midjourney_rules,
     restore_midjourney_rules_from_manifest,
@@ -34,6 +35,18 @@ from storage import backup_data
 
 
 class PromptRuleTests(unittest.TestCase):
+    def test_version_comparison_returns_original_and_migrated_copy(self):
+        migrated = {"id": 9, "title": "Guardian (MJ v8.2)", "category": "GraffitiX",
+                    "text": "Guardian --raw --v 8.2", "parent_prompt_id": 4, "migrated_from_version": "8.1"}
+        original = {"id": 4, "title": "Guardian", "category": "GraffitiX", "text": "Guardian --raw --v 8.1"}
+        with patch("app.rows", side_effect=[[migrated], [original]]):
+            result = prompt_version_comparison(9)
+
+        self.assertEqual(result["original"]["version"], "8.1")
+        self.assertEqual(result["original"]["text"], original["text"])
+        self.assertEqual(result["migrated"]["version"], "8.2")
+        self.assertEqual(result["migrated"]["text"], migrated["text"])
+
     def test_active_version_migration_creates_copy_and_keeps_original(self):
         original = {"id": 7, "title": "Archive Guardian", "category": "GraffitiX",
                     "text": "Guardian --style raw --v 8.1"}
