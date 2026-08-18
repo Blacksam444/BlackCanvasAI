@@ -20,6 +20,8 @@ document.querySelector('#filters button[data-filter="Untested copies"]')
   .insertAdjacentHTML("afterend", '<button data-filter="Retest recommended">Retest recommended</button>');
 document.querySelector('#filters button[data-filter="Syntax issues"]')
   .insertAdjacentHTML("afterend", '<button data-filter="Older MJ version">Older MJ version</button>');
+document.querySelector("#downloadVersionReport")
+  .insertAdjacentHTML("afterend", '<button id="downloadMigrationBatch" type="button" hidden>Download batch reports</button>');
 document.querySelectorAll("#filters button").forEach(button => {
   button.dataset.label = button.textContent;
   button.insertAdjacentHTML("beforeend", '<span class="filter-count">0</span>');
@@ -379,6 +381,11 @@ function nextVersionTestCopy(currentId) {
 }
 function updateNextUntestedButton() {
   const button = document.querySelector("#nextUntestedVersion");
+  const batchDownload = document.querySelector("#downloadMigrationBatch");
+  batchDownload.hidden = !activeMigrationBatchIds?.size;
+  batchDownload.textContent = activeMigrationBatchIds?.size
+    ? `Download batch reports (${activeMigrationBatchIds.size})`
+    : "Download batch reports";
   const migrated = prompts.filter(prompt => prompt.parent_prompt_id && !prompt.trashed);
   const scoped = activeMigrationBatchIds ? migrated.filter(prompt => activeMigrationBatchIds.has(prompt.id)) : migrated;
   const remaining = scoped.filter(prompt => !prompt.version_test_result).length;
@@ -448,6 +455,9 @@ document.querySelector("#copyMigratedVersion").onclick = () => copyComparisonTex
 document.querySelector("#copyVersionPair").onclick = () => copyComparisonText(activeVersionComparison?.test_pair, "Labeled version test pair copied.");
 document.querySelector("#downloadVersionReport").onclick = () => {
   if (activeVersionComparison) window.location.href = `/api/prompts/${activeVersionComparison.migrated.id}/version-report`;
+};
+document.querySelector("#downloadMigrationBatch").onclick = () => {
+  if (activeMigrationBatchIds?.size) downloadVersionReportBundle([...activeMigrationBatchIds]);
 };
 document.querySelector("#nextUntestedVersion").onclick = async () => {
   let next = nextVersionTestCopy(activeVersionComparison?.migrated.id);

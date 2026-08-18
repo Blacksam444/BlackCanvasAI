@@ -220,6 +220,8 @@ class PromptRuleTests(unittest.TestCase):
         self.assertIn("openVersionComparison(firstNewComparison.id)", script)
         self.assertIn("Continue with full queue", script)
         self.assertIn("activeMigrationBatchIds = null", script)
+        self.assertIn('id="downloadMigrationBatch"', script)
+        self.assertIn("downloadVersionReportBundle([...activeMigrationBatchIds])", script)
 
     def test_midjourney_verification_status_has_review_thresholds(self):
         with patch.dict("app.MIDJOURNEY_RULES", {"version": "8.2", "verified_at": "2026-01-01"}, clear=True):
