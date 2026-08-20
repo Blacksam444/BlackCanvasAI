@@ -1,0 +1,24 @@
+.prompt-builder .graffitix-options {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #65314f;
+  border-radius: 11px;
+  background: #1b1218;
+}
+
+.prompt-builder .graffitix-options[hidden] { display: none; }
+.prompt-builder .graffitix-options > p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #f1a4c2;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .1em;
+}
+
+@media (max-width: 680px) {
+  .prompt-builder .graffitix-options { grid-template-columns: 1fr; }
+}

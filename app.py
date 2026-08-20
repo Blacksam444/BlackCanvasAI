@@ -25,6 +25,14 @@ from spellchecker import SpellChecker
 from storage import UPLOAD_DIR, backup_data, connect, execute, initialize, rows
 
 BASE_DIR = Path(__file__).resolve().parent
+DEFAULT_ASPECT_RATIO = "4:5"
+SUPPORTED_ASPECT_RATIOS = {"1:1", "4:5", "3:2", "16:9", "9:16"}
+DEFAULT_NEGATIVE_INSTRUCTIONS = "no text, no watermark, no signature, no logo, no frame"
+GRAFFITIX_NEGATIVE_INSTRUCTIONS = (
+    "no digital smoothness, no glossy CGI finish, no polished 3D render, "
+    "no clean vector edges, no random decorative symbols, no cluttered focal hierarchy, "
+    f"{DEFAULT_NEGATIVE_INSTRUCTIONS}"
+)
 initialize()
 app = FastAPI(title="Black Canvas AI")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
@@ -258,6 +266,16 @@ def saved_style_direction(collection: str, palette: str, style: str, mood: str) 
     return palette, style, mood, avoid
 
 
+def midjourney_v82_suffix(idea: str) -> str:
+    requested_ratio = re.search(
+        r"(?:^|[.;])\s*aspect ratio\s*:\s*([0-9]+:[0-9]+)", idea, flags=re.IGNORECASE
+    )
+    aspect_ratio = requested_ratio.group(1) if requested_ratio else DEFAULT_ASPECT_RATIO
+    if aspect_ratio not in SUPPORTED_ASPECT_RATIOS:
+        aspect_ratio = DEFAULT_ASPECT_RATIO
+    return f"--ar {aspect_ratio} --raw --v 8.2"
+
+
 def create_image_prompt(message: str) -> tuple[str, str]:
     idea = clean_image_idea(message)
     collection, palette, style, mood = prompt_collection(idea)
@@ -266,6 +284,10 @@ def create_image_prompt(message: str) -> tuple[str, str]:
     subject = re.split(r"\s+in\s+the\s+(?:AfroNova|Quiet Nova|GraffitiX)\s+style", idea, maxsplit=1, flags=re.IGNORECASE)[0]
     requested_mood = re.search(r"with\s+(?:an?\s+)?(.+?)\s+mood", idea, flags=re.IGNORECASE)
     requested_colors = re.search(r"using\s+(.+?),\s+as\s+", idea, flags=re.IGNORECASE)
+    requested_pose = re.search(r"(?:^|[.;])\s*pose\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
+    requested_camera = re.search(r"(?:^|[.;])\s*camera\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
+    requested_hero = re.search(r"(?:^|[.;])\s*hero symbol\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
+    midjourney_suffix = midjourney_v82_suffix(idea)
     if requested_mood:
         mood = requested_mood.group(1).strip()
     if requested_colors and "collection color palette" not in requested_colors.group(1).lower():
@@ -283,6 +305,28 @@ def create_image_prompt(message: str) -> tuple[str, str]:
     safety = " age-appropriate styling and a dignified, authentic expression," if any(
         word in subject.lower() for word in ("child", "boy", "girl", "kid", "baby")
     ) else ""
+    if collection == "GraffitiX":
+        pose_direction = requested_pose.group(1).strip() if requested_pose else (
+            "a grounded pose with a planted foot, weight shift, bent joints, hip angle, shoulder counter-rotation, "
+            "torso twist, and a readable S-curve, Z-curve, or spiral line of action"
+        )
+        camera_direction = requested_camera.group(1).strip() if requested_camera else (
+            "a deliberate low-angle three-quarter, pavement tracking, high Dutch-angle, or eye-level camera view"
+        )
+        hero_symbol = requested_hero.group(1).strip() if requested_hero else "a rough-painted 444, crown, skull, X-eye, or nova glyph"
+        prompt = (
+            f"/imagine prompt: full-body {subject},{safety} presented as the unmistakable focal subject. "
+            f"Engineer {pose_direction}. Use {camera_direction}, keeping the silhouette immediately readable. "
+            "Build authentic 1990s streetwear with construction detail: oversized pleated chinos, stacked ankles, "
+            "pocket tee or cropped tank, open flannel or vintage windbreaker, bandana or snapback, and retro sneakers. "
+            f"Establish one dominant hero symbol—{hero_symbol}; use only one or two small supporting symbols, then restrained background writing. "
+            "Render raw Black Canvas / 444 GraffitiX mixed-media fine art: heavy oil stick, oil pastel, dripping acrylic, "
+            "impasto, aerosol haze, charcoal, chalk, scratches, collage, and exposed canvas. "
+            f"Use {palette}, stark graphic directional lighting, brutal contrast, irregular hand-drawn edges, tactile matte surfaces, "
+            f"and a {mood} emotional charge. Keep the figure emotionally present and dominant over every mark. "
+            f"Museum-quality contemporary urban artwork, {GRAFFITIX_NEGATIVE_INSTRUCTIONS} {midjourney_suffix}"
+        )
+        return collection, prompt
     prompt = (
         f"Create {medium} of {subject},{safety} presented as the unmistakable focal subject. "
         f"Use a balanced three-quarter composition at eye level, with confident posture, expressive eyes, "
@@ -292,7 +336,8 @@ def create_image_prompt(message: str) -> tuple[str, str]:
         f"{palette}. Place the subject against an atmospheric, story-rich background that supports the idea "
         f"without competing with the face. The mood is {mood}. Include believable materials, finely rendered "
         f"fabric and accessories, natural depth of field, sophisticated color grading, crisp focal detail, "
-        f"gallery-ready composition, ultra-detailed, cohesive, emotionally resonant{avoid}, no text, no watermark."
+        f"gallery-ready composition, ultra-detailed, cohesive, emotionally resonant{avoid}, "
+        f"{DEFAULT_NEGATIVE_INSTRUCTIONS} {midjourney_suffix}"
     )
     return collection, prompt
 

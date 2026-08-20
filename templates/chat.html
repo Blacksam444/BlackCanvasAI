@@ -5,7 +5,7 @@
   <title>Chat · Black Canvas AI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/chat.css"><link rel="stylesheet" href="/static/agent-brief.css?v=2"><link rel="stylesheet" href="/static/chat-save.css?v=1"><link rel="stylesheet" href="/static/prompt-builder.css?v=1"><link rel="stylesheet" href="/static/prompt-refiner.css?v=3"><link rel="stylesheet" href="/static/chat-artwork.css?v=1">
+  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/chat.css"><link rel="stylesheet" href="/static/agent-brief.css?v=2"><link rel="stylesheet" href="/static/chat-save.css?v=1"><link rel="stylesheet" href="/static/prompt-builder.css?v=1"><link rel="stylesheet" href="/static/prompt-builder-controls.css?v=1"><link rel="stylesheet" href="/static/prompt-refiner.css?v=3"><link rel="stylesheet" href="/static/chat-artwork.css?v=1">
 </head>
 <body>
 <div class="app-shell chat-shell">
@@ -24,6 +24,6 @@
   </main>
 </div>
 <dialog id="artworkPicker"><div class="artwork-picker-head"><div><span>IMAGE STUDIO</span><h2>Choose an artwork</h2><p>Black Canvas will use its saved details to create a new prompt.</p></div><button id="closeArtworkPicker" aria-label="Close">×</button></div><label class="artwork-picker-search">Search your artwork<input id="artworkPickerSearch" placeholder="Title, collection, or tag..."></label><div id="artworkPickerGrid" class="artwork-picker-grid"></div><p id="artworkPickerEmpty" class="artwork-picker-empty" hidden>No matching artwork found.</p><a class="artwork-picker-link" href="/image-studio">＋ Add artwork in Image Studio</a></dialog>
-<div class="toast" id="toast" role="status"></div><script src="/static/chat.js?v=8"></script>
+<div class="toast" id="toast" role="status"></div><script src="/static/chat.js?v=9"></script>
 </body>
 </html>

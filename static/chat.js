@@ -322,6 +322,17 @@ document.querySelectorAll("#newChat,#topNewChat").forEach((button) => {
 });
 document.querySelectorAll("[data-coming]").forEach((button) => { button.onclick = () => notify(`${button.dataset.coming} is next on our build list.`); });
 document.querySelector("#menuButton").onclick = () => document.querySelector("#sidebar").classList.toggle("open");
+function addPromptBuilderControls() {
+  const imageStyleLabel = document.querySelector("#builderStyle").closest("label");
+  imageStyleLabel.insertAdjacentHTML("afterend", '<label>Aspect ratio<select id="builderAspectRatio"><option value="4:5">Portrait · 4:5</option><option value="1:1">Square · 1:1</option><option value="3:2">Landscape · 3:2</option><option value="16:9">Widescreen · 16:9</option><option value="9:16">Story / Reel · 9:16</option></select></label>');
+  document.querySelector(".builder-create").insertAdjacentHTML("beforebegin", '<div class="graffitix-options" id="graffitixOptions" hidden><p>444 GRAFFITIX DIRECTION</p><label>Pose mechanics<select id="builderPose"><option value="grounded wide stance with both feet planted, rear-leg weight shift, bent front knee, angled hips, and a sharp Z-curve through the torso">Grounded Z-curve stance</option><option value="kinetic street-dance spin with one sneaker planted as a pivot, sweeping leg, dropped hips, and a corkscrew line of action">Kinetic spiral spin</option><option value="confident walking stride with a planted foot, forward swing leg, shifted hips, and counter-rotating shoulders">Forward walking stride</option><option value="low crouched stance with deeply flexed knees, centered weight, forward shoulders, and a compressed S-curve">Low crouched stance</option></select></label><label>Camera construction<select id="builderCamera"><option value="a dramatic low-angle three-quarter camera view that makes the figure monumental">Low-angle three-quarter</option><option value="a pavement-level tracking shot with strong forward perspective">Pavement tracking shot</option><option value="a sharp high-angle Dutch-angle view looking down from above and behind">High Dutch angle</option><option value="a close eye-level frontal view with flat graphic tension">Eye-level frontal</option></select></label><label>Hero symbol<select id="builderHero"><option value="a rough hand-painted hot-magenta 444 across the skull or forehead">Hot-magenta 444</option><option value="a distorted hand-drawn crown in thick red oil stick">Distorted crown</option><option value="a crude hot-magenta X-eye treatment">X-eye treatment</option><option value="a luminous rough-painted nova star glyph in the chest">Nova chest glyph</option><option value="an expressive skull motif with oversized exposed teeth">Expressive skull</option></select></label></div>');
+}
+addPromptBuilderControls();
+const updateGraffitiXOptions = () => {
+  document.querySelector("#graffitixOptions").hidden = document.querySelector("#builderCollection").value !== "GraffitiX";
+};
+document.querySelector("#builderCollection").onchange = updateGraffitiXOptions;
+updateGraffitiXOptions();
 document.querySelector("#builderToggle").onclick = () => {
   const builder = document.querySelector("#promptBuilder");
   builder.hidden = !builder.hidden;
@@ -335,9 +346,13 @@ document.querySelector("#promptBuilder").onsubmit = (event) => {
   const mood = document.querySelector("#builderMood").value;
   const colors = document.querySelector("#builderColors").value;
   const imageStyle = document.querySelector("#builderStyle").value;
+  const aspectRatio = document.querySelector("#builderAspectRatio").value;
   if (!subject) return document.querySelector("#builderSubject").focus();
   const colorDirection = colors === "Collection colors" ? "the collection color palette" : colors;
-  send(`Create an image prompt for ${subject} in the ${collection} style, with a ${mood} mood, using ${colorDirection}, as a ${imageStyle}.`);
+  const graffitiDirection = collection === "GraffitiX"
+    ? ` Pose: ${document.querySelector("#builderPose").value}; Camera: ${document.querySelector("#builderCamera").value}; Hero symbol: ${document.querySelector("#builderHero").value}.`
+    : "";
+  send(`Create an image prompt for ${subject} in the ${collection} style, with a ${mood} mood, using ${colorDirection}, as a ${imageStyle}. Aspect ratio: ${aspectRatio}.${graffitiDirection}`);
 };
 const openingQuestion = new URLSearchParams(window.location.search).get("q");
 const openingBrief = new URLSearchParams(window.location.search).get("brief") === "1";
