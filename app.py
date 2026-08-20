@@ -379,6 +379,38 @@ def chat_reply(payload: ChatMessage) -> dict[str, object]:
             ),
             "actions": [{"label": "Open Prompt Library", "href": "/prompts"}]
         }
+    if any(word in topic_lower for word in ("order", "shipping", "ship", "fulfillment", "fulfilment", "tracking", "buyer")):
+        active_orders = studio_data["active_orders"]
+        return {
+            "reply": (
+                "**Black Canvas order direction**\n\n"
+                f"You currently have **{active_orders}** active {'order' if active_orders == 1 else 'orders'} in fulfillment.\n\n"
+                "For each sold piece, confirm the buyer details, packing status, carrier, tracking number, "
+                "and delivery status. Keep the artwork record current so your sales and profit reports stay accurate."
+            ),
+            "actions": [{"label": "Open Orders Dashboard", "href": "/image-studio?focus=orders"}]
+        }
+    if any(word in topic_lower for word in ("print", "dpi", "300 dpi", "giclée", "giclee", "canvas size")):
+        return {
+            "reply": (
+                "**Black Canvas print direction**\n\n"
+                "Before sending a file to print, confirm the final print dimensions and pixel dimensions together. "
+                "A 300-DPI label does not create missing detail—it only prepares a file that already has enough pixels.\n\n"
+                "Use Print Prep from the artwork card in Image Studio. It will tell you the maximum clean print size "
+                "and can export a print-ready PNG when the artwork is large enough."
+            ),
+            "actions": [{"label": "Open Image Studio", "href": "/image-studio"}]
+        }
+    if any(word in topic_lower for word in ("style bible", "brand", "collection rules", "visual voice")):
+        return {
+            "reply": (
+                "**Black Canvas style direction**\n\n"
+                "Your Style Bible is the source of truth for AfroNova, Quiet Nova, and GraffitiX. "
+                "Use it before generating prompts so colors, symbols, mood, and visual storytelling stay consistent across a collection.\n\n"
+                "Add any new rule as an update first, then review it before it becomes part of the permanent collection direction."
+            ),
+            "actions": [{"label": "Open Style Bible", "href": "/style-bible"}]
+        }
     creative_triggers = ("prompt", "image", "portrait", "painting", "photo", "artwork", "style",
                          "afronova", "afro nova", "quiet nova", "graffitix", "graffiti x")
     if any(word in topic_lower for word in creative_triggers):
