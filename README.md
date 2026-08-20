@@ -10,3 +10,12 @@ python -m uvicorn app:app --reload
 ```
 
 Open `http://127.0.0.1:8000`.
+
+## Verify changes
+
+```powershell
+python -m unittest discover -v
+python -m py_compile app.py storage.py
+```
+
+GitHub automatically runs these checks, plus browser-script syntax validation, for pull requests and updates to `main`.
