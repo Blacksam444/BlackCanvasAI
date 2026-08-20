@@ -57,7 +57,13 @@ function render() {
     const card = document.createElement("article");
     card.className = "art-card";
     const displayPrice = artwork.sale_status === "Sold" && artwork.sale_price ? artwork.sale_price : artwork.price;
-    card.innerHTML = `<img src="${artwork.url}" alt="${escapeHtml(artwork.title)}"><button class="art-favorite ${artwork.favorite ? "on" : ""}">★</button><span class="inventory-card-status status-${String(artwork.sale_status || "In progress").toLowerCase().replaceAll(" ", "-")}">${escapeHtml(artwork.sale_status || "In progress")}</span><div class="art-meta"><h2>${escapeHtml(artwork.title)}</h2><p>${escapeHtml(artwork.collection)}${displayPrice ? ` · ${money(displayPrice)}` : ""}</p></div>`;
+    const missingDetails = [["dimensions", "size"], ["medium", "medium"], ["notes", "story"]]
+      .filter(([field]) => !String(artwork[field] || "").trim())
+      .map(([, label]) => label);
+    const attention = artwork.sale_status !== "Sold" && missingDetails.length
+      ? `<small class="art-needs-details">Needs ${escapeHtml(missingDetails.join(", "))}</small>`
+      : "";
+    card.innerHTML = `<img src="${artwork.url}" alt="${escapeHtml(artwork.title)}"><button class="art-favorite ${artwork.favorite ? "on" : ""}">★</button><span class="inventory-card-status status-${String(artwork.sale_status || "In progress").toLowerCase().replaceAll(" ", "-")}">${escapeHtml(artwork.sale_status || "In progress")}</span><div class="art-meta"><h2>${escapeHtml(artwork.title)}</h2><p>${escapeHtml(artwork.collection)}${displayPrice ? ` · ${money(displayPrice)}` : ""}</p>${attention}</div>`;
     card.querySelector(".art-favorite").onclick = async (event) => {
       event.stopPropagation();
       artwork.favorite = !artwork.favorite;

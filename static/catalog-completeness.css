@@ -1,0 +1,11 @@
+.art-needs-details {
+  display: inline-flex;
+  margin-top: 9px;
+  border: 1px solid #695022;
+  border-radius: 999px;
+  padding: 4px 7px;
+  background: #2a2114;
+  color: #e8c97f;
+  font-size: 9px;
+  font-weight: 700;
+}
