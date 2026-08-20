@@ -338,9 +338,47 @@ def connections() -> FileResponse:
 @app.post("/api/chat")
 def chat_reply(payload: ChatMessage) -> dict[str, str]:
     topic = payload.message.strip()
+    topic_lower = topic.lower()
+    studio = dashboard_summary()
+    studio_data = studio["studio"]
+    if any(word in topic_lower for word in ("price", "pricing", "cost", "sell", "selling", "etsy", "marketplace")):
+        return {
+            "reply": (
+                "**Black Canvas pricing direction**\n\n"
+                f"You currently have **{studio_data['ready_to_list']}** pieces marked Ready to List and "
+                f"**{studio_data['catalog_value']:,.0f}** in available catalog value.\n\n"
+                "For one artwork, use this order:\n"
+                "- Start with your material, printing, and packaging costs.\n"
+                "- Add time, complexity, size, and the collection’s position.\n"
+                "- Compare the final number to your intended buyer and sales channel.\n\n"
+                "Open **Image Studio**, select the artwork, and use the Pricing Calculator before publishing."
+            )
+        }
+    if any(word in topic_lower for word in ("tiktok", "instagram", "caption", "reel", "social", "content")):
+        return {
+            "reply": (
+                "**Black Canvas content direction**\n\n"
+                f"For **{topic}**, use this simple post structure:\n"
+                "- **Hook:** Name the feeling, story, or visual detail people should notice first.\n"
+                "- **Process:** Share one honest behind-the-scenes decision.\n"
+                "- **Meaning:** Explain what the piece represents in one or two clear lines.\n"
+                "- **Invitation:** Ask viewers to save, comment, or follow the collection.\n\n"
+                "Open an artwork in Image Studio and use its Content Kit to turn that structure into a caption set."
+            )
+        }
+    if any(word in topic_lower for word in ("organize", "organise", "review", "prompt library", "duplicate", "import")):
+        return {
+            "reply": (
+                "**Black Canvas library direction**\n\n"
+                f"You have **{studio['counts']['to_review']}** imported prompts waiting for review.\n\n"
+                "Start with **Duplicates first** in Prompt Library. Keep one strong copy, choose its collection, "
+                "and remove extra copies only when you confirm they are truly identical. Then review the detailed "
+                "prompts before the short entries."
+            )
+        }
     creative_triggers = ("prompt", "image", "portrait", "painting", "photo", "artwork", "style",
                          "afronova", "afro nova", "quiet nova", "graffitix", "graffiti x")
-    if any(word in topic.lower() for word in creative_triggers):
+    if any(word in topic_lower for word in creative_triggers):
         collection, prompt = create_image_prompt(topic)
         idea = clean_image_idea(topic)
         title = re.sub(r"\s+", " ", idea).strip().title()[:70] or "Generated Image Prompt"
