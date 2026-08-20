@@ -29,6 +29,13 @@
 .agent-command-card strong { font: 800 13px Manrope, sans-serif; }
 .agent-command-card small { margin-top: 4px; color: #a89dab; font-size: 11px; }
 
+.agent-command-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .agent-command-card a {
   border-radius: 9px;
   padding: 10px 13px;
@@ -38,7 +45,15 @@
   text-decoration: none;
 }
 
+.agent-command-card .agent-secondary-action {
+  background: #282132;
+  color: #d8c8ea;
+}
+
+.agent-command-card .agent-secondary-action:hover { background: #35283f; color: #fff; }
+
 @media (max-width: 620px) {
   .agent-command-card { grid-template-columns: auto 1fr; }
-  .agent-command-card a { grid-column: 1 / -1; text-align: center; }
+  .agent-command-actions { grid-column: 1 / -1; justify-content: stretch; }
+  .agent-command-card a { flex: 1; text-align: center; }
 }
