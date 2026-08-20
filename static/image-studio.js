@@ -46,13 +46,16 @@ async function load() {
 
 function render() {
   grid.innerHTML = "";
-  const shown = artworks.filter((artwork) => (
+  const shown = artworks.filter((artwork) => {
+    const actionable = artwork.sale_status !== "Sold" && artwork.sale_status !== "Not for sale";
+    return (
     filter === "All" || (filter === "Favorites" ? artwork.favorite : artwork.collection === filter)
   ) && (saleStatusFilter === "All statuses" || artwork.sale_status === saleStatusFilter)
     && `${artwork.title} ${artwork.collection} ${artwork.tags} ${artwork.notes} ${artwork.medium} ${artwork.dimensions}`.toLowerCase().includes(query)
-    && (focusMode !== "unpriced" || (Number(artwork.price) <= 0 && artwork.sale_status !== "Sold"))
-    && (focusMode !== "incomplete" || !artwork.dimensions?.trim() || !artwork.medium?.trim() || !artwork.notes?.trim() || !artwork.tags?.trim())
-    && (focusMode !== "ready" || artwork.sale_status === "Ready to list"));
+    && (focusMode !== "unpriced" || (Number(artwork.price) <= 0 && actionable))
+    && (focusMode !== "incomplete" || (actionable && (!artwork.dimensions?.trim() || !artwork.medium?.trim() || !artwork.notes?.trim() || !artwork.tags?.trim())))
+    && (focusMode !== "ready" || artwork.sale_status === "Ready to list");
+  });
   shown.forEach((artwork) => {
     const card = document.createElement("article");
     card.className = "art-card";
@@ -61,7 +64,7 @@ function render() {
       .filter(([field]) => !String(artwork[field] || "").trim())
       .map(([, label]) => label);
     if (Number(artwork.price) <= 0 && artwork.sale_status !== "Sold" && artwork.sale_status !== "Not for sale") missingDetails.push("price");
-    const attention = artwork.sale_status !== "Sold" && missingDetails.length
+    const attention = artwork.sale_status !== "Sold" && artwork.sale_status !== "Not for sale" && missingDetails.length
       ? `<small class="art-needs-details">Needs ${escapeHtml(missingDetails.join(", "))}</small>`
       : "";
     card.innerHTML = `<img src="${artwork.url}" alt="${escapeHtml(artwork.title)}"><button class="art-favorite ${artwork.favorite ? "on" : ""}">★</button><span class="inventory-card-status status-${String(artwork.sale_status || "In progress").toLowerCase().replaceAll(" ", "-")}">${escapeHtml(artwork.sale_status || "In progress")}</span><div class="art-meta"><h2>${escapeHtml(artwork.title)}</h2><p>${escapeHtml(artwork.collection)}${displayPrice ? ` · ${money(displayPrice)}` : ""}</p>${attention}</div>`;
