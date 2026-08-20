@@ -54,6 +54,9 @@ class AgentRouteTests(unittest.TestCase):
         self.assertIn("AfroNova is a reminder", result["reply"])
         self.assertIn("#BlackCanvasArt", result["reply"])
         self.assertIn("Build a content week", [action["label"] for action in result["actions"]])
+        save_action = next(action for action in result["actions"] if action["label"] == "Save caption to Prompt Library")
+        self.assertIn("/prompts?new=1", save_action["href"])
+        self.assertIn("category=Content", save_action["href"])
 
     def test_artwork_brief_prioritizes_missing_details_before_price(self):
         artwork = {

@@ -474,16 +474,25 @@ def chat_reply(payload: ChatMessage) -> dict[str, object]:
         channel = "TikTok" if "tiktok" in topic_lower else "Instagram"
         subject = re.sub(r"\b(write|create|make|me|a|an|tiktok|instagram|caption|for)\b", " ", topic, flags=re.IGNORECASE)
         subject = re.sub(r"\s+", " ", subject).strip(" .") or "this piece"
+        caption_text = (
+            f"{subject[:1].upper() + subject[1:]} is a reminder that the work can hold both memory and possibility. "
+            "Every layer is part of the story—built slowly, honestly, and with intention. "
+            "What detail pulls you in first?\n\n"
+            "#BlackCanvasArt #ContemporaryBlackArt #ArtistProcess #ArtCollector #CreativeStudio"
+        )
         return {
             "reply": (
                 f"**Your {channel} caption draft**\n\n"
-                f"{subject[:1].upper() + subject[1:]} is a reminder that the work can hold both memory and possibility. "
-                "Every layer is part of the story—built slowly, honestly, and with intention. "
-                "What detail pulls you in first?\n\n"
-                "#BlackCanvasArt #ContemporaryBlackArt #ArtistProcess #ArtCollector #CreativeStudio\n\n"
+                f"{caption_text}\n\n"
                 "Edit the wording so it sounds like you, then pair it with a close detail, a process clip, or the finished artwork."
             ),
-            "actions": [{"label": "Build a content week", "href": "/chat?q=Make%20me%20a%20weekly%20content%20plan"}],
+            "actions": [
+                {"label": "Build a content week", "href": "/chat?q=Make%20me%20a%20weekly%20content%20plan"},
+                {"label": "Save caption to Prompt Library", "href": (
+                    "/prompts?new=1&title=" + quote(f"{channel} Caption — {subject[:45]}")
+                    + "&category=Content&text=" + quote(caption_text)
+                )},
+            ],
         }
     if any(word in topic_lower for word in ("tiktok", "instagram", "caption", "reel", "social", "content")):
         return {
