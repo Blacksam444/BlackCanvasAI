@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from app import ChatMessage, artwork_agent_brief, chat_reply, is_likely_image_prompt
+from app import ChatMessage, PromptRefinePayload, artwork_agent_brief, chat_reply, is_likely_image_prompt, refine_prompt
 
 
 STUDIO_SUMMARY = {
@@ -19,6 +19,23 @@ class AgentRouteTests(unittest.TestCase):
         self.assertTrue(is_likely_image_prompt("Cosmic king portrait", "Unsorted", "Create an image prompt for a regal portrait."))
         self.assertTrue(is_likely_image_prompt("AfroNova idea", "AfroNova", "A short visual thought"))
         self.assertFalse(is_likely_image_prompt("Friday caption", "Content", "Share a process clip and invite a comment."))
+
+    def test_refiner_removes_legacy_model_code_from_old_prompts(self):
+        result = refine_prompt(PromptRefinePayload(
+            prompt=("/imagine prompt: Full-body graffiti king. Museum-quality contemporary urban artwork, "
+                    "no digital smoothness, no glossy CGI finish, no polished 3D render, no clean vector edges, "
+                    "no random decorative symbols, no cluttered focal hierarchy, no text, no watermark, "
+                    "no signature, no logo, no frame --ar 4:5 --raw --v 8.2"),
+            category="GraffitiX",
+            mode="cinematic",
+        ))
+
+        self.assertTrue(result["generated_prompt"].startswith("Full-body graffiti king"))
+        self.assertNotIn("/imagine prompt", result["generated_prompt"].lower())
+        self.assertNotIn("--ar", result["generated_prompt"])
+        self.assertNotIn("--raw", result["generated_prompt"])
+        self.assertNotIn("--v", result["generated_prompt"])
+        self.assertNotIn("no frame", result["generated_prompt"].lower())
 
     @patch("app.dashboard_summary", return_value=STUDIO_SUMMARY)
     def test_weekly_content_plan_has_save_draft_action(self, _summary):

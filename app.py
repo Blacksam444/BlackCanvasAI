@@ -338,6 +338,27 @@ def create_image_prompt(message: str) -> tuple[str, str]:
     return collection, prompt
 
 
+def clean_copy_ready_prompt(prompt: str) -> str:
+    """Remove legacy Midjourney labels and parameters from prompts before reuse."""
+    cleaned = re.sub(r"^\s*/imagine\s+prompt\s*:\s*", "", prompt, flags=re.IGNORECASE)
+    legacy_graffitix_tail = (
+        r"Museum-quality contemporary urban artwork, no digital smoothness, no glossy CGI finish, "
+        r"no polished 3D render, no clean vector edges, no random decorative symbols, "
+        r"no cluttered focal hierarchy, no text, no watermark, no signature, no logo, no frame"
+    )
+    cleaned = re.sub(
+        legacy_graffitix_tail,
+        "Museum-quality contemporary urban artwork with a raw, tactile, handmade finish.",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    cleaned = re.sub(r"\s+no text, no watermark, no signature, no logo, no frame", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+--ar\s+\d+:\d+", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+--raw\b", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+--v\s*\d+(?:\.\d+)?", "", cleaned, flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", cleaned).strip()
+
+
 @app.get("/")
 def home() -> FileResponse:
     return dashboard_file()
@@ -656,7 +677,7 @@ def delete_conversation(conversation_id: int) -> dict[str, str]:
 
 @app.post("/api/prompts/refine")
 def refine_prompt(payload: PromptRefinePayload) -> dict[str, str]:
-    prompt = payload.prompt.strip()
+    prompt = clean_copy_ready_prompt(payload.prompt)
     category = payload.category if payload.category in ("AfroNova", "Quiet Nova", "GraffitiX") else "AfroNova"
     labels = {
         "cinematic": "Cinematic variation",
