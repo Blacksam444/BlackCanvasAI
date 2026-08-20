@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from app import ChatMessage, chat_reply
+from app import ChatMessage, artwork_agent_brief, chat_reply
 
 
 STUDIO_SUMMARY = {
@@ -36,6 +36,68 @@ class AgentRouteTests(unittest.TestCase):
         action_labels = [action["label"] for action in result["actions"]]
         self.assertIn("Open listing-ready artwork", action_labels)
         self.assertIn("Build a content week", action_labels)
+
+    def test_artwork_brief_prioritizes_missing_details_before_price(self):
+        artwork = {
+            "id": 14,
+            "title": "Untitled Nova",
+            "collection": "AfroNova",
+            "tags": "cosmic, gold",
+            "notes": "",
+            "dimensions": "",
+            "medium": "",
+            "price": 0,
+            "sale_status": "In progress",
+            "fulfillment_status": "Not started",
+        }
+        with patch("app.connect", return_value=ArtworkConnection(artwork)):
+            result = artwork_agent_brief(14)
+
+        self.assertIn("Complete the missing", result["reply"])
+        action_labels = [action["label"] for action in result["actions"]]
+        self.assertIn("Complete artwork details", action_labels)
+        self.assertNotIn("Open Pricing Calculator", action_labels)
+
+    def test_complete_unpriced_artwork_opens_its_calculator(self):
+        artwork = {
+            "id": 15,
+            "title": "Ready for Price",
+            "collection": "Quiet Nova",
+            "tags": "quiet, window light",
+            "notes": "A quiet study in reflection.",
+            "dimensions": "24 × 36 inches",
+            "medium": "Acrylic on canvas",
+            "price": 0,
+            "sale_status": "In progress",
+            "fulfillment_status": "Not started",
+        }
+        with patch("app.connect", return_value=ArtworkConnection(artwork)):
+            result = artwork_agent_brief(15)
+
+        pricing_action = next(action for action in result["actions"] if action["label"] == "Open Pricing Calculator")
+        self.assertEqual(pricing_action["href"], "/image-studio?artwork=15&tool=pricing")
+
+
+class ArtworkQuery:
+    def __init__(self, artwork):
+        self.artwork = artwork
+
+    def fetchone(self):
+        return self.artwork
+
+
+class ArtworkConnection:
+    def __init__(self, artwork):
+        self.artwork = artwork
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+    def execute(self, _query, _values):
+        return ArtworkQuery(self.artwork)
 
 
 if __name__ == "__main__":
