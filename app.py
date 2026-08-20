@@ -477,7 +477,7 @@ def chat_reply(payload: ChatMessage) -> dict[str, object]:
         return {
             "reply": (
                 f"**Your {channel} caption draft**\n\n"
-                f"{subject.title()} is a reminder that the work can hold both memory and possibility. "
+                f"{subject[:1].upper() + subject[1:]} is a reminder that the work can hold both memory and possibility. "
                 "Every layer is part of the story—built slowly, honestly, and with intention. "
                 "What detail pulls you in first?\n\n"
                 "#BlackCanvasArt #ContemporaryBlackArt #ArtistProcess #ArtCollector #CreativeStudio\n\n"

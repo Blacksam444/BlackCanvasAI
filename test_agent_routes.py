@@ -51,6 +51,7 @@ class AgentRouteTests(unittest.TestCase):
         result = chat_reply(ChatMessage(message="Write a TikTok caption for AfroNova"))
 
         self.assertIn("TikTok caption draft", result["reply"])
+        self.assertIn("AfroNova is a reminder", result["reply"])
         self.assertIn("#BlackCanvasArt", result["reply"])
         self.assertIn("Build a content week", [action["label"] for action in result["actions"]])
 
