@@ -380,26 +380,32 @@ def connections() -> FileResponse:
     )
 
 
+def image_prompt_chat_response(topic: str) -> dict[str, object]:
+    collection, prompt = create_image_prompt(topic)
+    idea = clean_image_idea(topic)
+    title = re.sub(r"\s+", " ", idea).strip().title()[:70] or "Generated Image Prompt"
+    return {
+        "reply": (
+            f"**Your {collection} image prompt**\n\n{prompt}\n\n"
+            f"This uses your current {collection} Style Bible rules. You can copy it into your image "
+            "generator. It was created locally, so it did not use a paid AI key."
+        ),
+        "generated_prompt": prompt,
+        "prompt_title": title,
+        "prompt_category": collection,
+    }
+
+
 @app.post("/api/chat")
 def chat_reply(payload: ChatMessage) -> dict[str, object]:
     topic = payload.message.strip()
     topic_lower = topic.lower()
-    creative_triggers = ("prompt", "image", "portrait", "painting", "photo", "artwork", "style",
-                         "afronova", "afro nova", "quiet nova", "graffitix", "graffiti x")
-    if any(word in topic_lower for word in creative_triggers):
-        collection, prompt = create_image_prompt(topic)
-        idea = clean_image_idea(topic)
-        title = re.sub(r"\s+", " ", idea).strip().title()[:70] or "Generated Image Prompt"
-        return {
-            "reply": (
-                f"**Your {collection} image prompt**\n\n{prompt}\n\n"
-                f"This uses your current {collection} Style Bible rules. You can copy it into your image "
-                "generator. It was created locally, so it did not use a paid AI key."
-            ),
-            "generated_prompt": prompt,
-            "prompt_title": title,
-            "prompt_category": collection,
-        }
+    explicit_image_prompt = (
+        "image prompt" in topic_lower
+        or bool(re.search(r"\b(create|generate|make)\b.*\b(image|portrait|painting|photo|artwork)\b", topic_lower))
+    )
+    if explicit_image_prompt:
+        return image_prompt_chat_response(topic)
     studio = dashboard_summary()
     studio_data = studio["studio"]
     if any(word in topic_lower for word in ("price", "pricing", "cost", "sell", "selling", "etsy", "marketplace")):
@@ -493,6 +499,9 @@ def chat_reply(payload: ChatMessage) -> dict[str, object]:
             ),
             "actions": [{"label": "Open Image Studio", "href": "/image-studio"}]
         }
+    creative_triggers = ("portrait", "painting", "photo", "artwork", "afronova", "afro nova", "quiet nova", "graffitix", "graffiti x")
+    if any(word in topic_lower for word in creative_triggers):
+        return image_prompt_chat_response(topic)
     return {
         "reply": (
             f"**Black Canvas Agent plan for {topic}**\n\n"
