@@ -8,6 +8,7 @@ import sqlite3
 import uuid
 import zipfile
 from datetime import datetime, timezone
+from urllib.parse import quote
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -1015,6 +1016,12 @@ def artwork_agent_brief(artwork_id: int) -> dict[str, object]:
         f"**${float(artwork['price'] or 0):,.0f}** current catalog price"
         if float(artwork["price"] or 0) else "No price set yet"
     )
+    collection = str(artwork["collection"] or "").strip()
+    if collection in {"AfroNova", "Quiet Nova", "GraffitiX"}:
+        actions.append({
+            "label": f"Browse {collection} prompts",
+            "href": f"/prompts?category={quote(collection)}",
+        })
     return {
         "title": f"Artwork Plan: {title}"[:60],
         "reply": (
