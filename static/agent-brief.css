@@ -1,0 +1,16 @@
+.agent-brief-button {
+  margin: 22px 7px 0;
+  border: 0;
+  border-radius: 11px;
+  padding: 12px 15px;
+  background: linear-gradient(135deg, #9b7cff, #d760a0);
+  color: #fff;
+  font: 800 12px Manrope, sans-serif;
+  cursor: pointer;
+  box-shadow: 0 10px 28px #9b7cff2c;
+}
+
+.agent-brief-button:disabled {
+  opacity: .65;
+  cursor: wait;
+}

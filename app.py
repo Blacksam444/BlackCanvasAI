@@ -588,6 +588,43 @@ def dashboard_summary() -> dict:
     }
 
 
+@app.get("/api/agent-brief")
+def agent_brief() -> dict[str, str]:
+    """Return a local, data-aware studio brief without sending data to an AI provider."""
+    with connect() as db:
+        prompt_count = db.execute("SELECT COUNT(*) FROM prompts").fetchone()[0]
+        review_count = db.execute("SELECT COUNT(*) FROM prompts WHERE reviewed = 0").fetchone()[0]
+        artwork_count = db.execute("SELECT COUNT(*) FROM artworks").fetchone()[0]
+        ready_to_list = db.execute("SELECT COUNT(*) FROM artworks WHERE sale_status = 'Ready to list'").fetchone()[0]
+        unpriced = db.execute("SELECT COUNT(*) FROM artworks WHERE price <= 0 AND sale_status != 'Sold'").fetchone()[0]
+        active_orders = db.execute(
+            "SELECT COUNT(*) FROM artworks WHERE sale_status = 'Sold' "
+            "AND fulfillment_status NOT IN ('Delivered', 'Local pickup complete')"
+        ).fetchone()[0]
+        favorites = db.execute("SELECT COUNT(*) FROM prompts WHERE favorite = 1").fetchone()[0]
+
+    if active_orders:
+        next_step = f"Move {active_orders} active {'order' if active_orders == 1 else 'orders'} forward in Image Studio."
+    elif unpriced:
+        next_step = f"Price {unpriced} available {'artwork' if unpriced == 1 else 'artworks'} before listing."
+    elif ready_to_list:
+        next_step = f"Prepare {ready_to_list} {'piece' if ready_to_list == 1 else 'pieces'} that are ready to list."
+    elif review_count:
+        next_step = f"Review your {review_count} imported {'prompt' if review_count == 1 else 'prompts'} in a focused session."
+    else:
+        next_step = "Create a new prompt or add your next artwork to the studio."
+
+    return {"reply": (
+        "**Black Canvas Agent Brief**\n\n"
+        f"- **{artwork_count}** artworks in your studio\n"
+        f"- **{prompt_count}** saved prompts, including **{favorites}** favorites\n"
+        f"- **{review_count}** imported prompts still waiting for review\n"
+        f"- **{ready_to_list}** pieces ready to list\n\n"
+        f"**Best next move:** {next_step}\n\n"
+        "This brief uses the information already saved inside BlackCanvasAI."
+    )}
+
+
 @app.post("/api/prompts")
 def create_prompt(payload: PromptPayload) -> dict:
     try:

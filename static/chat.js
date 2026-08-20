@@ -229,7 +229,27 @@ async function send(text) {
   }
 }
 
+async function createAgentBrief() {
+  const button = document.querySelector("#agentBriefButton");
+  button.disabled = true;
+  button.textContent = "Creating your brief...";
+  try {
+    await ensureConversation("Studio Brief");
+    addMessage("user", "Create my studio brief");
+    const response = await fetch("/api/agent-brief");
+    if (!response.ok) throw new Error();
+    const data = await response.json();
+    addMessage("assistant", data.reply);
+  } catch {
+    notify("Could not create your studio brief just now.");
+  } finally {
+    button.disabled = false;
+    button.textContent = "✦ Create my Studio Brief";
+  }
+}
+
 document.querySelector("#chatForm").onsubmit = (event) => { event.preventDefault(); send(input.value); };
+document.querySelector("#agentBriefButton").onclick = createAgentBrief;
 async function openArtworkPicker() {
   artworkPickerGrid.innerHTML = '<p class="artwork-picker-loading">Loading your artwork...</p>';
   artworkPicker.showModal();
