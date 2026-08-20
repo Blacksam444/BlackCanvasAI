@@ -450,14 +450,18 @@ def chat_reply(payload: ChatMessage) -> dict[str, object]:
         }
     return {
         "reply": (
-            f"I’m ready to help you develop **{topic}**.\n\n"
-            "Here’s a strong way to begin:\n"
-            "- Define the goal and who it is for.\n"
-            "- Choose the Black Canvas style or collection it belongs to.\n"
-            "- Turn the idea into one clear, testable creative direction.\n\n"
-            "The chat workspace is working. The next connection will replace this preview "
-            "response with live AI reasoning."
-        )
+            f"**Black Canvas Agent plan for {topic}**\n\n"
+            "Start by choosing the one outcome you want from this idea:\n"
+            "- **Create:** turn it into an image prompt using AfroNova, Quiet Nova, or GraffitiX.\n"
+            "- **Sell:** connect it to pricing, a listing, or a collector document.\n"
+            "- **Share:** shape it into a process story, caption, or short-form content idea.\n"
+            "- **Organize:** save the strongest pieces of the idea into your Prompt Library or Style Bible.\n\n"
+            "Tell me which outcome you want, or use the Studio Brief for a recommendation based on your current workspace."
+        ),
+        "actions": [
+            {"label": "Open Prompt Builder", "href": "/chat"},
+            {"label": "Create Studio Brief", "href": "/chat?brief=1"},
+        ]
     }
 
 
