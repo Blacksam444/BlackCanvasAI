@@ -270,10 +270,6 @@ async function createAgentBrief() {
 
 document.querySelector("#chatForm").onsubmit = (event) => { event.preventDefault(); send(input.value); };
 document.querySelector("#agentBriefButton").onclick = createAgentBrief;
-if (new URLSearchParams(window.location.search).get("brief") === "1") {
-  window.history.replaceState({}, "", "/chat");
-  createAgentBrief();
-}
 async function openArtworkPicker() {
   artworkPickerGrid.innerHTML = '<p class="artwork-picker-loading">Loading your artwork...</p>';
   artworkPicker.showModal();
@@ -344,6 +340,7 @@ document.querySelector("#promptBuilder").onsubmit = (event) => {
   send(`Create an image prompt for ${subject} in the ${collection} style, with a ${mood} mood, using ${colorDirection}, as a ${imageStyle}.`);
 };
 const openingQuestion = new URLSearchParams(window.location.search).get("q");
+const openingBrief = new URLSearchParams(window.location.search).get("brief") === "1";
 async function initializeChat() {
   try {
     const conversations = await renderConversations();
@@ -353,10 +350,16 @@ async function initializeChat() {
       for (const item of legacy) await saveChatMessage(item.role, item.text);
       localStorage.removeItem(KEY);
       await openConversation(currentConversationId, legacy.find((item) => item.role === "user")?.text.slice(0, 60) || "Saved conversation");
-    } else if (!openingQuestion && conversations.length) {
+    } else if (!openingQuestion && !openingBrief && conversations.length) {
       await openConversation(conversations[0].id, conversations[0].title);
     }
-    if (openingQuestion) { history.replaceState({}, "", "/chat"); send(openingQuestion); }
+    if (openingBrief) {
+      history.replaceState({}, "", "/chat");
+      await createAgentBrief();
+    } else if (openingQuestion) {
+      history.replaceState({}, "", "/chat");
+      send(openingQuestion);
+    }
   } catch { notify("Could not load saved conversations."); }
 }
 initializeChat();
