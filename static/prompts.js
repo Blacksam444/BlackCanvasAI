@@ -12,6 +12,7 @@ let reviewQueue = [];
 let reviewPosition = 0;
 let reviewStats = {kept: 0, favorited: 0, skipped: 0, removed: 0};
 let reviewBusy = false;
+const requestedReviewMode = new URLSearchParams(window.location.search).get("review");
 
 const notify = message => {
   toast.textContent = message;
@@ -96,6 +97,9 @@ function updateBulkToolbar() {
 async function load() {
   const response = await fetch("/api/prompts");
   prompts = await response.json();
+  if (requestedReviewMode && ["all", "duplicates", "detailed", "short"].includes(requestedReviewMode)) {
+    document.querySelector("#reviewQueueMode").value = requestedReviewMode;
+  }
   for (const id of [...selectedIds]) if (!prompts.some(prompt => prompt.id === id)) selectedIds.delete(id);
   render();
 }

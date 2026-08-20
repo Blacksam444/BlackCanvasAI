@@ -438,7 +438,7 @@ def chat_reply(payload: ChatMessage) -> dict[str, object]:
                 "and remove extra copies only when you confirm they are truly identical. Then review the detailed "
                 "prompts before the short entries."
             ),
-            "actions": [{"label": "Open Prompt Library", "href": "/prompts"}]
+            "actions": [{"label": "Review duplicates first", "href": "/prompts?review=duplicates"}]
         }
     if any(word in topic_lower for word in ("order", "shipping", "ship", "fulfillment", "fulfilment", "tracking", "buyer")):
         active_orders = studio_data["active_orders"]
