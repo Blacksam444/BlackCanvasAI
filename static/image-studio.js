@@ -51,7 +51,7 @@ function render() {
   ) && (saleStatusFilter === "All statuses" || artwork.sale_status === saleStatusFilter)
     && `${artwork.title} ${artwork.collection} ${artwork.tags} ${artwork.notes} ${artwork.medium} ${artwork.dimensions}`.toLowerCase().includes(query)
     && (focusMode !== "unpriced" || (Number(artwork.price) <= 0 && artwork.sale_status !== "Sold"))
-    && (focusMode !== "incomplete" || !artwork.dimensions?.trim() || !artwork.medium?.trim() || !artwork.notes?.trim())
+    && (focusMode !== "incomplete" || !artwork.dimensions?.trim() || !artwork.medium?.trim() || !artwork.notes?.trim() || !artwork.tags?.trim())
     && (focusMode !== "ready" || artwork.sale_status === "Ready to list"));
   shown.forEach((artwork) => {
     const card = document.createElement("article");
@@ -930,7 +930,7 @@ async function initializeStudio() {
   await load();
   const focusCopy = {
     unpriced: ["Artwork that needs a price", "Open a piece and use Calculate artwork price."],
-    incomplete: ["Artwork with missing details", "Add size, medium, or a description to complete each record."],
+    incomplete: ["Artwork with missing details", "Add size, medium, story, or tags to complete each record."],
     ready: ["Artwork ready to list", "These pieces are prepared for publishing or sale."],
   };
   if (focusCopy[focusMode]) {

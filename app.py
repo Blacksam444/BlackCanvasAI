@@ -724,7 +724,8 @@ def dashboard_summary() -> dict:
             "SELECT COUNT(*) FROM artworks WHERE price <= 0 AND sale_status != 'Sold'"
         ).fetchone()[0]
         incomplete_artwork = db.execute(
-            "SELECT COUNT(*) FROM artworks WHERE TRIM(dimensions) = '' OR TRIM(medium) = '' OR TRIM(notes) = ''"
+            "SELECT COUNT(*) FROM artworks WHERE sale_status NOT IN ('Sold', 'Not for sale') AND "
+            "(TRIM(dimensions) = '' OR TRIM(medium) = '' OR TRIM(notes) = '' OR TRIM(tags) = '')"
         ).fetchone()[0]
         prompt_rows = [dict(item) for item in db.execute(
             "SELECT id, title, category, text FROM prompts ORDER BY id DESC LIMIT 3"
@@ -752,12 +753,12 @@ def dashboard_summary() -> dict:
     if active_orders:
         priorities.append({"icon": "▣", "title": "Move active orders forward", "count": active_orders,
                            "detail": "Review packing, shipping, and delivery status.", "href": "/image-studio?focus=orders", "tone": "blue"})
+    if incomplete_artwork:
+        priorities.append({"icon": "✓", "title": "Complete artwork details", "count": incomplete_artwork,
+                           "detail": "Add missing size, medium, story, or tags first.", "href": "/image-studio?focus=incomplete", "tone": "amber"})
     if unpriced_artwork:
         priorities.append({"icon": "$", "title": "Price your available artwork", "count": unpriced_artwork,
                            "detail": "Use the calculator so catalog value reflects your work.", "href": "/image-studio?focus=unpriced", "tone": "purple"})
-    if incomplete_artwork:
-        priorities.append({"icon": "✓", "title": "Complete artwork details", "count": incomplete_artwork,
-                           "detail": "Add missing size, medium, or descriptions.", "href": "/image-studio?focus=incomplete", "tone": "amber"})
     if ready_to_list:
         priorities.append({"icon": "✦", "title": "Publish ready artwork", "count": ready_to_list,
                            "detail": "These pieces have been marked Ready to List.", "href": "/image-studio?focus=ready", "tone": "pink"})
@@ -797,6 +798,10 @@ def agent_brief() -> dict[str, object]:
         artwork_count = db.execute("SELECT COUNT(*) FROM artworks").fetchone()[0]
         ready_to_list = db.execute("SELECT COUNT(*) FROM artworks WHERE sale_status = 'Ready to list'").fetchone()[0]
         unpriced = db.execute("SELECT COUNT(*) FROM artworks WHERE price <= 0 AND sale_status != 'Sold'").fetchone()[0]
+        incomplete = db.execute(
+            "SELECT COUNT(*) FROM artworks WHERE sale_status NOT IN ('Sold', 'Not for sale') AND "
+            "(TRIM(dimensions) = '' OR TRIM(medium) = '' OR TRIM(notes) = '' OR TRIM(tags) = '')"
+        ).fetchone()[0]
         active_orders = db.execute(
             "SELECT COUNT(*) FROM artworks WHERE sale_status = 'Sold' "
             "AND fulfillment_status NOT IN ('Delivered', 'Local pickup complete')"
@@ -806,6 +811,9 @@ def agent_brief() -> dict[str, object]:
     if active_orders:
         next_step = f"Move {active_orders} active {'order' if active_orders == 1 else 'orders'} forward in Image Studio."
         action = {"label": "Open Orders Dashboard", "href": "/image-studio?focus=orders"}
+    elif incomplete:
+        next_step = f"Complete the missing catalog details on {incomplete} {'artwork' if incomplete == 1 else 'artworks'} before pricing or listing."
+        action = {"label": "Complete artwork details", "href": "/image-studio?focus=incomplete"}
     elif unpriced:
         next_step = f"Price {unpriced} available {'artwork' if unpriced == 1 else 'artworks'} before listing."
         action = {"label": "Price available artwork", "href": "/image-studio?focus=unpriced"}
@@ -1080,6 +1088,7 @@ def artwork_agent_brief(artwork_id: int) -> dict[str, object]:
             ("dimensions", "size"),
             ("medium", "medium"),
             ("notes", "story / description"),
+            ("tags", "tags"),
         ) if not str(artwork[field] or "").strip()
     ]
     title = artwork["title"] or "This artwork"
