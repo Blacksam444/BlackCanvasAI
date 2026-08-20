@@ -55,8 +55,10 @@ class AgentRouteTests(unittest.TestCase):
 
         self.assertIn("Complete the missing", result["reply"])
         action_labels = [action["label"] for action in result["actions"]]
-        self.assertIn("Complete artwork details", action_labels)
+        self.assertIn("Edit this artwork", action_labels)
         self.assertNotIn("Open Pricing Calculator", action_labels)
+        edit_action = next(action for action in result["actions"] if action["label"] == "Edit this artwork")
+        self.assertEqual(edit_action["href"], "/image-studio?artwork=14&tool=edit")
 
     def test_complete_unpriced_artwork_opens_its_calculator(self):
         artwork = {

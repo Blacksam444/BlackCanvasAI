@@ -950,6 +950,7 @@ async function initializeStudio() {
       pricing: "#openPricing",
       readiness: "#openReadiness",
       fulfillment: "#openFulfillment",
+      edit: "#editArtwork",
     }[requestedTool];
     if (toolButton) document.querySelector(toolButton).click();
   }

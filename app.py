@@ -1100,7 +1100,10 @@ def artwork_agent_brief(artwork_id: int) -> dict[str, object]:
         ]
     elif missing:
         next_step = f"Complete the missing {', '.join(missing)} before moving it toward sale."
-        actions = [{"label": "Complete artwork details", "href": "/image-studio?focus=incomplete"}]
+        actions = [
+            {"label": "Edit this artwork", "href": f"/image-studio?artwork={artwork['id']}&tool=edit"},
+            {"label": "View all incomplete artwork", "href": "/image-studio?focus=incomplete"},
+        ]
     elif float(artwork["price"] or 0) <= 0:
         next_step = "Use the Pricing Calculator to set a confident starting retail price."
         actions = [
