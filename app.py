@@ -1053,7 +1053,10 @@ def artwork_agent_brief(artwork_id: int) -> dict[str, object]:
     title = artwork["title"] or "This artwork"
     if artwork["sale_status"] == "Sold":
         next_step = "Finish the fulfillment record, then prepare the collector documents and delivery details."
-        actions = [{"label": "Open Orders Dashboard", "href": "/image-studio?focus=orders"}]
+        actions = [
+            {"label": "Track this order", "href": f"/image-studio?artwork={artwork['id']}&tool=fulfillment"},
+            {"label": "Open Orders Dashboard", "href": "/image-studio?focus=orders"},
+        ]
     elif missing:
         next_step = f"Complete the missing {', '.join(missing)} before moving it toward sale."
         actions = [{"label": "Complete artwork details", "href": "/image-studio?focus=incomplete"}]
@@ -1065,7 +1068,10 @@ def artwork_agent_brief(artwork_id: int) -> dict[str, object]:
         ]
     elif artwork["sale_status"] == "Ready to list":
         next_step = "Create the listing materials and Seller Package, then publish it where your collectors can find it."
-        actions = [{"label": "Open ready-to-list artwork", "href": "/image-studio?focus=ready"}]
+        actions = [
+            {"label": "Open listing checklist", "href": f"/image-studio?artwork={artwork['id']}&tool=readiness"},
+            {"label": "View ready-to-list artwork", "href": "/image-studio?focus=ready"},
+        ]
     else:
         next_step = "Choose whether the next step is content, print prep, pricing, or listing readiness."
         actions = [{"label": "Open Image Studio", "href": "/image-studio"}]

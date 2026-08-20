@@ -938,7 +938,12 @@ async function initializeStudio() {
     const artwork = artworks.find((item) => item.id === requestedArtworkId);
     if (!artwork) return notify("That artwork could not be found in your catalog.");
     showDetail(artwork);
-    const toolButton = { content: "#createContentKit", pricing: "#openPricing" }[requestedTool];
+    const toolButton = {
+      content: "#createContentKit",
+      pricing: "#openPricing",
+      readiness: "#openReadiness",
+      fulfillment: "#openFulfillment",
+    }[requestedTool];
     if (toolButton) document.querySelector(toolButton).click();
   }
 }
