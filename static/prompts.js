@@ -15,6 +15,9 @@ let reviewBusy = false;
 const requestedReviewMode = new URLSearchParams(window.location.search).get("review");
 const requestedCategory = new URLSearchParams(window.location.search).get("category");
 const requestedSearch = new URLSearchParams(window.location.search).get("search");
+const requestedNew = new URLSearchParams(window.location.search).get("new") === "1";
+const requestedTitle = new URLSearchParams(window.location.search).get("title");
+const requestedText = new URLSearchParams(window.location.search).get("text");
 
 const notify = message => {
   toast.textContent = message;
@@ -114,6 +117,13 @@ async function load() {
   }
   for (const id of [...selectedIds]) if (!prompts.some(prompt => prompt.id === id)) selectedIds.delete(id);
   render();
+  if (requestedNew) {
+    openEditor();
+    document.querySelector("#promptTitle").value = requestedTitle || "Saved Content Plan";
+    document.querySelector("#promptCategory").value = canonicalCategories.includes(requestedCategory) ? requestedCategory : "Content";
+    document.querySelector("#promptText").value = requestedText || "";
+    window.history.replaceState({}, "", "/prompts");
+  }
 }
 
 async function migrate() {

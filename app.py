@@ -425,6 +425,13 @@ def chat_reply(payload: ChatMessage) -> dict[str, object]:
         }
     if any(phrase in topic_lower for phrase in ("content calendar", "content plan", "weekly content", "weekly posts", "post schedule")):
         catalog_count = studio["counts"]["artworks"]
+        weekly_plan = (
+            "Monday — The feeling: Show the finished artwork and name the emotion or question behind it.\n"
+            "Tuesday — The process: Share one close-up or short clip of a material, mark, or decision.\n"
+            "Wednesday — The story: Explain one piece of the artwork’s meaning, ancestry, place, or future vision.\n"
+            "Thursday — The detail: Post a crop, color choice, symbol, or texture and ask viewers what they notice.\n"
+            "Friday — The invitation: Introduce the collection, share availability, and invite collectors to save or inquire."
+        )
         return {
             "reply": (
                 "**Your Black Canvas five-post content plan**\n\n"
@@ -436,7 +443,13 @@ def chat_reply(payload: ChatMessage) -> dict[str, object]:
                 f"You have **{catalog_count}** cataloged {'artwork' if catalog_count == 1 else 'artworks'} to pull from. "
                 "Keep each post focused on one honest visual detail, then use the artwork Content Kit when you are ready to write the final caption."
             ),
-            "actions": [{"label": "Open Image Studio", "href": "/image-studio"}]
+            "actions": [
+                {"label": "Open Image Studio", "href": "/image-studio"},
+                {"label": "Save this plan to Prompt Library", "href": (
+                    "/prompts?new=1&title=" + quote("Weekly Content Plan")
+                    + "&category=Content&text=" + quote(weekly_plan)
+                )},
+            ]
         }
     if any(word in topic_lower for word in ("tiktok", "instagram", "caption", "reel", "social", "content")):
         return {
