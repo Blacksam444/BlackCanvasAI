@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from app import ChatMessage, artwork_agent_brief, chat_reply
+from app import ChatMessage, artwork_agent_brief, chat_reply, is_likely_image_prompt
 
 
 STUDIO_SUMMARY = {
@@ -15,6 +15,11 @@ STUDIO_SUMMARY = {
 
 
 class AgentRouteTests(unittest.TestCase):
+    def test_image_prompt_detection_keeps_content_drafts_out_of_visual_review(self):
+        self.assertTrue(is_likely_image_prompt("Cosmic king portrait", "Unsorted", "Create an image prompt for a regal portrait."))
+        self.assertTrue(is_likely_image_prompt("AfroNova idea", "AfroNova", "A short visual thought"))
+        self.assertFalse(is_likely_image_prompt("Friday caption", "Content", "Share a process clip and invite a comment."))
+
     @patch("app.dashboard_summary", return_value=STUDIO_SUMMARY)
     def test_weekly_content_plan_has_save_draft_action(self, _summary):
         result = chat_reply(ChatMessage(message="Make me a weekly content plan"))

@@ -34,6 +34,21 @@ GRAFFITIX_NEGATIVE_INSTRUCTIONS = (
     "no clean vector edges, no random decorative symbols, no cluttered focal hierarchy, "
     f"{DEFAULT_NEGATIVE_INSTRUCTIONS}"
 )
+
+
+def is_likely_image_prompt(title: str, category: str, text: str) -> bool:
+    """Identify visual-generation prompts without changing any imported records."""
+    if category in {"AfroNova", "Quiet Nova", "GraffitiX"}:
+        return True
+    searchable = f"{title} {text}".lower()
+    signals = (
+        "image prompt", "generate an image", "create a portrait", "digital painting",
+        "photorealistic", "illustration", "artwork", "visual composition", "midjourney",
+        "dall-e", "dalle",
+    )
+    return any(signal in searchable for signal in signals)
+
+
 initialize()
 app = FastAPI(title="Black Canvas AI")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
@@ -722,6 +737,13 @@ def dashboard_summary() -> dict:
             "(SELECT COUNT(*) FROM artworks WHERE favorite = 1)"
         ).fetchone()[0]
         review_count = db.execute("SELECT COUNT(*) FROM prompts WHERE reviewed = 0").fetchone()[0]
+        unreviewed_prompt_rows = db.execute(
+            "SELECT title, category, text FROM prompts WHERE reviewed = 0"
+        ).fetchall()
+        image_review_count = sum(
+            is_likely_image_prompt(item["title"], item["category"], item["text"])
+            for item in unreviewed_prompt_rows
+        )
         catalog_value = db.execute(
             "SELECT COALESCE(SUM(price), 0) FROM artworks WHERE sale_status != 'Sold'"
         ).fetchone()[0]
@@ -789,7 +811,10 @@ def dashboard_summary() -> dict:
     if ready_to_list:
         priorities.append({"icon": "✦", "title": "Publish ready artwork", "count": ready_to_list,
                            "detail": "These pieces have been marked Ready to List.", "href": "/image-studio?focus=ready", "tone": "pink"})
-    if review_count:
+    if image_review_count:
+        priorities.append({"icon": "✦", "title": "Review likely image prompts", "count": image_review_count,
+                           "detail": "Start with visual directions that are ready to develop.", "href": "/prompts?review=image", "tone": "purple"})
+    elif review_count:
         priorities.append({"icon": "▤", "title": "Review imported prompts", "count": review_count,
                            "detail": "Keep the strongest ideas and organize the rest.", "href": "/prompts", "tone": "amber"})
     if not priorities:
@@ -822,6 +847,13 @@ def agent_brief() -> dict[str, object]:
     with connect() as db:
         prompt_count = db.execute("SELECT COUNT(*) FROM prompts").fetchone()[0]
         review_count = db.execute("SELECT COUNT(*) FROM prompts WHERE reviewed = 0").fetchone()[0]
+        unreviewed_prompt_rows = db.execute(
+            "SELECT title, category, text FROM prompts WHERE reviewed = 0"
+        ).fetchall()
+        image_review_count = sum(
+            is_likely_image_prompt(item["title"], item["category"], item["text"])
+            for item in unreviewed_prompt_rows
+        )
         artwork_count = db.execute("SELECT COUNT(*) FROM artworks").fetchone()[0]
         ready_to_list = db.execute("SELECT COUNT(*) FROM artworks WHERE sale_status = 'Ready to list'").fetchone()[0]
         unpriced = db.execute("SELECT COUNT(*) FROM artworks WHERE price <= 0 AND sale_status != 'Sold'").fetchone()[0]
@@ -847,6 +879,9 @@ def agent_brief() -> dict[str, object]:
     elif ready_to_list:
         next_step = f"Prepare {ready_to_list} {'piece' if ready_to_list == 1 else 'pieces'} that are ready to list."
         action = {"label": "Open ready-to-list artwork", "href": "/image-studio?focus=ready"}
+    elif image_review_count:
+        next_step = f"Review {image_review_count} likely image {'prompt' if image_review_count == 1 else 'prompts'} before sorting the rest of your import."
+        action = {"label": "Review likely image prompts", "href": "/prompts?review=image"}
     elif review_count:
         next_step = f"Review your {review_count} imported {'prompt' if review_count == 1 else 'prompts'} in a focused session."
         action = {"label": "Review imported prompts", "href": "/prompts?review=duplicates"}
