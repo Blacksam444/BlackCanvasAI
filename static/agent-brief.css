@@ -14,3 +14,38 @@
   opacity: .65;
   cursor: wait;
 }
+
+.agent-brief-actions {
+  margin-top: 7px;
+}
+
+.agent-brief-actions > span {
+  display: block;
+  margin-bottom: 7px;
+  color: #827b8d;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.agent-brief-actions > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.agent-brief-actions button {
+  border: 1px solid #57476b;
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: #1d1824;
+  color: #d9c5e8;
+  font: 700 11px "DM Sans", sans-serif;
+  cursor: pointer;
+}
+
+.agent-brief-actions button:hover {
+  border-color: #a781c8;
+  color: #fff;
+}

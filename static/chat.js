@@ -198,6 +198,16 @@ function addPromptRefiner(message, data) {
   message.querySelector(".copy-message").parentElement.appendChild(wrap);
 }
 
+function addAgentBriefActions(message) {
+  const actions = document.createElement("div");
+  actions.className = "agent-brief-actions";
+  actions.innerHTML = '<span>Take action</span><div><button data-href="/prompts">Review prompts</button><button data-href="/image-studio">Open Image Studio</button><button data-href="/">View dashboard</button></div>';
+  actions.querySelectorAll("button").forEach((button) => {
+    button.onclick = () => { window.location.href = button.dataset.href; };
+  });
+  message.querySelector(".copy-message").parentElement.appendChild(actions);
+}
+
 async function send(text) {
   const message = text.trim();
   if (!message) return;
@@ -239,7 +249,8 @@ async function createAgentBrief() {
     const response = await fetch("/api/agent-brief");
     if (!response.ok) throw new Error();
     const data = await response.json();
-    addMessage("assistant", data.reply);
+    const answer = addMessage("assistant", data.reply);
+    addAgentBriefActions(answer);
   } catch {
     notify("Could not create your studio brief just now.");
   } finally {
