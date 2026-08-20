@@ -391,6 +391,7 @@ const openingBrief = new URLSearchParams(window.location.search).get("brief") ==
 const openingArtworkId = Number(new URLSearchParams(window.location.search).get("artwork")) || null;
 const openingStyle = new URLSearchParams(window.location.search).get("style");
 const openingBuilder = new URLSearchParams(window.location.search).get("builder") === "1";
+const openingCollection = new URLSearchParams(window.location.search).get("collection");
 async function initializeChat() {
   try {
     const conversations = await renderConversations();
@@ -415,6 +416,10 @@ async function initializeChat() {
     } else if (openingBuilder) {
       history.replaceState({}, "", "/chat");
       document.querySelector("#builderToggle").click();
+      if (["AfroNova", "Quiet Nova", "GraffitiX"].includes(openingCollection)) {
+        document.querySelector("#builderCollection").value = openingCollection;
+        updateGraffitiXOptions();
+      }
     } else if (openingQuestion) {
       history.replaceState({}, "", "/chat");
       send(openingQuestion);

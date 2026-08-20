@@ -966,7 +966,7 @@ def style_agent_brief(style_name: str) -> dict[str, object]:
         ),
         "actions": [
             {"label": f"Browse {style_name} prompts", "href": f"/prompts?category={quote(style_name)}"},
-            {"label": "Open Prompt Builder", "href": "/chat?builder=1"},
+            {"label": f"Create a {style_name} prompt", "href": f"/chat?builder=1&collection={quote(style_name)}"},
         ],
     }
 
