@@ -5,7 +5,7 @@
   <title>Style Bible · Black Canvas AI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/style-bible.css"><link rel="stylesheet" href="/static/style-inbox.css?v=2">
+  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/style-bible.css"><link rel="stylesheet" href="/static/style-inbox.css?v=2"><link rel="stylesheet" href="/static/style-agent.css?v=1">
 </head>
 <body>
 <div class="app-shell">
@@ -20,7 +20,7 @@
       <div class="bible-heading"><p class="eyebrow">THE VISUAL DNA OF BLACK CANVAS</p><h1>Style Bible</h1><p>Your creative north star—so every image feels unmistakably yours.</p></div>
       <div class="style-tabs" id="styleTabs"><button class="active" data-style="AfroNova"><i class="afro"></i><span><strong>AfroNova</strong><small>Cosmic · Regal · Futuristic</small></span></button><button data-style="Quiet Nova"><i class="quiet"></i><span><strong>Quiet Nova</strong><small>Intimate · Calm · Soulful</small></span></button><button data-style="GraffitiX"><i class="graffiti"></i><span><strong>GraffitiX</strong><small>Raw · Electric · Unfiltered</small></span></button></div>
       <article class="style-sheet" id="styleSheet">
-        <div class="style-banner"><div><span id="styleNumber">01 / 03</span><h2 id="styleName">AfroNova</h2><p id="styleTagline"></p></div><div class="orbit">✦</div></div>
+        <div class="style-banner"><div><span id="styleNumber">01 / 03</span><h2 id="styleName">AfroNova</h2><p id="styleTagline"></p><button id="askStyleAgent" class="ask-style-agent">✦ Ask Agent for a creative brief</button></div><div class="orbit">✦</div></div>
         <div class="style-content">
           <section class="statement"><p class="eyebrow">CORE IDEA</p><blockquote id="styleStatement"></blockquote></section>
           <div class="rule-grid">
@@ -41,6 +41,6 @@
 </div>
 <dialog id="styleDialog"><form id="styleForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">REFINE THE RULEBOOK</p><h2>Edit <span id="editName"></span></h2></div><button class="close" value="cancel">×</button></div><label>Tagline<input id="editTagline"></label><label>Core idea<textarea id="editStatement" rows="4"></textarea></label><label>Mood words <small>Separate with commas</small><input id="editMood"></label><label>Visual ingredients <small>Separate with commas</small><textarea id="editIngredients" rows="3"></textarea></label><label>Prompt language <small>Separate with commas</small><textarea id="editLanguage" rows="3"></textarea></label><label>Always include <small>Separate with commas</small><textarea id="editDos" rows="3"></textarea></label><label>Avoid <small>Separate with commas</small><textarea id="editDonts" rows="3"></textarea></label><div class="dialog-actions"><button class="cancel" value="cancel">Cancel</button><button class="save-style" id="saveStyle" value="default">Save changes</button></div></form></dialog>
 <dialog id="updateDialog"><form id="updateForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">NEW INBOX ITEM</p><h2>Paste a style update</h2></div><button class="close" value="cancel">×</button></div><label>Which style?<select id="updateStyle"><option>AfroNova</option><option>Quiet Nova</option><option>GraffitiX</option></select></label><label>Ideas or rules from the conversation<textarea id="updateText" rows="9" spellcheck="true" lang="en" placeholder="Paste the useful style ideas here..."></textarea></label><div class="spelling-tools"><button type="button" id="checkSpelling">✓ Check spelling</button><div id="spellingReview" hidden><p id="spellingSummary"></p><div id="spellingChanges"></div><button type="button" id="applySpelling">Apply corrections</button></div></div><p class="update-privacy">BlackCanvasAI saves this locally and does not change the Style Bible until you approve it.</p><div class="dialog-actions"><button class="cancel" value="cancel">Cancel</button><button class="save-style" id="reviewUpdate" value="default">Review suggestions</button></div></form></dialog>
-<div class="toast" id="toast"></div><script src="/static/style-bible.js"></script><script src="/static/style-inbox.js?v=2"></script>
+<div class="toast" id="toast"></div><script src="/static/style-bible.js?v=2"></script><script src="/static/style-inbox.js?v=2"></script>
 </body>
 </html>

@@ -1,0 +1,12 @@
+.ask-style-agent {
+  margin-top: 18px;
+  border: 1px solid #aa84d8;
+  border-radius: 9px;
+  padding: 10px 12px;
+  background: #ffffff12;
+  color: #f2eaff;
+  font: 800 11px Manrope, sans-serif;
+  cursor: pointer;
+}
+
+.ask-style-agent:hover { background: #ffffff20; border-color: #e2c5ff; }

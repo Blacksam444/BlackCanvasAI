@@ -864,6 +864,41 @@ def list_styles() -> dict:
     return {item["name"]: json.loads(item["content"]) for item in rows("SELECT name, content FROM styles")}
 
 
+@app.get("/api/styles/{style_name}/agent-brief")
+def style_agent_brief(style_name: str) -> dict[str, object]:
+    if style_name not in {"AfroNova", "Quiet Nova", "GraffitiX"}:
+        raise HTTPException(status_code=404, detail="Style not found")
+    with connect() as db:
+        row = db.execute("SELECT content FROM styles WHERE name = ?", (style_name,)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Style not found")
+    try:
+        style = json.loads(row[0])
+    except (TypeError, json.JSONDecodeError):
+        raise HTTPException(status_code=500, detail="Style data could not be read")
+
+    mood = ", ".join(str(value) for value in style.get("mood", [])[:4]) or "intentional and expressive"
+    ingredients = "; ".join(str(value) for value in style.get("ingredients", [])[:4]) or "the collection's saved visual ingredients"
+    dos = "; ".join(str(value) for value in style.get("dos", [])[:3]) or "the collection's saved rules"
+    donts = "; ".join(str(value) for value in style.get("donts", [])[:3]) or "generic visual choices"
+    return {
+        "title": f"{style_name} Creative Brief",
+        "reply": (
+            f"**Black Canvas Agent brief: {style_name}**\n\n"
+            f"**Core direction:** {style.get('statement') or style.get('tagline') or 'Use the saved collection identity.'}\n\n"
+            f"- **Energy:** {mood}\n"
+            f"- **Build with:** {ingredients}\n"
+            f"- **Always protect:** {dos}\n"
+            f"- **Avoid:** {donts}\n\n"
+            "**Best next move:** Pick one clear subject, let this collection direction lead the composition, then use the Prompt Builder to turn it into a testable image prompt."
+        ),
+        "actions": [
+            {"label": f"Browse {style_name} prompts", "href": f"/prompts?category={quote(style_name)}"},
+            {"label": "Open Prompt Builder", "href": "/chat"},
+        ],
+    }
+
+
 @app.put("/api/styles/{name}")
 def save_style(name: str, payload: StylePayload) -> dict[str, str]:
     execute("INSERT OR REPLACE INTO styles(name, content) VALUES (?, ?)", (name, json.dumps(payload.content)))
