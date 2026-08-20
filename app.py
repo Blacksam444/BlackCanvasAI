@@ -975,6 +975,60 @@ def list_artworks() -> list[dict]:
     return items
 
 
+@app.get("/api/artworks/{artwork_id}/agent-brief")
+def artwork_agent_brief(artwork_id: int) -> dict[str, object]:
+    with connect() as db:
+        artwork = db.execute(
+            "SELECT id, title, collection, tags, notes, dimensions, medium, price, sale_status, "
+            "fulfillment_status FROM artworks WHERE id = ?",
+            (artwork_id,),
+        ).fetchone()
+    if not artwork:
+        raise HTTPException(status_code=404, detail="Artwork not found")
+
+    artwork = dict(artwork)
+    missing = [
+        label for field, label in (
+            ("dimensions", "size"),
+            ("medium", "medium"),
+            ("notes", "story / description"),
+        ) if not str(artwork[field] or "").strip()
+    ]
+    title = artwork["title"] or "This artwork"
+    if artwork["sale_status"] == "Sold":
+        next_step = "Finish the fulfillment record, then prepare the collector documents and delivery details."
+        actions = [{"label": "Open Orders Dashboard", "href": "/image-studio?focus=orders"}]
+    elif missing:
+        next_step = f"Complete the missing {', '.join(missing)} before moving it toward sale."
+        actions = [{"label": "Complete artwork details", "href": "/image-studio?focus=incomplete"}]
+    elif float(artwork["price"] or 0) <= 0:
+        next_step = "Use the Pricing Calculator to set a confident starting retail price."
+        actions = [{"label": "Price available artwork", "href": "/image-studio?focus=unpriced"}]
+    elif artwork["sale_status"] == "Ready to list":
+        next_step = "Create the listing materials and Seller Package, then publish it where your collectors can find it."
+        actions = [{"label": "Open ready-to-list artwork", "href": "/image-studio?focus=ready"}]
+    else:
+        next_step = "Choose whether the next step is content, print prep, pricing, or listing readiness."
+        actions = [{"label": "Open Image Studio", "href": "/image-studio"}]
+
+    price_line = (
+        f"**${float(artwork['price'] or 0):,.0f}** current catalog price"
+        if float(artwork["price"] or 0) else "No price set yet"
+    )
+    return {
+        "title": f"Artwork Plan: {title}"[:60],
+        "reply": (
+            f"**Black Canvas Agent plan for {title}**\n\n"
+            f"- Collection: **{artwork['collection']}**\n"
+            f"- Status: **{artwork['sale_status']}**\n"
+            f"- {price_line}\n"
+            f"- {('Details still needed: ' + ', '.join(missing)) if missing else 'Core artwork details are present'}\n\n"
+            f"**Best next move:** {next_step}"
+        ),
+        "actions": actions,
+    }
+
+
 @app.get("/api/artworks-export")
 def export_artwork_catalog() -> Response:
     artworks = rows(

@@ -181,6 +181,10 @@ document.querySelector("#createArtworkPrompt").onclick = () => {
   const request = `Create an image prompt for ${artwork.title} in the ${artwork.collection} style${details ? `. Use this creative direction: ${details}` : ""}.`;
   window.location.href = `/chat?q=${encodeURIComponent(request)}`;
 };
+document.querySelector("#askArtworkAgent").onclick = () => {
+  if (!selectedId) return;
+  window.location.href = `/chat?artwork=${selectedId}`;
+};
 document.querySelector("#createContentKit").onclick = async () => {
   if (!selectedId) return;
   const button = document.querySelector("#createContentKit");

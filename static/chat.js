@@ -268,6 +268,21 @@ async function createAgentBrief() {
   }
 }
 
+async function createArtworkAgentBrief(artworkId) {
+  try {
+    const response = await fetch(`/api/artworks/${artworkId}/agent-brief`);
+    if (!response.ok) throw new Error();
+    const data = await response.json();
+    await ensureConversation(data.title || "Artwork Plan");
+    const artworkTitle = (data.title || "Artwork Plan").replace(/^Artwork Plan: /, "");
+    addMessage("user", `Create an agent plan for ${artworkTitle}`);
+    const answer = addMessage("assistant", data.reply);
+    if (data.actions?.length) addAgentActions(answer, "Open workspace", data.actions);
+  } catch {
+    notify("Could not create an artwork plan just now.");
+  }
+}
+
 document.querySelector("#chatForm").onsubmit = (event) => { event.preventDefault(); send(input.value); };
 document.querySelector("#agentBriefButton").onclick = createAgentBrief;
 async function openArtworkPicker() {
@@ -356,6 +371,7 @@ document.querySelector("#promptBuilder").onsubmit = (event) => {
 };
 const openingQuestion = new URLSearchParams(window.location.search).get("q");
 const openingBrief = new URLSearchParams(window.location.search).get("brief") === "1";
+const openingArtworkId = Number(new URLSearchParams(window.location.search).get("artwork")) || null;
 async function initializeChat() {
   try {
     const conversations = await renderConversations();
@@ -365,12 +381,15 @@ async function initializeChat() {
       for (const item of legacy) await saveChatMessage(item.role, item.text);
       localStorage.removeItem(KEY);
       await openConversation(currentConversationId, legacy.find((item) => item.role === "user")?.text.slice(0, 60) || "Saved conversation");
-    } else if (!openingQuestion && !openingBrief && conversations.length) {
+    } else if (!openingQuestion && !openingBrief && !openingArtworkId && conversations.length) {
       await openConversation(conversations[0].id, conversations[0].title);
     }
     if (openingBrief) {
       history.replaceState({}, "", "/chat");
       await createAgentBrief();
+    } else if (openingArtworkId) {
+      history.replaceState({}, "", "/chat");
+      await createArtworkAgentBrief(openingArtworkId);
     } else if (openingQuestion) {
       history.replaceState({}, "", "/chat");
       send(openingQuestion);

@@ -1,0 +1,16 @@
+.ask-artwork-agent {
+  width: 100%;
+  margin-top: 10px;
+  border: 1px solid #7b58a8;
+  border-radius: 10px;
+  padding: 11px 13px;
+  background: linear-gradient(135deg, #38234e, #261b32);
+  color: #ebd5ff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ask-artwork-agent:hover {
+  border-color: #b383e0;
+  color: #fff;
+}
