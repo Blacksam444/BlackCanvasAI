@@ -5,6 +5,8 @@ let query = "";
 let pendingFile = null;
 let selectedId = null;
 let focusMode = new URLSearchParams(window.location.search).get("focus") || "";
+const requestedArtworkId = Number(new URLSearchParams(window.location.search).get("artwork")) || null;
+const requestedTool = new URLSearchParams(window.location.search).get("tool");
 
 const grid = document.querySelector("#artGrid");
 const drop = document.querySelector("#dropZone");
@@ -931,6 +933,12 @@ async function initializeStudio() {
   } else if (focusMode === "orders") {
     focusMode = "";
     document.querySelector("#openOrdersDashboard").click();
+  }
+  if (requestedArtworkId) {
+    const artwork = artworks.find((item) => item.id === requestedArtworkId);
+    if (!artwork) return notify("That artwork could not be found in your catalog.");
+    showDetail(artwork);
+    if (requestedTool === "content") document.querySelector("#createContentKit").click();
   }
 }
 initializeStudio().catch(() => notify("Could not load the artwork catalog."));

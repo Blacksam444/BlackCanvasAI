@@ -1077,6 +1077,11 @@ def artwork_agent_brief(artwork_id: int) -> dict[str, object]:
             "label": f"Browse {collection} prompts",
             "href": f"/prompts?category={quote(collection)}",
         })
+    if artwork["sale_status"] != "Sold":
+        actions.append({
+            "label": "Create artwork content kit",
+            "href": f"/image-studio?artwork={artwork['id']}&tool=content",
+        })
     return {
         "title": f"Artwork Plan: {title}"[:60],
         "reply": (
