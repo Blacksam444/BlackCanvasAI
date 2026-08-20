@@ -387,6 +387,7 @@ const openingQuestion = new URLSearchParams(window.location.search).get("q");
 const openingBrief = new URLSearchParams(window.location.search).get("brief") === "1";
 const openingArtworkId = Number(new URLSearchParams(window.location.search).get("artwork")) || null;
 const openingStyle = new URLSearchParams(window.location.search).get("style");
+const openingBuilder = new URLSearchParams(window.location.search).get("builder") === "1";
 async function initializeChat() {
   try {
     const conversations = await renderConversations();
@@ -396,7 +397,7 @@ async function initializeChat() {
       for (const item of legacy) await saveChatMessage(item.role, item.text);
       localStorage.removeItem(KEY);
       await openConversation(currentConversationId, legacy.find((item) => item.role === "user")?.text.slice(0, 60) || "Saved conversation");
-    } else if (!openingQuestion && !openingBrief && !openingArtworkId && !openingStyle && conversations.length) {
+    } else if (!openingQuestion && !openingBrief && !openingArtworkId && !openingStyle && !openingBuilder && conversations.length) {
       await openConversation(conversations[0].id, conversations[0].title);
     }
     if (openingBrief) {
@@ -408,6 +409,9 @@ async function initializeChat() {
     } else if (openingStyle) {
       history.replaceState({}, "", "/chat");
       await createStyleAgentBrief(openingStyle);
+    } else if (openingBuilder) {
+      history.replaceState({}, "", "/chat");
+      document.querySelector("#builderToggle").click();
     } else if (openingQuestion) {
       history.replaceState({}, "", "/chat");
       send(openingQuestion);

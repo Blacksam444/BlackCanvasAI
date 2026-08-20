@@ -785,7 +785,7 @@ def agent_brief() -> dict[str, object]:
         action = {"label": "Review imported prompts", "href": "/prompts?review=duplicates"}
     else:
         next_step = "Create a new prompt or add your next artwork to the studio."
-        action = {"label": "Open Prompt Builder", "href": "/chat"}
+        action = {"label": "Open Prompt Builder", "href": "/chat?builder=1"}
 
     return {"next_step": next_step, "action": action, "reply": (
         "**Black Canvas Agent Brief**\n\n"
@@ -899,7 +899,7 @@ def style_agent_brief(style_name: str) -> dict[str, object]:
         ),
         "actions": [
             {"label": f"Browse {style_name} prompts", "href": f"/prompts?category={quote(style_name)}"},
-            {"label": "Open Prompt Builder", "href": "/chat"},
+            {"label": "Open Prompt Builder", "href": "/chat?builder=1"},
         ],
     }
 
