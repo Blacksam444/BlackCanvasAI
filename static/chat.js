@@ -345,9 +345,13 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 let speechRecognition = null;
 let isListening = false;
 let spokenStartText = "";
+const useWindowsVoiceTyping = () => {
+  input.focus();
+  notify("Click the message box, press Win + H, then speak. Windows will type your words here.");
+};
 if (!SpeechRecognition) {
-  voiceButton.disabled = true;
-  voiceButton.title = "Voice input is not available in this browser.";
+  voiceButton.title = "Use Windows voice typing (Win + H)";
+  voiceButton.onclick = useWindowsVoiceTyping;
 } else {
   speechRecognition = new SpeechRecognition();
   speechRecognition.lang = "en-US";
@@ -373,7 +377,11 @@ if (!SpeechRecognition) {
     input.focus();
   };
   speechRecognition.onerror = (event) => {
-    if (event.error !== "aborted") notify(event.error === "not-allowed" ? "Allow microphone access, then try again." : "I could not hear that. Please try again.");
+    if (event.error !== "aborted") {
+      notify(event.error === "not-allowed"
+        ? "Voice input is blocked here. Click the message box and press Win + H, then speak."
+        : "I could not hear that. Please try again.");
+    }
   };
   voiceButton.onclick = () => {
     if (isListening) return speechRecognition.stop();
