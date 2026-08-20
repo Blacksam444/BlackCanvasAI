@@ -270,6 +270,10 @@ async function createAgentBrief() {
 
 document.querySelector("#chatForm").onsubmit = (event) => { event.preventDefault(); send(input.value); };
 document.querySelector("#agentBriefButton").onclick = createAgentBrief;
+if (new URLSearchParams(window.location.search).get("brief") === "1") {
+  window.history.replaceState({}, "", "/chat");
+  createAgentBrief();
+}
 async function openArtworkPicker() {
   artworkPickerGrid.innerHTML = '<p class="artwork-picker-loading">Loading your artwork...</p>';
   artworkPicker.showModal();

@@ -10,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/styles.css">
     <link rel="stylesheet" href="/static/dashboard-live.css?v=2">
+    <link rel="stylesheet" href="/static/dashboard-agent.css?v=1">
 </head>
 <body>
     <div class="app-shell">
@@ -52,6 +53,12 @@
                     <input id="askInput" type="text" placeholder="Ask Black Canvas AI anything..." autocomplete="off">
                     <button type="submit" aria-label="Send message">↑</button>
                 </form>
+
+                <section class="agent-command-card">
+                    <span class="agent-command-mark">✦</span>
+                    <div><strong>Black Canvas Agent is ready</strong><small>Get a private Studio Brief based on your saved prompts, artwork, and business records.</small></div>
+                    <a href="/chat?brief=1">Create Studio Brief</a>
+                </section>
 
                 <div class="section-heading"><div><p class="eyebrow">START HERE</p><h2>Quick actions</h2></div></div>
                 <div class="quick-grid">

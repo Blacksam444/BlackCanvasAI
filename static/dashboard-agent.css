@@ -1,0 +1,44 @@
+.agent-command-card {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+  margin: 18px 0 30px;
+  padding: 17px 19px;
+  border: 1px solid #513c68;
+  border-radius: 16px;
+  background: linear-gradient(100deg, #1d1427, #15131a);
+}
+
+.agent-command-mark {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #8a6cf1, #d85f9d);
+  color: #fff;
+  font-size: 17px;
+}
+
+.agent-command-card strong,
+.agent-command-card small {
+  display: block;
+}
+
+.agent-command-card strong { font: 800 13px Manrope, sans-serif; }
+.agent-command-card small { margin-top: 4px; color: #a89dab; font-size: 11px; }
+
+.agent-command-card a {
+  border-radius: 9px;
+  padding: 10px 13px;
+  background: #875be0;
+  color: #fff;
+  font: 800 11px Manrope, sans-serif;
+  text-decoration: none;
+}
+
+@media (max-width: 620px) {
+  .agent-command-card { grid-template-columns: auto 1fr; }
+  .agent-command-card a { grid-column: 1 / -1; text-align: center; }
+}
