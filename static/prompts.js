@@ -152,7 +152,7 @@ function render() {
   shown.forEach(prompt => {
     const card = document.createElement("article");
     card.className = `prompt-card${selectedIds.has(prompt.id) ? " selected" : ""}${!prompt.reviewed ? " unreviewed" : ""}`;
-    card.innerHTML = `<div class="card-top"><label class="select-prompt"><input type="checkbox" ${selectedIds.has(prompt.id) ? "checked" : ""}><span></span></label><div class="card-badges"><span class="category">${escape(prompt.category)}</span><span class="source ${escape(prompt.source)}">${sourceLabel(prompt.source)}</span>${!prompt.reviewed ? '<span class="review-badge">Unreviewed</span>' : ""}${duplicates.has(prompt.id) ? '<span class="duplicate-badge">Duplicate</span>' : ""}</div><button class="favorite ${prompt.favorite ? "on" : ""}" title="Favorite">★</button></div><h2>${escape(prompt.title)}</h2><p class="prompt-preview">${escape(prompt.text)}</p><div class="card-bottom"><button class="view">Review & edit</button><button class="copy">Copy prompt</button></div>`;
+    card.innerHTML = `<div class="card-top"><label class="select-prompt"><input type="checkbox" ${selectedIds.has(prompt.id) ? "checked" : ""}><span></span></label><div class="card-badges"><span class="category">${escape(prompt.category)}</span><span class="source ${escape(prompt.source)}">${sourceLabel(prompt.source)}</span>${!prompt.reviewed ? '<span class="review-badge">Unreviewed</span>' : ""}${duplicates.has(prompt.id) ? '<span class="duplicate-badge">Duplicate</span>' : ""}</div><button class="favorite ${prompt.favorite ? "on" : ""}" title="Favorite">★</button></div><h2>${escape(prompt.title)}</h2><p class="prompt-preview">${escape(prompt.text)}</p><div class="card-bottom"><button class="view">Review & edit</button><button class="use-agent">Use in Agent</button><button class="copy">Copy prompt</button></div>`;
     const checkbox = card.querySelector('input[type="checkbox"]');
     checkbox.onchange = () => {
       if (checkbox.checked) selectedIds.add(prompt.id);
@@ -167,6 +167,12 @@ function render() {
     card.querySelector(".copy").onclick = async () => {
       await navigator.clipboard.writeText(prompt.text);
       notify("Prompt copied.");
+    };
+    card.querySelector(".use-agent").onclick = () => {
+      const request = isLikelyImagePrompt(prompt)
+        ? `Refine this image prompt for production: ${prompt.text}`
+        : `Help me use this saved ${prompt.category} draft: ${prompt.text}`;
+      window.location.href = `/chat?q=${encodeURIComponent(request)}`;
     };
     card.querySelector(".view").onclick = () => openEditor(prompt);
     grid.appendChild(card);
