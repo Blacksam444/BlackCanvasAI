@@ -52,8 +52,28 @@
 
 .agent-command-card .agent-secondary-action:hover { background: #35283f; color: #fff; }
 
+.agent-next-step {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  margin: -14px 0 34px;
+  padding: 14px 17px;
+  border: 1px solid #403052;
+  border-radius: 14px;
+  background: #15111a;
+}
+
+.agent-next-step > span { color: #d6aeff; font-size: 18px; }
+.agent-next-step p { margin: 0 0 4px; color: #9d91a8; font-size: 9px; }
+.agent-next-step strong { font: 700 12px/1.45 Manrope, sans-serif; color: #eee8f3; }
+.agent-next-step a { border-radius: 8px; padding: 9px 11px; background: #292034; color: #e6d6f7; font: 800 10px Manrope, sans-serif; text-decoration: none; }
+.agent-next-step a:hover { background: #382746; color: #fff; }
+
 @media (max-width: 620px) {
   .agent-command-card { grid-template-columns: auto 1fr; }
   .agent-command-actions { grid-column: 1 / -1; justify-content: stretch; }
   .agent-command-card a { flex: 1; text-align: center; }
+  .agent-next-step { grid-template-columns: auto 1fr; }
+  .agent-next-step a { grid-column: 1 / -1; text-align: center; }
 }

@@ -757,7 +757,7 @@ def dashboard_summary() -> dict:
 
 
 @app.get("/api/agent-brief")
-def agent_brief() -> dict[str, str]:
+def agent_brief() -> dict[str, object]:
     """Return a local, data-aware studio brief without sending data to an AI provider."""
     with connect() as db:
         prompt_count = db.execute("SELECT COUNT(*) FROM prompts").fetchone()[0]
@@ -773,16 +773,21 @@ def agent_brief() -> dict[str, str]:
 
     if active_orders:
         next_step = f"Move {active_orders} active {'order' if active_orders == 1 else 'orders'} forward in Image Studio."
+        action = {"label": "Open Orders Dashboard", "href": "/image-studio?focus=orders"}
     elif unpriced:
         next_step = f"Price {unpriced} available {'artwork' if unpriced == 1 else 'artworks'} before listing."
+        action = {"label": "Price available artwork", "href": "/image-studio?focus=unpriced"}
     elif ready_to_list:
         next_step = f"Prepare {ready_to_list} {'piece' if ready_to_list == 1 else 'pieces'} that are ready to list."
+        action = {"label": "Open ready-to-list artwork", "href": "/image-studio?focus=ready"}
     elif review_count:
         next_step = f"Review your {review_count} imported {'prompt' if review_count == 1 else 'prompts'} in a focused session."
+        action = {"label": "Review imported prompts", "href": "/prompts?review=duplicates"}
     else:
         next_step = "Create a new prompt or add your next artwork to the studio."
+        action = {"label": "Open Prompt Builder", "href": "/chat"}
 
-    return {"reply": (
+    return {"next_step": next_step, "action": action, "reply": (
         "**Black Canvas Agent Brief**\n\n"
         f"- **{artwork_count}** artworks in your studio\n"
         f"- **{prompt_count}** saved prompts, including **{favorites}** favorites\n"

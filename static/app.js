@@ -89,4 +89,19 @@ async function loadDashboard() {
   }
 }
 
+async function loadAgentNextStep() {
+  try {
+    const response = await fetch("/api/agent-brief");
+    if (!response.ok) throw new Error();
+    const brief = await response.json();
+    document.querySelector("#agentNextStepText").textContent = brief.next_step;
+    const link = document.querySelector("#agentNextStepLink");
+    link.textContent = brief.action.label;
+    link.href = brief.action.href;
+  } catch {
+    document.querySelector("#agentNextStepText").textContent = "Open your Studio Brief to choose the next move for your workspace.";
+  }
+}
+
 loadDashboard();
+loadAgentNextStep();
