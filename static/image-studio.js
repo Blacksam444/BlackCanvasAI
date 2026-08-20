@@ -938,6 +938,7 @@ document.querySelectorAll("#studioToolsMenu button").forEach((button) => {
 function clearStudioFocus() {
   focusMode = "";
   document.querySelector("#studioFocus").hidden = true;
+  document.querySelector("#focusAction").hidden = true;
   window.history.replaceState({}, "", "/image-studio");
   render();
 }
@@ -953,6 +954,24 @@ async function initializeStudio() {
     document.querySelector("#focusTitle").textContent = focusCopy[focusMode][0];
     document.querySelector("#focusDescription").textContent = focusCopy[focusMode][1];
     document.querySelector("#studioFocus").hidden = false;
+    const actionable = artworks.filter((artwork) => {
+      const available = artwork.sale_status !== "Sold" && artwork.sale_status !== "Not for sale";
+      if (focusMode === "incomplete") return available && (!artwork.dimensions?.trim() || !artwork.medium?.trim() || !artwork.notes?.trim() || !artwork.tags?.trim());
+      if (focusMode === "unpriced") return available && Number(artwork.price) <= 0;
+      return artwork.sale_status === "Ready to list";
+    });
+    const nextArtwork = actionable[0];
+    const focusAction = document.querySelector("#focusAction");
+    if (nextArtwork) {
+      const labels = { incomplete: "Complete next artwork", unpriced: "Price next artwork", ready: "Open next listing" };
+      focusAction.textContent = labels[focusMode];
+      focusAction.hidden = false;
+      focusAction.onclick = () => {
+        showDetail(nextArtwork);
+        const tool = { incomplete: "#editArtwork", unpriced: "#openPricing", ready: "#openReadiness" }[focusMode];
+        document.querySelector(tool).click();
+      };
+    }
   } else if (focusMode === "orders") {
     focusMode = "";
     document.querySelector("#openOrdersDashboard").click();
