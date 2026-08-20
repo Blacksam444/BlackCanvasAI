@@ -157,6 +157,10 @@ drop.ondragleave = () => drop.classList.remove("dragging");
 drop.ondrop = (event) => { event.preventDefault(); drop.classList.remove("dragging"); prepare(event.dataTransfer.files[0]); };
 document.querySelector("#artCollection").onchange = (event) => applySuggestedDetails(event.target.value, document.querySelector("#artTags"), document.querySelector("#artNotes"));
 document.querySelector("#editCollection").onchange = (event) => applySuggestedDetails(event.target.value, document.querySelector("#editTags"), document.querySelector("#editNotes"));
+document.querySelector("#fillCollectionDetails").onclick = () => {
+  applySuggestedDetails(document.querySelector("#editCollection").value, document.querySelector("#editTags"), document.querySelector("#editNotes"));
+  notify("Blank tags and description filled from the collection.");
+};
 
 document.querySelector("#saveArtwork").onclick = async (event) => {
   event.preventDefault();
