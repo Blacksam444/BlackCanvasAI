@@ -198,14 +198,22 @@ function addPromptRefiner(message, data) {
   message.querySelector(".copy-message").parentElement.appendChild(wrap);
 }
 
-function addAgentBriefActions(message) {
-  const actions = document.createElement("div");
-  actions.className = "agent-brief-actions";
-  actions.innerHTML = '<span>Take action</span><div><button data-href="/prompts">Review prompts</button><button data-href="/image-studio">Open Image Studio</button><button data-href="/">View dashboard</button></div>';
-  actions.querySelectorAll("button").forEach((button) => {
+function addAgentActions(message, label, actions) {
+  const actionPanel = document.createElement("div");
+  actionPanel.className = "agent-brief-actions";
+  actionPanel.innerHTML = `<span>${escapeHtml(label)}</span><div>${actions.map((action) => `<button data-href="${escapeHtml(action.href)}">${escapeHtml(action.label)}</button>`).join("")}</div>`;
+  actionPanel.querySelectorAll("button").forEach((button) => {
     button.onclick = () => { window.location.href = button.dataset.href; };
   });
-  message.querySelector(".copy-message").parentElement.appendChild(actions);
+  message.querySelector(".copy-message").parentElement.appendChild(actionPanel);
+}
+
+function addAgentBriefActions(message) {
+  addAgentActions(message, "Take action", [
+    {label: "Review prompts", href: "/prompts"},
+    {label: "Open Image Studio", href: "/image-studio"},
+    {label: "View dashboard", href: "/"},
+  ]);
 }
 
 async function send(text) {
@@ -229,6 +237,7 @@ async function send(text) {
     const data = await response.json();
     typing.remove();
     const answer = addMessage("assistant", data.reply, true, data);
+    if (data.actions?.length) addAgentActions(answer, "Open workspace", data.actions);
     if (data.generated_prompt) {
       addPromptSaveButton(answer, data);
       addPromptRefiner(answer, data);

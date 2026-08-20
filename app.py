@@ -336,7 +336,7 @@ def connections() -> FileResponse:
 
 
 @app.post("/api/chat")
-def chat_reply(payload: ChatMessage) -> dict[str, str]:
+def chat_reply(payload: ChatMessage) -> dict[str, object]:
     topic = payload.message.strip()
     topic_lower = topic.lower()
     studio = dashboard_summary()
@@ -352,7 +352,8 @@ def chat_reply(payload: ChatMessage) -> dict[str, str]:
                 "- Add time, complexity, size, and the collection’s position.\n"
                 "- Compare the final number to your intended buyer and sales channel.\n\n"
                 "Open **Image Studio**, select the artwork, and use the Pricing Calculator before publishing."
-            )
+            ),
+            "actions": [{"label": "Open unpriced artwork", "href": "/image-studio?focus=unpriced"}]
         }
     if any(word in topic_lower for word in ("tiktok", "instagram", "caption", "reel", "social", "content")):
         return {
@@ -364,7 +365,8 @@ def chat_reply(payload: ChatMessage) -> dict[str, str]:
                 "- **Meaning:** Explain what the piece represents in one or two clear lines.\n"
                 "- **Invitation:** Ask viewers to save, comment, or follow the collection.\n\n"
                 "Open an artwork in Image Studio and use its Content Kit to turn that structure into a caption set."
-            )
+            ),
+            "actions": [{"label": "Open Image Studio", "href": "/image-studio"}]
         }
     if any(word in topic_lower for word in ("organize", "organise", "review", "prompt library", "duplicate", "import")):
         return {
@@ -374,7 +376,8 @@ def chat_reply(payload: ChatMessage) -> dict[str, str]:
                 "Start with **Duplicates first** in Prompt Library. Keep one strong copy, choose its collection, "
                 "and remove extra copies only when you confirm they are truly identical. Then review the detailed "
                 "prompts before the short entries."
-            )
+            ),
+            "actions": [{"label": "Open Prompt Library", "href": "/prompts"}]
         }
     creative_triggers = ("prompt", "image", "portrait", "painting", "photo", "artwork", "style",
                          "afronova", "afro nova", "quiet nova", "graffitix", "graffiti x")
