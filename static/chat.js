@@ -122,9 +122,12 @@ async function openConversation(id, title) {
   welcome.hidden = savedMessages.length > 0;
   savedMessages.forEach((saved) => {
     const message = addMessage(saved.role, saved.text, false, saved.metadata || {});
-    if (saved.role === "assistant" && saved.metadata?.generated_prompt) {
-      addPromptSaveButton(message, saved.metadata);
-      addPromptRefiner(message, saved.metadata);
+    if (saved.role === "assistant") {
+      if (saved.metadata?.actions?.length) addAgentActions(message, "Open workspace", saved.metadata.actions);
+      if (saved.metadata?.generated_prompt) {
+        addPromptSaveButton(message, saved.metadata);
+        addPromptRefiner(message, saved.metadata);
+      }
     }
   });
   await renderConversations();
@@ -258,7 +261,7 @@ async function createAgentBrief() {
     const response = await fetch("/api/agent-brief");
     if (!response.ok) throw new Error();
     const data = await response.json();
-    const answer = addMessage("assistant", data.reply);
+    const answer = addMessage("assistant", data.reply, true, data);
     addAgentBriefActions(answer);
   } catch {
     notify("Could not create your studio brief just now.");
@@ -276,7 +279,7 @@ async function createArtworkAgentBrief(artworkId) {
     await ensureConversation(data.title || "Artwork Plan");
     const artworkTitle = (data.title || "Artwork Plan").replace(/^Artwork Plan: /, "");
     addMessage("user", `Create an agent plan for ${artworkTitle}`);
-    const answer = addMessage("assistant", data.reply);
+    const answer = addMessage("assistant", data.reply, true, data);
     if (data.actions?.length) addAgentActions(answer, "Open workspace", data.actions);
   } catch {
     notify("Could not create an artwork plan just now.");
@@ -290,7 +293,7 @@ async function createStyleAgentBrief(styleName) {
     const data = await response.json();
     await ensureConversation(data.title || `${styleName} Creative Brief`);
     addMessage("user", `Create a creative brief for ${styleName}`);
-    const answer = addMessage("assistant", data.reply);
+    const answer = addMessage("assistant", data.reply, true, data);
     if (data.actions?.length) addAgentActions(answer, "Open workspace", data.actions);
   } catch {
     notify("Could not create a style brief just now.");
