@@ -451,6 +451,25 @@ def chat_reply(payload: ChatMessage) -> dict[str, object]:
                 )},
             ]
         }
+    if any(phrase in topic_lower for phrase in ("launch plan", "launch my collection", "launch this collection", "art launch", "launch my art")):
+        return {
+            "reply": (
+                "**Your Black Canvas collection-launch plan**\n\n"
+                "**1. Select the release:** Choose 3–6 pieces that share one clear story and visual voice.\n"
+                "**2. Complete the records:** Add title, size, medium, story, tags, and price for every chosen piece.\n"
+                "**3. Prepare the buying path:** Run Listing Readiness, then create each Seller Package.\n"
+                "**4. Build anticipation:** Share process, details, and the collection story before showing every finished piece.\n"
+                "**5. Announce the release:** Publish the collection name, launch date, key artwork, and a simple way to inquire or buy.\n"
+                "**6. Show the work again:** Use detail posts, a studio video, and one collector-focused explanation during launch week.\n"
+                "**7. Follow up:** Track inquiries, update sold artwork immediately, and keep fulfillment records complete.\n\n"
+                f"Right now you have **{studio_data['ready_to_list']}** pieces marked Ready to List. "
+                "Start with the catalog so every artwork you promote is ready when someone wants to collect it."
+            ),
+            "actions": [
+                {"label": "Open listing-ready artwork", "href": "/image-studio?focus=ready"},
+                {"label": "Build a content week", "href": "/chat?q=Make%20me%20a%20weekly%20content%20plan"},
+            ],
+        }
     if any(word in topic_lower for word in ("tiktok", "instagram", "caption", "reel", "social", "content")):
         return {
             "reply": (
