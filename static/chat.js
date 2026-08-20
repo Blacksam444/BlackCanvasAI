@@ -340,6 +340,47 @@ function chooseArtwork(id) {
 document.querySelector(".attach").onclick = openArtworkPicker;
 document.querySelector("#closeArtworkPicker").onclick = () => artworkPicker.close();
 document.querySelector("#artworkPickerSearch").oninput = (event) => renderArtworkPicker(event.target.value);
+const voiceButton = document.querySelector("#voiceInput");
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let speechRecognition = null;
+let isListening = false;
+let spokenStartText = "";
+if (!SpeechRecognition) {
+  voiceButton.disabled = true;
+  voiceButton.title = "Voice input is not available in this browser.";
+} else {
+  speechRecognition = new SpeechRecognition();
+  speechRecognition.lang = "en-US";
+  speechRecognition.interimResults = true;
+  speechRecognition.continuous = false;
+  speechRecognition.onstart = () => {
+    isListening = true;
+    voiceButton.classList.add("listening");
+    voiceButton.textContent = "■";
+    voiceButton.title = "Stop listening";
+  };
+  speechRecognition.onresult = (event) => {
+    let transcript = "";
+    for (let index = event.resultIndex; index < event.results.length; index += 1) transcript += event.results[index][0].transcript;
+    input.value = `${spokenStartText}${spokenStartText && transcript ? " " : ""}${transcript}`.trimStart();
+    input.dispatchEvent(new Event("input"));
+  };
+  speechRecognition.onend = () => {
+    isListening = false;
+    voiceButton.classList.remove("listening");
+    voiceButton.textContent = "🎙";
+    voiceButton.title = "Speak your message";
+    input.focus();
+  };
+  speechRecognition.onerror = (event) => {
+    if (event.error !== "aborted") notify(event.error === "not-allowed" ? "Allow microphone access, then try again." : "I could not hear that. Please try again.");
+  };
+  voiceButton.onclick = () => {
+    if (isListening) return speechRecognition.stop();
+    spokenStartText = input.value.trim();
+    try { speechRecognition.start(); } catch { notify("The microphone is already starting. Please try again."); }
+  };
+}
 input.onkeydown = (event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(input.value); } };
 input.oninput = () => { input.style.height = "auto"; input.style.height = `${input.scrollHeight}px`; };
 document.querySelectorAll(".suggestions button").forEach((button) => { button.onclick = () => send(button.textContent); });
