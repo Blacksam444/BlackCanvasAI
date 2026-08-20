@@ -938,7 +938,8 @@ async function initializeStudio() {
     const artwork = artworks.find((item) => item.id === requestedArtworkId);
     if (!artwork) return notify("That artwork could not be found in your catalog.");
     showDetail(artwork);
-    if (requestedTool === "content") document.querySelector("#createContentKit").click();
+    const toolButton = { content: "#createContentKit", pricing: "#openPricing" }[requestedTool];
+    if (toolButton) document.querySelector(toolButton).click();
   }
 }
 initializeStudio().catch(() => notify("Could not load the artwork catalog."));

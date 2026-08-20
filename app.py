@@ -1059,7 +1059,10 @@ def artwork_agent_brief(artwork_id: int) -> dict[str, object]:
         actions = [{"label": "Complete artwork details", "href": "/image-studio?focus=incomplete"}]
     elif float(artwork["price"] or 0) <= 0:
         next_step = "Use the Pricing Calculator to set a confident starting retail price."
-        actions = [{"label": "Price available artwork", "href": "/image-studio?focus=unpriced"}]
+        actions = [
+            {"label": "Open Pricing Calculator", "href": f"/image-studio?artwork={artwork['id']}&tool=pricing"},
+            {"label": "View all unpriced artwork", "href": "/image-studio?focus=unpriced"},
+        ]
     elif artwork["sale_status"] == "Ready to list":
         next_step = "Create the listing materials and Seller Package, then publish it where your collectors can find it."
         actions = [{"label": "Open ready-to-list artwork", "href": "/image-studio?focus=ready"}]
