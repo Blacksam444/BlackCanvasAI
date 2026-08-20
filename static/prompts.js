@@ -79,6 +79,12 @@ function suggestedCategory(prompt) {
   return bestCategory;
 }
 
+function isLikelyImagePrompt(prompt) {
+  if (["AfroNova", "Quiet Nova", "GraffitiX"].includes(prompt.category)) return true;
+  const text = `${prompt.title} ${prompt.text}`.toLowerCase();
+  return ["image prompt", "generate an image", "create a portrait", "digital painting", "photorealistic", "illustration", "artwork", "visual composition", "midjourney", "dall-e", "dalle"].some((signal) => text.includes(signal));
+}
+
 function visiblePrompts() {
   const duplicates = duplicateIds();
   return prompts.filter(prompt => {
@@ -102,7 +108,7 @@ function updateBulkToolbar() {
 async function load() {
   const response = await fetch("/api/prompts");
   prompts = await response.json();
-  if (requestedReviewMode && ["all", "duplicates", "detailed", "short"].includes(requestedReviewMode)) {
+  if (requestedReviewMode && ["all", "image", "duplicates", "detailed", "short"].includes(requestedReviewMode)) {
     document.querySelector("#reviewQueueMode").value = requestedReviewMode;
   }
   if (requestedCategory && canonicalCategories.includes(requestedCategory)) {
@@ -271,6 +277,8 @@ document.querySelector("#startReviewQueue").onclick = () => {
   if (mode === "duplicates") {
     const duplicates = duplicateIds();
     reviewQueue = unreviewed.filter(prompt => duplicates.has(prompt.id));
+  } else if (mode === "image") {
+    reviewQueue = unreviewed.filter(isLikelyImagePrompt);
   } else if (mode === "detailed") {
     reviewQueue = unreviewed.filter(prompt => (prompt.text || "").length > 1200);
   } else if (mode === "short") {
