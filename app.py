@@ -745,7 +745,7 @@ def dashboard_summary() -> dict:
             for item in unreviewed_prompt_rows
         )
         catalog_value = db.execute(
-            "SELECT COALESCE(SUM(price), 0) FROM artworks WHERE sale_status != 'Sold'"
+            "SELECT COALESCE(SUM(price), 0) FROM artworks WHERE sale_status NOT IN ('Sold', 'Not for sale')"
         ).fetchone()[0]
         sales_revenue = db.execute(
             "SELECT COALESCE(SUM(sale_price), 0) FROM artworks WHERE sale_status = 'Sold'"
@@ -770,7 +770,7 @@ def dashboard_summary() -> dict:
             "SELECT COUNT(*) FROM artworks WHERE sale_status = 'Ready to list'"
         ).fetchone()[0]
         unpriced_artwork = db.execute(
-            "SELECT COUNT(*) FROM artworks WHERE price <= 0 AND sale_status != 'Sold'"
+            "SELECT COUNT(*) FROM artworks WHERE price <= 0 AND sale_status NOT IN ('Sold', 'Not for sale')"
         ).fetchone()[0]
         incomplete_artwork = db.execute(
             "SELECT COUNT(*) FROM artworks WHERE sale_status NOT IN ('Sold', 'Not for sale') AND "
@@ -856,7 +856,9 @@ def agent_brief() -> dict[str, object]:
         )
         artwork_count = db.execute("SELECT COUNT(*) FROM artworks").fetchone()[0]
         ready_to_list = db.execute("SELECT COUNT(*) FROM artworks WHERE sale_status = 'Ready to list'").fetchone()[0]
-        unpriced = db.execute("SELECT COUNT(*) FROM artworks WHERE price <= 0 AND sale_status != 'Sold'").fetchone()[0]
+        unpriced = db.execute(
+            "SELECT COUNT(*) FROM artworks WHERE price <= 0 AND sale_status NOT IN ('Sold', 'Not for sale')"
+        ).fetchone()[0]
         incomplete = db.execute(
             "SELECT COUNT(*) FROM artworks WHERE sale_status NOT IN ('Sold', 'Not for sale') AND "
             "(TRIM(dimensions) = '' OR TRIM(medium) = '' OR TRIM(notes) = '' OR TRIM(tags) = '')"
