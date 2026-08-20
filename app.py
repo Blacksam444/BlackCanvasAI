@@ -411,6 +411,27 @@ def chat_reply(payload: ChatMessage) -> dict[str, object]:
             ),
             "actions": [{"label": "Open Style Bible", "href": "/style-bible"}]
         }
+    if any(word in topic_lower for word in ("listing", "list this", "product description", "product title", "seo", "shop listing")):
+        return {
+            "reply": (
+                "**Black Canvas listing direction**\n\n"
+                "A strong art listing needs four things: a clear title, the story behind the artwork, exact physical details, "
+                "and a simple invitation to collect it. Write for the buyer who wants to understand both the piece and the process.\n\n"
+                "In Image Studio, open the artwork and use Listing Readiness first. When the piece is complete, "
+                "use the Seller Package to gather the listing copy, buyer details, and supporting files."
+            ),
+            "actions": [{"label": "Open ready-to-list artwork", "href": "/image-studio?focus=ready"}]
+        }
+    if any(word in topic_lower for word in ("certificate", "coa", "receipt", "provenance")):
+        return {
+            "reply": (
+                "**Black Canvas collector-document direction**\n\n"
+                "For a finished sale, keep the collector documents tied to the artwork record: the Certificate of Authenticity, "
+                "sale receipt, artwork details, and fulfillment record. That gives the buyer a clear, professional package and keeps your studio records organized.\n\n"
+                "Open the sold artwork in Image Studio to create the document set."
+            ),
+            "actions": [{"label": "Open Image Studio", "href": "/image-studio"}]
+        }
     creative_triggers = ("prompt", "image", "portrait", "painting", "photo", "artwork", "style",
                          "afronova", "afro nova", "quiet nova", "graffitix", "graffiti x")
     if any(word in topic_lower for word in creative_triggers):
