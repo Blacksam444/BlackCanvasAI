@@ -230,6 +230,15 @@ document.querySelectorAll("[data-copy]").forEach((button) => {
     notify("Content copied.");
   };
 });
+document.querySelectorAll("[data-save]").forEach((button) => {
+  button.onclick = () => {
+    const text = document.querySelector(`#${button.dataset.save}`).value.trim();
+    const artwork = artworks.find((item) => item.id === selectedId);
+    if (!text) return notify("There is no content to save yet.");
+    const title = `${artwork?.title || "Artwork"} — ${button.dataset.label}`;
+    window.location.href = `/prompts?new=1&title=${encodeURIComponent(title)}&category=Content&text=${encodeURIComponent(text)}`;
+  };
+});
 const pricingInputs = ["priceMaterials", "priceHours", "priceHourly", "priceOverhead", "priceFees", "priceProfit"];
 let pricingSummary = "";
 let recommendedArtworkPrice = 0;
