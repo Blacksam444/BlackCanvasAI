@@ -470,6 +470,21 @@ def chat_reply(payload: ChatMessage) -> dict[str, object]:
                 {"label": "Build a content week", "href": "/chat?q=Make%20me%20a%20weekly%20content%20plan"},
             ],
         }
+    if "tiktok caption" in topic_lower or "instagram caption" in topic_lower:
+        channel = "TikTok" if "tiktok" in topic_lower else "Instagram"
+        subject = re.sub(r"\b(write|create|make|me|a|an|tiktok|instagram|caption|for)\b", " ", topic, flags=re.IGNORECASE)
+        subject = re.sub(r"\s+", " ", subject).strip(" .") or "this piece"
+        return {
+            "reply": (
+                f"**Your {channel} caption draft**\n\n"
+                f"{subject.title()} is a reminder that the work can hold both memory and possibility. "
+                "Every layer is part of the story—built slowly, honestly, and with intention. "
+                "What detail pulls you in first?\n\n"
+                "#BlackCanvasArt #ContemporaryBlackArt #ArtistProcess #ArtCollector #CreativeStudio\n\n"
+                "Edit the wording so it sounds like you, then pair it with a close detail, a process clip, or the finished artwork."
+            ),
+            "actions": [{"label": "Build a content week", "href": "/chat?q=Make%20me%20a%20weekly%20content%20plan"}],
+        }
     if any(word in topic_lower for word in ("tiktok", "instagram", "caption", "reel", "social", "content")):
         return {
             "reply": (

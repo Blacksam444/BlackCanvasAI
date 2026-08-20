@@ -46,6 +46,14 @@ class AgentRouteTests(unittest.TestCase):
         image_action = next(action for action in result["actions"] if action["label"] == "Review likely image prompts")
         self.assertEqual(image_action["href"], "/prompts?review=image")
 
+    @patch("app.dashboard_summary", return_value=STUDIO_SUMMARY)
+    def test_caption_request_returns_a_draft(self, _summary):
+        result = chat_reply(ChatMessage(message="Write a TikTok caption for AfroNova"))
+
+        self.assertIn("TikTok caption draft", result["reply"])
+        self.assertIn("#BlackCanvasArt", result["reply"])
+        self.assertIn("Build a content week", [action["label"] for action in result["actions"]])
+
     def test_artwork_brief_prioritizes_missing_details_before_price(self):
         artwork = {
             "id": 14,
