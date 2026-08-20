@@ -57,9 +57,10 @@ function render() {
     const card = document.createElement("article");
     card.className = "art-card";
     const displayPrice = artwork.sale_status === "Sold" && artwork.sale_price ? artwork.sale_price : artwork.price;
-    const missingDetails = [["dimensions", "size"], ["medium", "medium"], ["notes", "story"]]
+    const missingDetails = [["dimensions", "size"], ["medium", "medium"], ["notes", "story"], ["tags", "tags"]]
       .filter(([field]) => !String(artwork[field] || "").trim())
       .map(([, label]) => label);
+    if (Number(artwork.price) <= 0 && artwork.sale_status !== "Sold" && artwork.sale_status !== "Not for sale") missingDetails.push("price");
     const attention = artwork.sale_status !== "Sold" && missingDetails.length
       ? `<small class="art-needs-details">Needs ${escapeHtml(missingDetails.join(", "))}</small>`
       : "";
