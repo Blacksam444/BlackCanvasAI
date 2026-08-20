@@ -165,6 +165,49 @@ document.querySelector("#fillCollectionDetails").onclick = () => {
   notify("Blank tags and description filled from the collection.");
 };
 
+const artworkSpellLabels = {
+  artTags: "Tags", artNotes: "Description", editTags: "Tags", editNotes: "Description",
+};
+let artworkSpellCorrections = new Map();
+const artworkSpellingDialog = document.querySelector("#artSpellingDialog");
+document.querySelectorAll(".check-art-spelling").forEach((button) => {
+  button.onclick = async () => {
+    const ids = button.dataset.fields.split(",");
+    const fields = ids.map((id) => ({ id, text: document.querySelector(`#${id}`).value.trim() })).filter((field) => field.text);
+    if (!fields.length) return notify("Add tags or a description first.");
+    button.disabled = true;
+    button.textContent = "Checking...";
+    try {
+      const results = await Promise.all(fields.map(async (field) => {
+        const response = await fetch("/api/spellcheck", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: field.text }),
+        });
+        if (!response.ok) throw new Error();
+        return { ...field, ...(await response.json()) };
+      }));
+      artworkSpellCorrections = new Map(results.filter((result) => result.changes.length).map((result) => [result.id, result.corrected_text]));
+      const changes = results.flatMap((result) => result.changes.map((change) => ({ ...change, field: artworkSpellLabels[result.id] })));
+      if (!changes.length) return notify("No spelling changes found.");
+      document.querySelector("#artSpellingSummary").textContent = `${changes.length} possible correction${changes.length === 1 ? "" : "s"} found.`;
+      document.querySelector("#artSpellingChanges").innerHTML = changes.map((change) => `<span><b>${escapeHtml(change.field)}:</b> ${escapeHtml(change.original)} → ${escapeHtml(change.replacement)}</span>`).join("");
+      artworkSpellingDialog.showModal();
+    } catch {
+      notify("Could not check spelling just now.");
+    } finally {
+      button.disabled = false;
+      button.textContent = "✓ Check tags & description";
+    }
+  };
+});
+const closeArtworkSpelling = () => { artworkSpellCorrections.clear(); artworkSpellingDialog.close(); };
+document.querySelector("#closeArtSpelling").onclick = closeArtworkSpelling;
+document.querySelector("#cancelArtSpelling").onclick = closeArtworkSpelling;
+document.querySelector("#applyArtSpelling").onclick = () => {
+  artworkSpellCorrections.forEach((text, id) => { document.querySelector(`#${id}`).value = text; });
+  closeArtworkSpelling();
+  notify("Spelling corrections applied.");
+};
+
 document.querySelector("#saveArtwork").onclick = async (event) => {
   event.preventDefault();
   const title = document.querySelector("#artTitle").value.trim();
