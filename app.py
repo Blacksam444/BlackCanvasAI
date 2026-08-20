@@ -488,11 +488,14 @@ def chat_reply(payload: ChatMessage) -> dict[str, object]:
             "reply": (
                 "**Black Canvas library direction**\n\n"
                 f"You have **{studio['counts']['to_review']}** imported prompts waiting for review.\n\n"
-                "Start with **Duplicates first** in Prompt Library. Keep one strong copy, choose its collection, "
-                "and remove extra copies only when you confirm they are truly identical. Then review the detailed "
-                "prompts before the short entries."
+                "Start with **Likely image prompts** when you want to pull creative directions forward. Use "
+                "**Duplicates first** for cleanup: keep one strong copy, choose its collection, and remove extra "
+                "copies only when you confirm they are truly identical."
             ),
-            "actions": [{"label": "Review duplicates first", "href": "/prompts?review=duplicates"}]
+            "actions": [
+                {"label": "Review likely image prompts", "href": "/prompts?review=image"},
+                {"label": "Review duplicates first", "href": "/prompts?review=duplicates"},
+            ]
         }
     if any(word in topic_lower for word in ("order", "shipping", "ship", "fulfillment", "fulfilment", "tracking", "buyer")):
         active_orders = studio_data["active_orders"]

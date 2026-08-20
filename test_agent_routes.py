@@ -37,6 +37,15 @@ class AgentRouteTests(unittest.TestCase):
         self.assertIn("Open listing-ready artwork", action_labels)
         self.assertIn("Build a content week", action_labels)
 
+    @patch("app.dashboard_summary", return_value=STUDIO_SUMMARY)
+    def test_import_guidance_links_to_image_prompt_review(self, _summary):
+        result = chat_reply(ChatMessage(message="Organize imported prompts"))
+
+        action_labels = [action["label"] for action in result["actions"]]
+        self.assertIn("Review likely image prompts", action_labels)
+        image_action = next(action for action in result["actions"] if action["label"] == "Review likely image prompts")
+        self.assertEqual(image_action["href"], "/prompts?review=image")
+
     def test_artwork_brief_prioritizes_missing_details_before_price(self):
         artwork = {
             "id": 14,
