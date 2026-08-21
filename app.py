@@ -2735,18 +2735,18 @@ def create_google_photos_session() -> dict[str, str]:
 @app.get("/api/google/photos/selection")
 def list_google_photos_selection(session_id: str, page_token: str | None = None) -> dict[str, object]:
     client = google_photos_client()
-    session_response = client.get(f"https://photospicker.googleapis.com/v1/sessions/{quote(session_id, safe='')}")
-    session = google_photos_response(session_response, "Could not check Google Photos")
-    if not session.get("mediaItemsSet"):
-        polling = session.get("pollingConfig") or {}
-        interval = polling.get("pollInterval", "3s")
-        match = re.match(r"([0-9.]+)s", interval)
-        wait_seconds = min(max(float(match.group(1)) if match else 3, 2), 8)
-        return {"ready": False, "photos": [], "wait_seconds": wait_seconds}
     query = {"sessionId": session_id, "pageSize": 60}
     if page_token:
         query["pageToken"] = page_token
     response = client.get("https://photospicker.googleapis.com/v1/mediaItems?" + urlencode(query))
+    if not response.ok:
+        try:
+            error = response.json().get("error", {})
+        except ValueError:
+            error = {}
+        if error.get("status") == "FAILED_PRECONDITION":
+            return {"ready": False, "photos": [], "wait_seconds": 3}
+        return google_photos_response(response, "Could not read the photos you selected")
     result = google_photos_response(response, "Could not read the photos you selected")
     photos = []
     for item in result.get("mediaItems", []):
