@@ -2729,7 +2729,7 @@ def create_google_photos_session() -> dict[str, str]:
     picker_uri = session.get("pickerUri")
     if not picker_uri or not session.get("id"):
         raise HTTPException(status_code=502, detail="Google Photos did not return a picker. Try again.")
-    return {"id": session["id"], "pickerUri": picker_uri}
+    return {"id": session["id"], "pickerUri": f"{picker_uri.rstrip('/')}/autoclose"}
 
 
 @app.get("/api/google/photos/selection")
@@ -2738,7 +2738,11 @@ def list_google_photos_selection(session_id: str, page_token: str | None = None)
     session_response = client.get(f"https://photospicker.googleapis.com/v1/sessions/{session_id}")
     session = google_photos_response(session_response, "Could not check Google Photos")
     if not session.get("mediaItemsSet"):
-        return {"ready": False, "photos": []}
+        polling = session.get("pollingConfig") or {}
+        interval = polling.get("pollInterval", "3s")
+        match = re.match(r"([0-9.]+)s", interval)
+        wait_seconds = min(max(float(match.group(1)) if match else 3, 2), 8)
+        return {"ready": False, "photos": [], "wait_seconds": wait_seconds}
     query = {"sessionId": session_id, "pageSize": 60}
     if page_token:
         query["pageToken"] = page_token

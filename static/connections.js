@@ -23,6 +23,7 @@ const loadMorePhotos = document.querySelector("#loadMorePhotos");
 let selectedDriveArtwork = null;
 let selectedPhotoSession = null;
 let photosNextPageToken = null;
+let photosPollingAttempt = 0;
 
 const collectionSuggestions = {
   "AfroNova": {
@@ -179,7 +180,7 @@ function showSelectedPhotos(photos, append = false, nextPageToken = null) {
   loadMorePhotos.hidden = !photosNextPageToken;
 }
 
-async function checkPhotosSelection(pageToken = null) {
+async function checkPhotosSelection(pageToken = null, automatic = false) {
   if (!selectedPhotoSession) return;
   checkPhotosPicker.disabled = true;
   checkPhotosPicker.textContent = "Checking...";
@@ -189,9 +190,17 @@ async function checkPhotosSelection(pageToken = null) {
     const result = await response.json();
     if (!response.ok) throw Error(result.detail || "Could not check Google Photos");
     if (!result.ready) {
-      notify("Google Photos is still waiting. Select your images there and press Done.");
+      if (!pageToken && photosPollingAttempt < 12) {
+        photosPollingAttempt += 1;
+        const seconds = Number(result.wait_seconds || 3);
+        notify("Google is finishing your selection. Black Canvas is checking automatically...");
+        setTimeout(() => checkPhotosSelection(null, true), seconds * 1000);
+      } else if (!automatic) {
+        notify("Google is still waiting. In Google Photos, press Done, then wait a few seconds.");
+      }
       return;
     }
+    photosPollingAttempt = 0;
     showSelectedPhotos(result.photos, Boolean(pageToken), result.next_page_token);
     notify(result.photos.length ? "Your selected artwork is ready to catalog." : "No supported images were selected.");
   } catch (error) {
@@ -210,6 +219,7 @@ openPhotosPicker.onclick = async () => {
     const result = await response.json();
     if (!response.ok) throw Error(result.detail || "Google Photos could not open");
     selectedPhotoSession = result.id;
+    photosPollingAttempt = 0;
     photosPickerLink.href = result.pickerUri;
     photosPickerLink.hidden = false;
     checkPhotosPicker.hidden = false;
