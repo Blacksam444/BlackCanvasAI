@@ -2695,16 +2695,20 @@ def google_photos_response(response, fallback: str) -> dict:
 
 
 def picked_photo(session_id: str, photo_id: str) -> dict:
-    from urllib.parse import urlencode
-
     client = google_photos_client()
-    query = urlencode({"sessionId": session_id, "pageSize": 100})
-    response = client.get(f"https://photospicker.googleapis.com/v1/mediaItems?{query}")
-    items = google_photos_response(response, "Could not read the photos you selected").get("mediaItems", [])
-    item = next((candidate for candidate in items if candidate.get("id") == photo_id), None)
-    if not item:
-        raise HTTPException(status_code=404, detail="That selected photo is no longer available. Choose it again in Google Photos.")
-    return item
+    page_token = None
+    while True:
+        query = {"sessionId": session_id, "pageSize": 100}
+        if page_token:
+            query["pageToken"] = page_token
+        response = client.get(f"https://photospicker.googleapis.com/v1/mediaItems?{urlencode(query)}")
+        result = google_photos_response(response, "Could not read the photos you selected")
+        item = next((candidate for candidate in result.get("mediaItems", []) if candidate.get("id") == photo_id), None)
+        if item:
+            return item
+        page_token = result.get("nextPageToken")
+        if not page_token:
+            raise HTTPException(status_code=404, detail="That selected photo is no longer available. Choose it again in Google Photos.")
 
 
 def picked_photo_details(item: dict) -> tuple[str, str, str]:
@@ -2729,17 +2733,16 @@ def create_google_photos_session() -> dict[str, str]:
 
 
 @app.get("/api/google/photos/selection")
-def list_google_photos_selection(session_id: str) -> dict[str, object]:
-    from urllib.parse import urlencode
-
+def list_google_photos_selection(session_id: str, page_token: str | None = None) -> dict[str, object]:
     client = google_photos_client()
-    session_response = client.get(f"https://photospicker.googleapis.com/v1/{session_id}")
+    session_response = client.get(f"https://photospicker.googleapis.com/v1/sessions/{session_id}")
     session = google_photos_response(session_response, "Could not check Google Photos")
     if not session.get("mediaItemsSet"):
         return {"ready": False, "photos": []}
-    response = client.get(
-        "https://photospicker.googleapis.com/v1/mediaItems?" + urlencode({"sessionId": session_id, "pageSize": 100})
-    )
+    query = {"sessionId": session_id, "pageSize": 60}
+    if page_token:
+        query["pageToken"] = page_token
+    response = client.get("https://photospicker.googleapis.com/v1/mediaItems?" + urlencode(query))
     result = google_photos_response(response, "Could not read the photos you selected")
     photos = []
     for item in result.get("mediaItems", []):
@@ -2748,7 +2751,7 @@ def list_google_photos_selection(session_id: str) -> dict[str, object]:
             photos.append({"id": item["id"], "name": filename, "mimeType": mime_type, "preview": f"/api/google/photos/preview?{urlencode({'session_id': session_id, 'photo_id': item['id']})}"})
         except HTTPException:
             continue
-    return {"ready": True, "photos": photos}
+    return {"ready": True, "photos": photos, "next_page_token": result.get("nextPageToken")}
 
 
 @app.get("/api/google/photos/preview")

@@ -19,8 +19,10 @@ const photosFiles = document.querySelector("#photosFiles");
 const openPhotosPicker = document.querySelector("#openPhotosPicker");
 const photosPickerLink = document.querySelector("#photosPickerLink");
 const checkPhotosPicker = document.querySelector("#checkPhotosPicker");
+const loadMorePhotos = document.querySelector("#loadMorePhotos");
 let selectedDriveArtwork = null;
 let selectedPhotoSession = null;
+let photosNextPageToken = null;
 
 const collectionSuggestions = {
   "AfroNova": {
@@ -139,50 +141,58 @@ photosAction.onclick = () => {
 
 document.querySelector("#closePhotosBrowser").onclick = () => { photosBrowser.hidden = true; };
 
-function showSelectedPhotos(photos) {
-  if (!photos.length) {
-    photosFiles.innerHTML = '<p class="empty-files">No supported images were selected. Choose artwork in Google Photos and press Done.</p>';
-    return;
-  }
-  photosFiles.replaceChildren(...photos.map(photo => {
-    const card = document.createElement("article");
-    card.className = "drive-artwork-card";
-    const preview = document.createElement("img");
-    preview.src = photo.preview;
-    preview.alt = photo.name;
-    preview.loading = "lazy";
-    const footer = document.createElement("div");
-    const name = document.createElement("strong");
-    name.textContent = photo.name;
-    const button = document.createElement("button");
-    button.textContent = "Catalog";
-    button.onclick = () => {
-      selectedDriveArtwork = { ...photo, source: "photos" };
-      document.querySelector("#driveArtForm").reset();
-      document.querySelector("#driveArtTitle").value = photo.name.replace(/\.[^.]+$/, "");
-      document.querySelector("#driveArtPreview").src = photo.preview;
-      autofillDriveArtwork();
-      document.querySelector("#driveArtDialog").showModal();
-    };
-    footer.append(name, button);
-    card.append(preview, footer);
-    return card;
-  }));
+function photoCard(photo) {
+  const card = document.createElement("article");
+  card.className = "drive-artwork-card";
+  const preview = document.createElement("img");
+  preview.src = photo.preview;
+  preview.alt = photo.name;
+  preview.loading = "lazy";
+  const footer = document.createElement("div");
+  const name = document.createElement("strong");
+  name.textContent = photo.name;
+  const button = document.createElement("button");
+  button.textContent = "Catalog";
+  button.onclick = () => {
+    selectedDriveArtwork = { ...photo, source: "photos" };
+    document.querySelector("#driveArtForm").reset();
+    document.querySelector("#driveArtTitle").value = photo.name.replace(/\.[^.]+$/, "");
+    document.querySelector("#driveArtPreview").src = photo.preview;
+    autofillDriveArtwork();
+    document.querySelector("#driveArtDialog").showModal();
+  };
+  footer.append(name, button);
+  card.append(preview, footer);
+  return card;
 }
 
-async function checkPhotosSelection() {
+function showSelectedPhotos(photos, append = false, nextPageToken = null) {
+  if (!photos.length) {
+    if (!append) photosFiles.innerHTML = '<p class="empty-files">No supported images were selected. Choose artwork in Google Photos and press Done.</p>';
+    loadMorePhotos.hidden = true;
+    return;
+  }
+  const cards = photos.map(photoCard);
+  if (append) photosFiles.append(...cards);
+  else photosFiles.replaceChildren(...cards);
+  photosNextPageToken = nextPageToken;
+  loadMorePhotos.hidden = !photosNextPageToken;
+}
+
+async function checkPhotosSelection(pageToken = null) {
   if (!selectedPhotoSession) return;
   checkPhotosPicker.disabled = true;
   checkPhotosPicker.textContent = "Checking...";
   try {
-    const response = await fetch(`/api/google/photos/selection?session_id=${encodeURIComponent(selectedPhotoSession)}`);
+    const page = pageToken ? `&page_token=${encodeURIComponent(pageToken)}` : "";
+    const response = await fetch(`/api/google/photos/selection?session_id=${encodeURIComponent(selectedPhotoSession)}${page}`);
     const result = await response.json();
     if (!response.ok) throw Error(result.detail || "Could not check Google Photos");
     if (!result.ready) {
       notify("Google Photos is still waiting. Select your images there and press Done.");
       return;
     }
-    showSelectedPhotos(result.photos);
+    showSelectedPhotos(result.photos, Boolean(pageToken), result.next_page_token);
     notify(result.photos.length ? "Your selected artwork is ready to catalog." : "No supported images were selected.");
   } catch (error) {
     notify(error.message);
@@ -213,6 +223,14 @@ openPhotosPicker.onclick = async () => {
 };
 
 checkPhotosPicker.onclick = checkPhotosSelection;
+loadMorePhotos.onclick = async () => {
+  if (!photosNextPageToken) return;
+  loadMorePhotos.disabled = true;
+  loadMorePhotos.textContent = "Loading...";
+  await checkPhotosSelection(photosNextPageToken);
+  loadMorePhotos.disabled = false;
+  loadMorePhotos.textContent = "Show 60 more";
+};
 
 async function loadBackups() {
   backupList.innerHTML = '<p class="loading-files">Loading your backups...</p>';
