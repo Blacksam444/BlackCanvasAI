@@ -2735,7 +2735,7 @@ def create_google_photos_session() -> dict[str, str]:
 @app.get("/api/google/photos/selection")
 def list_google_photos_selection(session_id: str, page_token: str | None = None) -> dict[str, object]:
     client = google_photos_client()
-    session_response = client.get(f"https://photospicker.googleapis.com/v1/sessions/{session_id}")
+    session_response = client.get(f"https://photospicker.googleapis.com/v1/sessions/{quote(session_id, safe='')}")
     session = google_photos_response(session_response, "Could not check Google Photos")
     if not session.get("mediaItemsSet"):
         polling = session.get("pollingConfig") or {}
