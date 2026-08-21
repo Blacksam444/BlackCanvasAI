@@ -8,7 +8,7 @@ import sqlite3
 import uuid
 import zipfile
 from datetime import datetime, timezone
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -192,6 +192,11 @@ class DriveArtworkPayload(BaseModel):
     collection: str = "Unsorted"
     tags: str = ""
     notes: str = ""
+
+
+class GooglePhotosImportPayload(DriveArtworkPayload):
+    session_id: str
+    photo_id: str
 
 
 def clean_image_idea(message: str) -> str:
@@ -2365,12 +2370,13 @@ GOOGLE_SCOPES = [
     "https://www.googleapis.com/auth/drive.file",
     "https://www.googleapis.com/auth/drive.readonly",
 ]
+GOOGLE_PHOTOS_SCOPE = "https://www.googleapis.com/auth/photospicker.mediaitems.readonly"
 GOOGLE_CREDENTIALS = UPLOAD_DIR.parent / "google_credentials.json"
 GOOGLE_TOKEN = UPLOAD_DIR.parent / "google_token.json"
 GOOGLE_STATE = UPLOAD_DIR.parent / "google_oauth_state.txt"
 
 
-def google_credentials():
+def google_credentials(required_scopes: list[str] | None = None):
     if not GOOGLE_TOKEN.exists():
         raise HTTPException(status_code=401, detail="Google Drive is not connected")
     from google.auth.transport.requests import Request
@@ -2378,10 +2384,15 @@ def google_credentials():
 
     credentials = Credentials.from_authorized_user_file(GOOGLE_TOKEN)
     if credentials.expired and credentials.refresh_token:
-        credentials.refresh(Request())
-        GOOGLE_TOKEN.write_text(credentials.to_json(), encoding="utf-8")
+        try:
+            credentials.refresh(Request())
+            GOOGLE_TOKEN.write_text(credentials.to_json(), encoding="utf-8")
+        except Exception as refresh_error:
+            raise HTTPException(status_code=401, detail="Google needs to be connected again") from refresh_error
     if not credentials.valid:
         raise HTTPException(status_code=401, detail="Google Drive connection needs authorization")
+    if required_scopes and not credentials.has_scopes(required_scopes):
+        raise HTTPException(status_code=401, detail="Google Photos needs one permission update")
     return credentials
 
 
@@ -2393,7 +2404,7 @@ def google_status() -> dict:
         try:
             from googleapiclient.discovery import build
 
-            credentials = google_credentials()
+            credentials = google_credentials(GOOGLE_SCOPES)
             if credentials.has_scopes(GOOGLE_SCOPES):
                 about = build("drive", "v3", credentials=credentials).about().get(fields="user(displayName,emailAddress)").execute()
                 email = about.get("user", {}).get("emailAddress")
@@ -2408,7 +2419,13 @@ def google_status() -> dict:
             configured = bool(client.get("client_id") and client.get("client_secret"))
         except (OSError, ValueError):
             configured = False
-    return {"configured": configured, "connected": connected, "email": email}
+    photos_connected = False
+    if GOOGLE_TOKEN.exists():
+        try:
+            photos_connected = google_credentials([GOOGLE_PHOTOS_SCOPE]).has_scopes([GOOGLE_PHOTOS_SCOPE])
+        except Exception:
+            photos_connected = False
+    return {"configured": configured, "connected": connected, "email": email, "photos_connected": photos_connected}
 
 
 @app.post("/api/google/backup")
@@ -2660,6 +2677,109 @@ def google_artwork_files() -> dict[str, list[dict]]:
     return {"files": [item for item in result.get("files", []) if item.get("mimeType") in supported]}
 
 
+def google_photos_client():
+    """Create an authorized client only for images the user picks in Google Photos."""
+    from google.auth.transport.requests import AuthorizedSession
+
+    return AuthorizedSession(google_credentials([GOOGLE_PHOTOS_SCOPE]))
+
+
+def google_photos_response(response, fallback: str) -> dict:
+    if response.ok:
+        return response.json()
+    try:
+        detail = response.json().get("error", {}).get("message", fallback)
+    except ValueError:
+        detail = fallback
+    raise HTTPException(status_code=response.status_code, detail=detail)
+
+
+def picked_photo(session_id: str, photo_id: str) -> dict:
+    from urllib.parse import urlencode
+
+    client = google_photos_client()
+    query = urlencode({"sessionId": session_id, "pageSize": 100})
+    response = client.get(f"https://photospicker.googleapis.com/v1/mediaItems?{query}")
+    items = google_photos_response(response, "Could not read the photos you selected").get("mediaItems", [])
+    item = next((candidate for candidate in items if candidate.get("id") == photo_id), None)
+    if not item:
+        raise HTTPException(status_code=404, detail="That selected photo is no longer available. Choose it again in Google Photos.")
+    return item
+
+
+def picked_photo_details(item: dict) -> tuple[str, str, str]:
+    media_file = item.get("mediaFile") or item
+    base_url = media_file.get("baseUrl") or item.get("baseUrl")
+    mime_type = media_file.get("mimeType") or item.get("mimeType") or ""
+    filename = media_file.get("filename") or item.get("filename") or "Google Photos artwork"
+    if not base_url or mime_type not in {"image/jpeg", "image/png", "image/webp", "image/gif"}:
+        raise HTTPException(status_code=400, detail="Choose a JPG, PNG, WebP, or GIF image from Google Photos.")
+    return base_url, mime_type, filename
+
+
+@app.post("/api/google/photos/session")
+def create_google_photos_session() -> dict[str, str]:
+    client = google_photos_client()
+    response = client.post("https://photospicker.googleapis.com/v1/sessions", json={})
+    session = google_photos_response(response, "Google Photos could not open the photo picker")
+    picker_uri = session.get("pickerUri")
+    if not picker_uri or not session.get("id"):
+        raise HTTPException(status_code=502, detail="Google Photos did not return a picker. Try again.")
+    return {"id": session["id"], "pickerUri": picker_uri}
+
+
+@app.get("/api/google/photos/selection")
+def list_google_photos_selection(session_id: str) -> dict[str, object]:
+    from urllib.parse import urlencode
+
+    client = google_photos_client()
+    session_response = client.get(f"https://photospicker.googleapis.com/v1/{session_id}")
+    session = google_photos_response(session_response, "Could not check Google Photos")
+    if not session.get("mediaItemsSet"):
+        return {"ready": False, "photos": []}
+    response = client.get(
+        "https://photospicker.googleapis.com/v1/mediaItems?" + urlencode({"sessionId": session_id, "pageSize": 100})
+    )
+    result = google_photos_response(response, "Could not read the photos you selected")
+    photos = []
+    for item in result.get("mediaItems", []):
+        try:
+            base_url, mime_type, filename = picked_photo_details(item)
+            photos.append({"id": item["id"], "name": filename, "mimeType": mime_type, "preview": f"/api/google/photos/preview?{urlencode({'session_id': session_id, 'photo_id': item['id']})}"})
+        except HTTPException:
+            continue
+    return {"ready": True, "photos": photos}
+
+
+@app.get("/api/google/photos/preview")
+def google_photos_preview(session_id: str, photo_id: str) -> Response:
+    item = picked_photo(session_id, photo_id)
+    base_url, mime_type, _ = picked_photo_details(item)
+    response = google_photos_client().get(f"{base_url}=w1200")
+    if not response.ok:
+        raise HTTPException(status_code=502, detail="Google Photos could not load that image")
+    return Response(content=response.content, media_type=mime_type, headers={"Cache-Control": "private, max-age=300"})
+
+
+@app.post("/api/google/photos/import")
+def import_google_photos_artwork(payload: GooglePhotosImportPayload) -> dict[str, str | int]:
+    item = picked_photo(payload.session_id, payload.photo_id)
+    base_url, mime_type, source_name = picked_photo_details(item)
+    response = google_photos_client().get(f"{base_url}=w4096")
+    if not response.ok:
+        raise HTTPException(status_code=502, detail="Google Photos could not download that image")
+    if len(response.content) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="That image is larger than 20 MB. Use a smaller copy for now.")
+    extensions = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif"}
+    filename = f"{uuid.uuid4().hex}{extensions[mime_type]}"
+    (UPLOAD_DIR / filename).write_bytes(response.content)
+    artwork_id = execute(
+        "INSERT INTO artworks(title, collection, tags, notes, favorite, filename) VALUES (?, ?, ?, ?, 0, ?)",
+        (payload.title.strip() or source_name, payload.collection, payload.tags.strip(), payload.notes.strip(), filename),
+    )
+    return {"status": "imported", "id": artwork_id, "url": f"/uploads/{filename}"}
+
+
 @app.get("/api/google/artwork-preview/{file_id}")
 def google_artwork_preview(file_id: str) -> Response:
     from googleapiclient.discovery import build
@@ -2730,19 +2850,28 @@ def save_google_client_id(payload: GoogleClientPayload) -> dict[str, str]:
 
 @app.get("/google/connect")
 def google_connect() -> RedirectResponse:
+    return start_google_oauth(GOOGLE_SCOPES, "drive")
+
+
+@app.get("/google/photos/connect")
+def google_photos_connect() -> RedirectResponse:
+    return start_google_oauth([*GOOGLE_SCOPES, GOOGLE_PHOTOS_SCOPE], "photos")
+
+
+def start_google_oauth(scopes: list[str], connection: str) -> RedirectResponse:
     if not GOOGLE_CREDENTIALS.exists():
         return RedirectResponse("/connections?setup=needed")
     from google_auth_oauthlib.flow import Flow
 
     flow = Flow.from_client_secrets_file(
         GOOGLE_CREDENTIALS,
-        scopes=GOOGLE_SCOPES,
+        scopes=scopes,
         autogenerate_code_verifier=True,
     )
     flow.redirect_uri = "http://localhost:8010/google/callback"
     authorization_url, state = flow.authorization_url(access_type="offline", include_granted_scopes="true", prompt="consent")
     GOOGLE_STATE.write_text(
-        json.dumps({"state": state, "code_verifier": flow.code_verifier}),
+        json.dumps({"state": state, "code_verifier": flow.code_verifier, "scopes": scopes, "connection": connection}),
         encoding="utf-8",
     )
     return RedirectResponse(authorization_url)
@@ -2761,7 +2890,7 @@ def google_callback(state: str, code: str | None = None, error: str | None = Non
 
     flow = Flow.from_client_secrets_file(
         GOOGLE_CREDENTIALS,
-        scopes=GOOGLE_SCOPES,
+        scopes=authorization.get("scopes", GOOGLE_SCOPES),
         state=state,
         code_verifier=authorization["code_verifier"],
     )
@@ -2782,4 +2911,6 @@ def google_callback(state: str, code: str | None = None, error: str | None = Non
         return RedirectResponse("/connections?error=token_exchange_failed")
     GOOGLE_TOKEN.write_text(flow.credentials.to_json(), encoding="utf-8")
     GOOGLE_STATE.unlink(missing_ok=True)
+    if authorization.get("connection") == "photos":
+        return RedirectResponse("/connections?photos=connected")
     return RedirectResponse("/connections?connected=true")

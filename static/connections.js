@@ -12,7 +12,14 @@ const driveBrowser = document.querySelector("#driveBrowser");
 const driveFiles = document.querySelector("#driveFiles");
 const artworkBrowser = document.querySelector("#artworkBrowser");
 const driveArtworkFiles = document.querySelector("#driveArtworkFiles");
+const photosStatus = document.querySelector("#photosStatus");
+const photosAction = document.querySelector("#photosAction");
+const photosBrowser = document.querySelector("#photosBrowser");
+const photosFiles = document.querySelector("#photosFiles");
+const openPhotosPicker = document.querySelector("#openPhotosPicker");
+const checkPhotosPicker = document.querySelector("#checkPhotosPicker");
 let selectedDriveArtwork = null;
+let selectedPhotoSession = null;
 
 const collectionSuggestions = {
   "AfroNova": {
@@ -73,6 +80,18 @@ async function loadStatus() {
     importArtwork.hidden = true;
     restoreLibrary.hidden = true;
   }
+  photosAction.disabled = false;
+  if (status.photos_connected) {
+    photosStatus.textContent = "Connected · choose artwork";
+    photosStatus.classList.add("connected");
+    photosAction.textContent = "Choose artwork";
+  } else if (status.configured) {
+    photosStatus.textContent = "One permission update needed";
+    photosAction.textContent = "Connect Google Photos";
+  } else {
+    photosStatus.textContent = "Set up Google Drive first";
+    photosAction.textContent = "Set up Google first";
+  }
 }
 
 action.onclick = async () => {
@@ -103,6 +122,95 @@ action.onclick = async () => {
     panel.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 };
+
+photosAction.onclick = () => {
+  if (!status.configured) {
+    notify("Set up Google Drive first. Photos will use the same secure Google connection.");
+    return;
+  }
+  if (!status.photos_connected) {
+    window.location.href = "/google/photos/connect";
+    return;
+  }
+  photosBrowser.hidden = false;
+  photosBrowser.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+document.querySelector("#closePhotosBrowser").onclick = () => { photosBrowser.hidden = true; };
+
+function showSelectedPhotos(photos) {
+  if (!photos.length) {
+    photosFiles.innerHTML = '<p class="empty-files">No supported images were selected. Choose artwork in Google Photos and press Done.</p>';
+    return;
+  }
+  photosFiles.replaceChildren(...photos.map(photo => {
+    const card = document.createElement("article");
+    card.className = "drive-artwork-card";
+    const preview = document.createElement("img");
+    preview.src = photo.preview;
+    preview.alt = photo.name;
+    preview.loading = "lazy";
+    const footer = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = photo.name;
+    const button = document.createElement("button");
+    button.textContent = "Catalog";
+    button.onclick = () => {
+      selectedDriveArtwork = { ...photo, source: "photos" };
+      document.querySelector("#driveArtForm").reset();
+      document.querySelector("#driveArtTitle").value = photo.name.replace(/\.[^.]+$/, "");
+      document.querySelector("#driveArtPreview").src = photo.preview;
+      autofillDriveArtwork();
+      document.querySelector("#driveArtDialog").showModal();
+    };
+    footer.append(name, button);
+    card.append(preview, footer);
+    return card;
+  }));
+}
+
+async function checkPhotosSelection() {
+  if (!selectedPhotoSession) return;
+  checkPhotosPicker.disabled = true;
+  checkPhotosPicker.textContent = "Checking...";
+  try {
+    const response = await fetch(`/api/google/photos/selection?session_id=${encodeURIComponent(selectedPhotoSession)}`);
+    const result = await response.json();
+    if (!response.ok) throw Error(result.detail || "Could not check Google Photos");
+    if (!result.ready) {
+      notify("Google Photos is still waiting. Select your images there and press Done.");
+      return;
+    }
+    showSelectedPhotos(result.photos);
+    notify(result.photos.length ? "Your selected artwork is ready to catalog." : "No supported images were selected.");
+  } catch (error) {
+    notify(error.message);
+  } finally {
+    checkPhotosPicker.disabled = false;
+    checkPhotosPicker.textContent = "I chose my artwork";
+  }
+}
+
+openPhotosPicker.onclick = async () => {
+  openPhotosPicker.disabled = true;
+  openPhotosPicker.textContent = "Opening Google Photos...";
+  try {
+    const response = await fetch("/api/google/photos/session", { method: "POST" });
+    const result = await response.json();
+    if (!response.ok) throw Error(result.detail || "Google Photos could not open");
+    selectedPhotoSession = result.id;
+    window.open(result.pickerUri, "blackcanvas-google-photos", "popup,width=1100,height=800");
+    checkPhotosPicker.hidden = false;
+    photosFiles.innerHTML = '<p class="loading-files">Choose artwork in Google Photos, press Done, then click “I chose my artwork.”</p>';
+  } catch (error) {
+    notify(error.message);
+  } finally {
+    openPhotosPicker.disabled = false;
+    openPhotosPicker.textContent = "Open Google Photos";
+  }
+};
+
+checkPhotosPicker.onclick = checkPhotosSelection;
 
 async function loadBackups() {
   backupList.innerHTML = '<p class="loading-files">Loading your backups...</p>';
@@ -237,7 +345,7 @@ importArtwork.onclick = async () => {
       const button = document.createElement("button");
       button.textContent = "Catalog";
       button.onclick = () => {
-        selectedDriveArtwork = file;
+        selectedDriveArtwork = { ...file, source: "drive" };
         document.querySelector("#driveArtForm").reset();
         document.querySelector("#driveArtTitle").value = file.name.replace(/\.[^.]+$/, "");
         document.querySelector("#driveArtPreview").src = preview.src;
@@ -266,15 +374,24 @@ document.querySelector("#saveDriveArtwork").onclick = async event => {
   const button = event.currentTarget;
   button.disabled = true;
   button.textContent = "Saving...";
-  const response = await fetch(`/api/google/import-artwork/${encodeURIComponent(selectedDriveArtwork.id)}`, {
+  const isGooglePhoto = selectedDriveArtwork.source === "photos";
+  const importUrl = isGooglePhoto
+    ? "/api/google/photos/import"
+    : `/api/google/import-artwork/${encodeURIComponent(selectedDriveArtwork.id)}`;
+  const body = {
+    title,
+    collection: document.querySelector("#driveArtCollection").value,
+    tags: document.querySelector("#driveArtTags").value.trim(),
+    notes: document.querySelector("#driveArtNotes").value.trim(),
+  };
+  if (isGooglePhoto) {
+    body.session_id = selectedPhotoSession;
+    body.photo_id = selectedDriveArtwork.id;
+  }
+  const response = await fetch(importUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      title,
-      collection: document.querySelector("#driveArtCollection").value,
-      tags: document.querySelector("#driveArtTags").value.trim(),
-      notes: document.querySelector("#driveArtNotes").value.trim(),
-    }),
+    body: JSON.stringify(body),
   });
   const result = await response.json();
   if (!response.ok) {
@@ -284,6 +401,7 @@ document.querySelector("#saveDriveArtwork").onclick = async event => {
     return;
   }
   document.querySelector("#driveArtDialog").close();
+  selectedDriveArtwork = null;
   button.disabled = false;
   button.textContent = "Save to Image Studio";
   notify("Artwork added to Image Studio.");
