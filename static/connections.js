@@ -17,6 +17,7 @@ const photosAction = document.querySelector("#photosAction");
 const photosBrowser = document.querySelector("#photosBrowser");
 const photosFiles = document.querySelector("#photosFiles");
 const openPhotosPicker = document.querySelector("#openPhotosPicker");
+const photosPickerLink = document.querySelector("#photosPickerLink");
 const checkPhotosPicker = document.querySelector("#checkPhotosPicker");
 let selectedDriveArtwork = null;
 let selectedPhotoSession = null;
@@ -199,14 +200,15 @@ openPhotosPicker.onclick = async () => {
     const result = await response.json();
     if (!response.ok) throw Error(result.detail || "Google Photos could not open");
     selectedPhotoSession = result.id;
-    window.open(result.pickerUri, "blackcanvas-google-photos", "popup,width=1100,height=800");
+    photosPickerLink.href = result.pickerUri;
+    photosPickerLink.hidden = false;
     checkPhotosPicker.hidden = false;
-    photosFiles.innerHTML = '<p class="loading-files">Choose artwork in Google Photos, press Done, then click “I chose my artwork.”</p>';
+    photosFiles.innerHTML = '<p class="loading-files">Now click “Open Google Photos” above. Choose artwork there, press Done, then return here and click “I chose my artwork.”</p>';
   } catch (error) {
     notify(error.message);
   } finally {
     openPhotosPicker.disabled = false;
-    openPhotosPicker.textContent = "Open Google Photos";
+    openPhotosPicker.textContent = "Prepare Google Photos";
   }
 };
 
