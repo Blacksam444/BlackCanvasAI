@@ -131,6 +131,13 @@ class ArtworkDetailsPayload(BaseModel):
     gallery_visible: bool = False
 
 
+class GallerySettingsPayload(BaseModel):
+    artist_name: str = "Jeffrey McKay"
+    intro: str = "Black Canvas is a living archive of color, story, texture, and Black imagination."
+    shop_url: str = ""
+    pinterest_url: str = ""
+
+
 class PrintExportPayload(BaseModel):
     width_inches: float
     height_inches: float
@@ -400,6 +407,35 @@ def style_bible() -> FileResponse:
 def gallery() -> FileResponse:
     """A public-facing gallery preview, kept separate from the studio tools."""
     return FileResponse(BASE_DIR / "templates" / "gallery.html")
+
+
+@app.get("/api/gallery-settings")
+def get_gallery_settings() -> dict[str, str]:
+    defaults = GallerySettingsPayload().model_dump()
+    with connect() as db:
+        setting = db.execute("SELECT value FROM studio_settings WHERE key = 'gallery_settings'").fetchone()
+    if not setting:
+        return defaults
+    try:
+        saved = json.loads(setting["value"])
+    except json.JSONDecodeError:
+        return defaults
+    return {key: str(saved.get(key, value)) for key, value in defaults.items()}
+
+
+@app.put("/api/gallery-settings")
+def update_gallery_settings(payload: GallerySettingsPayload) -> dict[str, str]:
+    settings = {key: value.strip() for key, value in payload.model_dump().items()}
+    for key in ("shop_url", "pinterest_url"):
+        if settings[key] and not re.match(r"https?://", settings[key], re.IGNORECASE):
+            raise HTTPException(status_code=400, detail="Links need to begin with https://")
+    with connect() as db:
+        db.execute(
+            "INSERT INTO studio_settings(key, value) VALUES ('gallery_settings', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (json.dumps(settings),),
+        )
+    return settings
 
 
 @app.get("/connections")

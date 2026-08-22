@@ -56,3 +56,35 @@ fetch('/api/artworks').then((response) => response.ok ? response.json() : []).th
 }).catch(() => { count.textContent = 'Artwork will appear here'; emptyState.hidden = false; });
 
 document.getElementById('year').textContent = new Date().getFullYear();
+
+const galleryEditor = document.getElementById('galleryEditor');
+let gallerySettings = {};
+function applyGallerySettings(settings) {
+  gallerySettings = settings;
+  document.getElementById('artistName').textContent = settings.artist_name.toUpperCase();
+  document.getElementById('galleryIntro').textContent = settings.intro;
+  const hasShop = Boolean(settings.shop_url);
+  const shopNav = document.getElementById('shopNav'); shopNav.href = settings.shop_url || '#collection'; shopNav.hidden = !hasShop;
+  const shop = document.getElementById('shopLink'); shop.href = settings.shop_url || '#collection'; shop.hidden = !hasShop;
+  const pinterest = document.getElementById('pinterestLink'); pinterest.href = settings.pinterest_url || '#collection'; pinterest.hidden = !settings.pinterest_url;
+  document.getElementById('galleryLinkNote').hidden = hasShop || Boolean(settings.pinterest_url);
+}
+fetch('/api/gallery-settings').then((response) => response.ok ? response.json() : null).then((settings) => { if (settings) applyGallerySettings(settings); });
+if (new URLSearchParams(window.location.search).get('edit') === '1') {
+  const openButton = document.getElementById('openGalleryEditor');
+  openButton.hidden = false;
+  openButton.addEventListener('click', () => {
+    document.getElementById('settingArtistName').value = gallerySettings.artist_name || '';
+    document.getElementById('settingIntro').value = gallerySettings.intro || '';
+    document.getElementById('settingShopUrl').value = gallerySettings.shop_url || '';
+    document.getElementById('settingPinterestUrl').value = gallerySettings.pinterest_url || '';
+    galleryEditor.showModal();
+  });
+  document.getElementById('saveGallerySettings').addEventListener('click', async (event) => {
+    event.preventDefault();
+    const settings = { artist_name: document.getElementById('settingArtistName').value, intro: document.getElementById('settingIntro').value, shop_url: document.getElementById('settingShopUrl').value, pinterest_url: document.getElementById('settingPinterestUrl').value };
+    const response = await fetch('/api/gallery-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) });
+    if (!response.ok) return alert('Please make sure links begin with https://');
+    applyGallerySettings(await response.json()); galleryEditor.close();
+  });
+}

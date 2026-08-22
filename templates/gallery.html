@@ -15,16 +15,16 @@
         <a class="wordmark" href="/gallery"><span>BC</span><strong>BLACK CANVAS</strong></a>
         <nav aria-label="Gallery navigation">
             <a href="#collection">Collection</a>
-            <a href="#about">About</a>
+            <a href="#about">About</a><a id="shopNav" href="#collection" hidden>Shop</a>
             <a href="/">Studio</a>
         </nav>
     </header>
 
     <main>
         <section class="hero">
-            <p class="eyebrow">CONTEMPORARY ART · JEFFREY MCKAY</p>
+            <p class="eyebrow">CONTEMPORARY ART · <span id="artistName">JEFFREY MCKAY</span></p>
             <h1>Art that refuses<br>to fade into the background.</h1>
-            <p class="intro">Black Canvas is a living archive of color, story, texture, and Black imagination.</p>
+            <p class="intro" id="galleryIntro">Black Canvas is a living archive of color, story, texture, and Black imagination.</p>
             <a class="primary" href="#collection">View the collection <b>↓</b></a>
         </section>
 
@@ -51,8 +51,8 @@
         <section class="contact-card">
             <p class="eyebrow">STAY CLOSE TO THE WORK</p>
             <h2>New pieces. New worlds.<br>Same Black Canvas energy.</h2>
-            <p>Your store and Pinterest links can be added here when you are ready to share them.</p>
-            <a class="outline" href="/image-studio">Manage gallery artwork</a>
+            <p id="galleryLinkNote">Your store and Pinterest links can be added here when you are ready to share them.</p>
+            <div class="gallery-links"><a class="outline" href="/image-studio">Manage gallery artwork</a><a class="outline" id="shopLink" href="#collection" hidden>Shop available work</a><a class="outline" id="pinterestLink" href="#collection" hidden>Follow on Pinterest</a></div>
         </section>
     </main>
 
@@ -62,6 +62,8 @@
         <div class="dialog-image"><img id="dialogImage" alt=""></div>
         <div class="dialog-copy"><p class="eyebrow" id="dialogCollection"></p><h2 id="dialogTitle"></h2><p id="dialogDescription"></p><dl><div><dt>Medium</dt><dd id="dialogMedium">—</dd></div><div><dt>Size</dt><dd id="dialogDimensions">—</dd></div><div><dt>Availability</dt><dd id="dialogAvailability">Available</dd></div></dl><a class="outline" href="/image-studio">View in my studio</a></div>
     </dialog>
+    <button class="gallery-editor-button" id="openGalleryEditor" hidden>Customize gallery</button>
+    <dialog class="gallery-editor" id="galleryEditor"><form id="galleryEditorForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">YOUR GALLERY SITE</p><h2>Customize the gallery</h2></div><button class="close" value="cancel">×</button></div><label>Artist name<input id="settingArtistName" required></label><label>Gallery introduction<textarea id="settingIntro" rows="3" required></textarea></label><label>Store link (optional)<input id="settingShopUrl" placeholder="https://"></label><label>Pinterest link (optional)<input id="settingPinterestUrl" placeholder="https://"></label><div class="dialog-actions"><button class="cancel" value="cancel">Cancel</button><button class="save-art" id="saveGallerySettings" value="default">Save changes</button></div></form></dialog>
     <script src="/static/gallery.js?v=1"></script>
 </body>
 </html>
