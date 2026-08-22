@@ -2,12 +2,15 @@ import base64
 import csv
 import io
 import json
+import os
 import re
 import shutil
 import sqlite3
 import uuid
 import zipfile
 from datetime import datetime, timezone
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 from urllib.parse import quote, urlencode
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -26,6 +29,9 @@ from spellchecker import SpellChecker
 from storage import UPLOAD_DIR, backup_data, connect, execute, initialize, rows
 
 BASE_DIR = Path(__file__).resolve().parent
+OPENAI_ENV_FILE = BASE_DIR / ".env"
+OPENAI_MODEL = "gpt-5.6-luna"
+OPENAI_MONTHLY_CALL_LIMIT = 250
 
 
 def is_likely_image_prompt(title: str, category: str, text: str) -> bool:
@@ -51,8 +57,125 @@ def dashboard_file() -> FileResponse:
     return FileResponse(BASE_DIR / "templates" / "dashboard.html")
 
 
+def openai_api_key() -> str:
+    """Load the API key locally without ever returning it to the browser."""
+    environment_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    if environment_key:
+        return environment_key
+    if not OPENAI_ENV_FILE.exists():
+        return ""
+    for line in OPENAI_ENV_FILE.read_text(encoding="utf-8").splitlines():
+        if line.startswith("OPENAI_API_KEY="):
+            return line.partition("=")[2].strip().strip('"')
+    return ""
+
+
+def save_openai_api_key(api_key: str) -> None:
+    """Keep the secret in the ignored local environment file, never in Git or SQLite."""
+    lines = []
+    if OPENAI_ENV_FILE.exists():
+        lines = [line for line in OPENAI_ENV_FILE.read_text(encoding="utf-8").splitlines()
+                 if not line.startswith("OPENAI_API_KEY=")]
+    lines.append(f"OPENAI_API_KEY={api_key}")
+    OPENAI_ENV_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    os.environ["OPENAI_API_KEY"] = api_key
+
+
+def openai_call_count() -> tuple[str, int]:
+    current_month = datetime.now().strftime("%Y-%m")
+    saved = rows("SELECT value FROM studio_settings WHERE key = 'openai_agent_usage'")
+    if not saved:
+        return current_month, 0
+    try:
+        usage = json.loads(saved[0]["value"])
+    except (TypeError, json.JSONDecodeError):
+        return current_month, 0
+    if usage.get("month") != current_month:
+        return current_month, 0
+    return current_month, int(usage.get("calls", 0))
+
+
+def record_openai_call() -> None:
+    month, calls = openai_call_count()
+    value = json.dumps({"month": month, "calls": calls + 1})
+    with connect() as db:
+        db.execute(
+            "INSERT INTO studio_settings(key, value) VALUES ('openai_agent_usage', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (value,),
+        )
+
+
+def studio_agent_instructions() -> str:
+    return """You are Black Canvas Agent, Jeffrey McKay's skilled creative studio assistant.
+Be specific, warm, decisive, and practical. Use the studio information provided in the user's
+message when relevant. Give direct creative, cataloging, pricing, gallery, and business help.
+For image-generation prompts, output only the usable prompt itself: never begin with '/imagine prompt:',
+never include Midjourney flags such as --ar, --raw, or --v, and do not add unsupported generator settings.
+Do not claim to have performed web browsing, made purchases, contacted people, or changed anything outside
+Black Canvas AI. If a task needs a choice, offer the strongest recommendation first."""
+
+
+def live_agent_reply(message: str) -> dict[str, object] | None:
+    """Use the Responses API when Jeffrey has connected a local key; otherwise use local tools."""
+    api_key = openai_api_key()
+    if not api_key:
+        return None
+    _, calls = openai_call_count()
+    if calls >= OPENAI_MONTHLY_CALL_LIMIT:
+        return {
+            "reply": (
+                "**Live Agent safety pause**\n\n"
+                "This month’s Black Canvas AI limit of 250 live requests has been reached. "
+                "The local creative tools are still available, and the limit will reset next month."
+            )
+        }
+    studio = dashboard_summary()
+    compact_studio = {
+        "artworks": studio["counts"]["artworks"],
+        "prompts": studio["counts"]["prompts"],
+        "ready_to_list": studio["studio"]["ready_to_list"],
+        "active_orders": studio["studio"]["active_orders"],
+    }
+    request_body = {
+        "model": OPENAI_MODEL,
+        "instructions": studio_agent_instructions(),
+        "input": (
+            "Black Canvas AI studio snapshot: " + json.dumps(compact_studio) + "\n\n"
+            "Jeffrey's request: " + message
+        ),
+        "max_output_tokens": 900,
+    }
+    request = Request(
+        "https://api.openai.com/v1/responses",
+        data=json.dumps(request_body).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=45) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        detail = error.read().decode("utf-8", errors="replace")
+        raise HTTPException(status_code=502, detail=f"Live Agent could not respond: {detail[:200]}")
+    except URLError:
+        raise HTTPException(status_code=502, detail="Live Agent could not reach OpenAI. Please try again.")
+    reply = str(result.get("output_text", "")).strip()
+    if not reply:
+        raise HTTPException(status_code=502, detail="Live Agent returned an empty reply. Please try again.")
+    record_openai_call()
+    return {"reply": reply, "live_agent": True}
+
+
 class ChatMessage(BaseModel):
     message: str
+
+
+class OpenAIApiKeyPayload(BaseModel):
+    api_key: str
 
 
 class ConversationPayload(BaseModel):
@@ -468,6 +591,26 @@ def connections() -> FileResponse:
     )
 
 
+@app.get("/api/openai/status")
+def openai_status() -> dict[str, object]:
+    _, calls = openai_call_count()
+    return {
+        "connected": bool(openai_api_key()),
+        "model": OPENAI_MODEL,
+        "calls_used": calls,
+        "calls_limit": OPENAI_MONTHLY_CALL_LIMIT,
+    }
+
+
+@app.post("/api/openai/key")
+def connect_openai_agent(payload: OpenAIApiKeyPayload) -> dict[str, object]:
+    api_key = payload.api_key.strip()
+    if not api_key.startswith("sk-") or len(api_key) < 20:
+        raise HTTPException(status_code=400, detail="That does not look like an OpenAI API key.")
+    save_openai_api_key(api_key)
+    return {"connected": True, "message": "Live Agent key saved locally."}
+
+
 def image_prompt_chat_response(topic: str) -> dict[str, object]:
     collection, prompt = create_image_prompt(topic)
     idea = clean_image_idea(topic)
@@ -492,6 +635,17 @@ def chat_reply(payload: ChatMessage) -> dict[str, object]:
         "image prompt" in topic_lower
         or bool(re.search(r"\b(create|generate|make)\b.*\b(image|portrait|painting|photo|artwork)\b", topic_lower))
     )
+    live_reply = live_agent_reply(topic)
+    if live_reply:
+        if explicit_image_prompt:
+            collection, _ = create_image_prompt(topic)
+            live_reply.update({
+                "generated_prompt": live_reply["reply"],
+                "prompt_title": (re.sub(r"\s+", " ", clean_image_idea(topic)).strip().title()[:70]
+                                 or "Generated Image Prompt"),
+                "prompt_category": collection,
+            })
+        return live_reply
     if explicit_image_prompt:
         return image_prompt_chat_response(topic)
     studio = dashboard_summary()

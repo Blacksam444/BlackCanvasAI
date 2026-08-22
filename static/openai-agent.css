@@ -1,0 +1,13 @@
+.live-agent-card { margin-top: 12px; }
+.provider-icon.live-agent-icon { background: linear-gradient(135deg, #d4a8ff, #7655e7 55%, #2ac0d0); }
+.openai-setup { border: 1px solid #58457a; border-radius: 16px; background: linear-gradient(135deg, #191321, #111015); padding: 22px; margin-top: 12px; display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: end; }
+.openai-setup h2 { font: 700 16px Manrope; margin: 0; }
+.openai-setup p { color: var(--muted); font-size: 11px; max-width: 600px; margin: 6px 0 0; }
+.openai-setup > a { color: #d6c6ff; font-size: 11px; text-decoration: none; border: 1px solid #58457a; border-radius: 8px; padding: 9px 11px; }
+.openai-setup label { grid-column: 1 / -1; color: #b6adbd; font-size: 10px; font-weight: 700; }
+.openai-setup input { display: block; box-sizing: border-box; width: 100%; margin-top: 7px; border: 1px solid #3d3547; border-radius: 9px; background: #0c0b0f; color: #fff; padding: 11px; font: 13px "DM Sans"; outline: none; }
+.openai-setup input:focus { border-color: #9b7cff; }
+.openai-setup button { border: 0; border-radius: 9px; background: linear-gradient(135deg, #9b7cff, #7655e7); color: #fff; padding: 10px 14px; font-weight: 700; cursor: pointer; }
+.openai-setup button.secondary { margin-left: 7px; background: #292630; border: 1px solid #4b405f; }
+.openai-setup small { align-self: center; color: #8cd7a0; font-size: 10px; }
+@media(max-width:680px) { .openai-setup { grid-template-columns: 1fr; } .openai-setup > a { justify-self: start; } .openai-setup small { grid-column: 1; } }
