@@ -159,6 +159,27 @@ document.querySelector("#fileInput").onchange = (event) => prepare(event.target.
 document.querySelector("#artSaleStatus").onchange = (event) => {
   if (["Ready to list", "Listed"].includes(event.target.value)) document.querySelector("#artGalleryVisible").checked = true;
 };
+
+const collectionTitles = {
+  AfroNova: ["Crown of Tomorrow", "Celestial Sovereign", "Golden Orbit", "Ancestral Light", "Future Royalty"],
+  "Quiet Nova": ["Stillness in Gold", "Soft Morning", "Held in Light", "Quiet Horizon", "A Place to Breathe"],
+  GraffitiX: ["Electric Witness", "Midnight Rhythm", "Concrete Crown", "City Pulse", "Raw Frequency"],
+  Unsorted: ["Black Canvas Study", "Untitled Black Canvas Work", "New Visual Direction"],
+};
+
+function createTitleAndTags() {
+  const collection = document.querySelector("#artCollection").value;
+  const choices = collectionTitles[collection] || collectionTitles.Unsorted;
+  const currentCount = artworks.filter((item) => item.collection === collection).length;
+  const titleInput = document.querySelector("#artTitle");
+  const tagsInput = document.querySelector("#artTags");
+  const notesInput = document.querySelector("#artNotes");
+  titleInput.value = choices[currentCount % choices.length];
+  const baseTags = collectionDetails[collection]?.tags || "original art, contemporary art, Black Canvas";
+  tagsInput.value = `${baseTags}, original art, contemporary Black art`;
+  if (!notesInput.value.trim() && collectionDetails[collection]) notesInput.value = collectionDetails[collection].notes;
+  notify("Title and tags are ready. You can change any wording.");
+}
 document.querySelector("#editSaleStatus").onchange = (event) => {
   if (["Ready to list", "Listed"].includes(event.target.value)) document.querySelector("#editGalleryVisible").checked = true;
 };
@@ -166,6 +187,14 @@ drop.ondragover = (event) => { event.preventDefault(); drop.classList.add("dragg
 drop.ondragleave = () => drop.classList.remove("dragging");
 drop.ondrop = (event) => { event.preventDefault(); drop.classList.remove("dragging"); prepare(event.dataTransfer.files[0]); };
 document.querySelector("#artCollection").onchange = (event) => applySuggestedDetails(event.target.value, document.querySelector("#artTags"), document.querySelector("#artNotes"));
+const titleTagButton = document.createElement("button");
+titleTagButton.type = "button";
+titleTagButton.className = "generate-art-details";
+titleTagButton.textContent = "✦ Create title & tags";
+titleTagButton.title = "Fill in a clean title and matching tags for this collection";
+titleTagButton.style.cssText = "margin:2px 0 12px;padding:10px 12px;border:1px solid #7257c8;border-radius:9px;background:#251d38;color:#ded4ff;font-weight:700;cursor:pointer;text-align:left";
+titleTagButton.onclick = createTitleAndTags;
+document.querySelector("#artCollection").closest("label").insertAdjacentElement("afterend", titleTagButton);
 document.querySelector("#editCollection").onchange = (event) => applySuggestedDetails(event.target.value, document.querySelector("#editTags"), document.querySelector("#editNotes"));
 document.querySelector("#fillCollectionDetails").onclick = () => {
   applySuggestedDetails(document.querySelector("#editCollection").value, document.querySelector("#editTags"), document.querySelector("#editNotes"));
