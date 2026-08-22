@@ -406,7 +406,10 @@ def style_bible() -> FileResponse:
 @app.get("/gallery")
 def gallery() -> FileResponse:
     """A public-facing gallery preview, kept separate from the studio tools."""
-    return FileResponse(BASE_DIR / "templates" / "gallery.html")
+    return FileResponse(
+        BASE_DIR / "templates" / "gallery.html",
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
 
 
 @app.get("/api/gallery-settings")
