@@ -115,6 +115,7 @@ class ArtworkPayload(BaseModel):
     medium: str = ""
     price: float = 0
     sale_status: str = "In progress"
+    gallery_visible: bool = False
     data_url: str
 
 
@@ -127,6 +128,7 @@ class ArtworkDetailsPayload(BaseModel):
     medium: str = ""
     price: float = 0
     sale_status: str = "In progress"
+    gallery_visible: bool = False
 
 
 class PrintExportPayload(BaseModel):
@@ -1141,7 +1143,7 @@ def dismiss_style_update(update_id: int) -> dict[str, str]:
 
 @app.get("/api/artworks")
 def list_artworks() -> list[dict]:
-    items = rows("SELECT id, title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, sale_price, sold_date, sales_channel, buyer_name, sale_notes, fulfillment_status, shipping_carrier, tracking_number, filename, created_at FROM artworks ORDER BY id DESC")
+    items = rows("SELECT id, title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, sale_price, sold_date, sales_channel, buyer_name, sale_notes, fulfillment_status, shipping_carrier, tracking_number, gallery_visible, filename, created_at FROM artworks ORDER BY id DESC")
     for item in items:
         item["url"] = f"/uploads/{item['filename']}"
     return items
@@ -2229,9 +2231,9 @@ def create_artwork(payload: ArtworkPayload) -> dict:
     filename = f"{uuid.uuid4().hex}{extension}"
     (UPLOAD_DIR / filename).write_bytes(image_bytes)
     artwork_id = execute(
-        "INSERT INTO artworks(title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, filename) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO artworks(title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, gallery_visible, filename) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (payload.title.strip(), payload.collection, payload.tags.strip(), payload.notes.strip(), int(payload.favorite),
-         payload.dimensions.strip(), payload.medium.strip(), max(payload.price, 0), payload.sale_status, filename),
+         payload.dimensions.strip(), payload.medium.strip(), max(payload.price, 0), payload.sale_status, int(payload.gallery_visible), filename),
     )
     return {"id": artwork_id, "url": f"/uploads/{filename}"}
 
@@ -2249,15 +2251,16 @@ def update_artwork(artwork_id: int, payload: ArtworkDetailsPayload) -> dict:
         raise HTTPException(status_code=400, detail="Artwork title is required")
     with connect() as db:
         cursor = db.execute(
-            "UPDATE artworks SET title = ?, collection = ?, tags = ?, notes = ?, dimensions = ?, medium = ?, price = ?, sale_status = ? WHERE id = ?",
+            "UPDATE artworks SET title = ?, collection = ?, tags = ?, notes = ?, dimensions = ?, medium = ?, price = ?, sale_status = ?, gallery_visible = ? WHERE id = ?",
             (title, payload.collection, payload.tags.strip(), payload.notes.strip(), payload.dimensions.strip(),
-             payload.medium.strip(), max(payload.price, 0), payload.sale_status, artwork_id),
+             payload.medium.strip(), max(payload.price, 0), payload.sale_status, int(payload.gallery_visible), artwork_id),
         )
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Artwork not found")
     return {"id": artwork_id, "title": title, "collection": payload.collection,
             "tags": payload.tags.strip(), "notes": payload.notes.strip(), "dimensions": payload.dimensions.strip(),
-            "medium": payload.medium.strip(), "price": max(payload.price, 0), "sale_status": payload.sale_status}
+            "medium": payload.medium.strip(), "price": max(payload.price, 0), "sale_status": payload.sale_status,
+            "gallery_visible": payload.gallery_visible}
 
 
 @app.delete("/api/artworks/{artwork_id}")

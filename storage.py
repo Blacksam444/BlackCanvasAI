@@ -63,6 +63,7 @@ def initialize() -> None:
                 shipping_carrier TEXT NOT NULL DEFAULT '',
                 tracking_number TEXT NOT NULL DEFAULT '',
                 pricing_data TEXT NOT NULL DEFAULT '{}',
+                gallery_visible INTEGER NOT NULL DEFAULT 0,
                 filename TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
@@ -136,6 +137,9 @@ def initialize() -> None:
             db.execute("ALTER TABLE artworks ADD COLUMN tracking_number TEXT NOT NULL DEFAULT ''")
         if "pricing_data" not in artwork_columns:
             db.execute("ALTER TABLE artworks ADD COLUMN pricing_data TEXT NOT NULL DEFAULT '{}'")
+        if "gallery_visible" not in artwork_columns:
+            db.execute("ALTER TABLE artworks ADD COLUMN gallery_visible INTEGER NOT NULL DEFAULT 0")
+            db.execute("UPDATE artworks SET gallery_visible = 1 WHERE sale_status IN ('Ready to list', 'Listed')")
         db.execute("UPDATE prompts SET source = 'chatgpt', reviewed = 0 WHERE category = 'ChatGPT Import' AND source = 'manual'")
         db.execute("UPDATE prompts SET source = 'drive', reviewed = 0 WHERE category = 'Imported' AND source = 'manual'")
         if db.execute("SELECT COUNT(*) FROM prompts").fetchone()[0] == 0:
@@ -156,10 +160,10 @@ def execute(query: str, values: tuple[Any, ...] = ()) -> int:
 def backup_data() -> dict[str, Any]:
     styles = rows("SELECT name, content FROM styles ORDER BY name")
     return {
-        "version": 1,
+        "version": 2,
         "prompts": rows("SELECT id, title, category, text, favorite, source, reviewed FROM prompts ORDER BY id"),
         "styles": {item["name"]: json.loads(item["content"]) for item in styles},
-        "artworks": rows("SELECT id, title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, sale_price, sold_date, sales_channel, buyer_name, sale_notes, fulfillment_status, shipping_carrier, tracking_number, pricing_data, filename, created_at FROM artworks ORDER BY id"),
+        "artworks": rows("SELECT id, title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, sale_price, sold_date, sales_channel, buyer_name, sale_notes, fulfillment_status, shipping_carrier, tracking_number, pricing_data, gallery_visible, filename, created_at FROM artworks ORDER BY id"),
         "style_updates": rows("SELECT id, style_name, source_text, suggestions, status, created_at FROM style_updates ORDER BY id"),
         "conversations": rows("SELECT id, title, created_at, updated_at FROM conversations ORDER BY id"),
         "chat_messages": rows("SELECT id, conversation_id, role, text, metadata, created_at FROM chat_messages ORDER BY id"),

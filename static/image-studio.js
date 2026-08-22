@@ -142,6 +142,7 @@ function openEditDialog() {
   document.querySelector("#editMedium").value = artwork.medium || "";
   document.querySelector("#editPrice").value = artwork.price || 0;
   document.querySelector("#editSaleStatus").value = artwork.sale_status || "In progress";
+  document.querySelector("#editGalleryVisible").checked = Boolean(artwork.gallery_visible);
   if (document.querySelector("#detailDialog").open) document.querySelector("#detailDialog").close();
   document.querySelector("#editDialog").showModal();
 }
@@ -155,6 +156,12 @@ const toDataUrl = (file) => new Promise((resolve, reject) => {
 
 document.querySelectorAll("#uploadButton,#dropButton").forEach((button) => { button.onclick = choose; });
 document.querySelector("#fileInput").onchange = (event) => prepare(event.target.files[0]);
+document.querySelector("#artSaleStatus").onchange = (event) => {
+  if (["Ready to list", "Listed"].includes(event.target.value)) document.querySelector("#artGalleryVisible").checked = true;
+};
+document.querySelector("#editSaleStatus").onchange = (event) => {
+  if (["Ready to list", "Listed"].includes(event.target.value)) document.querySelector("#editGalleryVisible").checked = true;
+};
 drop.ondragover = (event) => { event.preventDefault(); drop.classList.add("dragging"); };
 drop.ondragleave = () => drop.classList.remove("dragging");
 drop.ondrop = (event) => { event.preventDefault(); drop.classList.remove("dragging"); prepare(event.dataTransfer.files[0]); };
@@ -221,6 +228,7 @@ document.querySelector("#saveArtwork").onclick = async (event) => {
     medium: document.querySelector("#artMedium").value.trim(),
     price: Number(document.querySelector("#artPrice").value) || 0,
     sale_status: document.querySelector("#artSaleStatus").value,
+    gallery_visible: document.querySelector("#artGalleryVisible").checked,
     data_url: await toDataUrl(pendingFile),
   };
   const response = await fetch("/api/artworks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -947,6 +955,7 @@ document.querySelector("#saveArtworkDetails").onclick = async (event) => {
     medium: document.querySelector("#editMedium").value.trim(),
     price: Number(document.querySelector("#editPrice").value) || 0,
     sale_status: document.querySelector("#editSaleStatus").value,
+    gallery_visible: document.querySelector("#editGalleryVisible").checked,
   };
   if (!payload.title) return document.querySelector("#editTitle").focus();
   const response = await fetch(`/api/artworks/${selectedId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });

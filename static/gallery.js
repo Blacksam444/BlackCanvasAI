@@ -51,7 +51,7 @@ document.querySelectorAll('[data-filter]').forEach((button) => {
 });
 
 fetch('/api/artworks').then((response) => response.ok ? response.json() : []).then((items) => {
-  artwork = items.filter((item) => item.filename && item.sale_status !== 'Sold' && item.sale_status !== 'Not for sale');
+  artwork = items.filter((item) => item.filename && item.gallery_visible && item.sale_status !== 'Sold' && item.sale_status !== 'Not for sale');
   render();
 }).catch(() => { count.textContent = 'Artwork will appear here'; emptyState.hidden = false; });
 
