@@ -293,6 +293,25 @@ def create_image_prompt(message: str) -> tuple[str, str]:
     collection, palette, style, mood = prompt_collection(idea)
     palette, style, mood, avoid = saved_style_direction(collection, palette, style, mood)
     lowered = idea.lower()
+    artwork_reference = "visual details:" in lowered or "use this creative direction:" in lowered
+    if artwork_reference:
+        title_match = re.search(r"image prompt for\s+(.+?)\s+in the\s+(?:AfroNova|Quiet Nova|GraffitiX)\s+style", message, flags=re.IGNORECASE)
+        notes_match = re.search(r"use this creative direction:\s*(.+?)(?:\.\s*visual details:|$)", message, flags=re.IGNORECASE | re.DOTALL)
+        tags_match = re.search(r"visual details:\s*(.+?)\s*$", message, flags=re.IGNORECASE | re.DOTALL)
+        title = title_match.group(1).strip() if title_match else "the source artwork"
+        source_notes = notes_match.group(1).strip() if notes_match else ""
+        source_tags = tags_match.group(1).strip() if tags_match else ""
+        source_direction = ". ".join(part for part in (source_notes, source_tags) if part) or title
+        prompt = (
+            f"{collection} fine-art reinterpretation of {title}. Preserve the actual source concept and visual cues: "
+            f"{source_direction}. Keep the composition focused on the described subject, form, expression, and mood; "
+            "if the source is a face, mask, monster head, or close portrait, keep it a close portrait rather than inventing a full body. "
+            f"Use {style}. Use a refined palette of {palette}, tactile materials, cinematic directional lighting, "
+            f"strong focal hierarchy, and a {mood} emotional charge. Do not add generic streetwear, a standing pose, "
+            "or unrelated characters unless they are specifically part of the source description. "
+            "Museum-quality contemporary artwork with a handmade, expressive finish."
+        )
+        return collection, prompt
     subject = re.split(r"\s+in\s+the\s+(?:AfroNova|Quiet Nova|GraffitiX)\s+style", idea, maxsplit=1, flags=re.IGNORECASE)[0]
     requested_mood = re.search(r"with\s+(?:an?\s+)?(.+?)\s+mood", idea, flags=re.IGNORECASE)
     requested_colors = re.search(r"using\s+(.+?),\s+as\s+", idea, flags=re.IGNORECASE)
