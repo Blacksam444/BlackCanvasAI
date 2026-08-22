@@ -394,6 +394,12 @@ def style_bible() -> FileResponse:
     return FileResponse(BASE_DIR / "templates" / "style-bible.html")
 
 
+@app.get("/gallery")
+def gallery() -> FileResponse:
+    """A public-facing gallery preview, kept separate from the studio tools."""
+    return FileResponse(BASE_DIR / "templates" / "gallery.html")
+
+
 @app.get("/connections")
 def connections() -> FileResponse:
     return FileResponse(

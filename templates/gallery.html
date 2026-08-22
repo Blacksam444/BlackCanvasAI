@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0b0a0d">
+    <title>Black Canvas — Art Gallery</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/gallery.css?v=1">
+</head>
+<body>
+    <header class="site-header">
+        <a class="wordmark" href="/gallery"><span>BC</span><strong>BLACK CANVAS</strong></a>
+        <nav aria-label="Gallery navigation">
+            <a href="#collection">Collection</a>
+            <a href="#about">About</a>
+            <a href="/">Studio</a>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero">
+            <p class="eyebrow">CONTEMPORARY ART · JEFFREY MCKAY</p>
+            <h1>Art that refuses<br>to fade into the background.</h1>
+            <p class="intro">Black Canvas is a living archive of color, story, texture, and Black imagination.</p>
+            <a class="primary" href="#collection">View the collection <b>↓</b></a>
+        </section>
+
+        <section class="statement" id="about">
+            <span>01</span>
+            <p>Every work begins with a feeling—then becomes a world you can stand inside.</p>
+        </section>
+
+        <section class="collection" id="collection">
+            <div class="section-top"><div><p class="eyebrow">SELECTED WORKS</p><h2>In the gallery</h2></div><p id="collectionCount">Loading artwork…</p></div>
+            <div class="filter-row" aria-label="Filter artwork collection">
+                <button class="active" data-filter="all">All work</button>
+                <button data-filter="AfroNova">AfroNova</button>
+                <button data-filter="Quiet Nova">Quiet Nova</button>
+                <button data-filter="GraffitiX">GraffitiX</button>
+            </div>
+            <div class="art-grid" id="artGrid" aria-live="polite"></div>
+            <div class="empty-state" id="emptyState" hidden>
+                <p>Your selected artwork will appear here.</p>
+                <a href="/image-studio">Open Image Studio</a>
+            </div>
+        </section>
+
+        <section class="contact-card">
+            <p class="eyebrow">STAY CLOSE TO THE WORK</p>
+            <h2>New pieces. New worlds.<br>Same Black Canvas energy.</h2>
+            <p>Your store and Pinterest links can be added here when you are ready to share them.</p>
+            <a class="outline" href="/image-studio">Manage gallery artwork</a>
+        </section>
+    </main>
+
+    <footer><span>© <span id="year"></span> Black Canvas</span><a href="/">Black Canvas AI Studio</a></footer>
+    <script src="/static/gallery.js?v=1"></script>
+</body>
+</html>
