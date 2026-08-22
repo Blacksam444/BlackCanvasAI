@@ -167,13 +167,13 @@ const collectionTitles = {
   Unsorted: ["Black Canvas Study", "Untitled Black Canvas Work", "New Visual Direction"],
 };
 
-function createTitleAndTags() {
-  const collection = document.querySelector("#artCollection").value;
+function createTitleAndTags(prefix = "art") {
+  const collection = document.querySelector(`#${prefix}Collection`).value;
   const choices = collectionTitles[collection] || collectionTitles.Unsorted;
   const currentCount = artworks.filter((item) => item.collection === collection).length;
-  const titleInput = document.querySelector("#artTitle");
-  const tagsInput = document.querySelector("#artTags");
-  const notesInput = document.querySelector("#artNotes");
+  const titleInput = document.querySelector(`#${prefix}Title`);
+  const tagsInput = document.querySelector(`#${prefix}Tags`);
+  const notesInput = document.querySelector(`#${prefix}Notes`);
   titleInput.value = choices[currentCount % choices.length];
   const baseTags = collectionDetails[collection]?.tags || "original art, contemporary art, Black Canvas";
   tagsInput.value = `${baseTags}, original art, contemporary Black art`;
@@ -193,9 +193,13 @@ titleTagButton.className = "generate-art-details";
 titleTagButton.textContent = "✦ Create title & tags";
 titleTagButton.title = "Fill in a clean title and matching tags for this collection";
 titleTagButton.style.cssText = "margin:2px 0 12px;padding:10px 12px;border:1px solid #7257c8;border-radius:9px;background:#251d38;color:#ded4ff;font-weight:700;cursor:pointer;text-align:left";
-titleTagButton.onclick = createTitleAndTags;
+titleTagButton.onclick = () => createTitleAndTags("art");
 document.querySelector("#artCollection").closest("label").insertAdjacentElement("afterend", titleTagButton);
 document.querySelector("#editCollection").onchange = (event) => applySuggestedDetails(event.target.value, document.querySelector("#editTags"), document.querySelector("#editNotes"));
+const editTitleTagButton = titleTagButton.cloneNode(true);
+editTitleTagButton.textContent = "✦ Create title & tags";
+editTitleTagButton.onclick = () => createTitleAndTags("edit");
+document.querySelector("#editCollection").closest("label").insertAdjacentElement("afterend", editTitleTagButton);
 document.querySelector("#fillCollectionDetails").onclick = () => {
   applySuggestedDetails(document.querySelector("#editCollection").value, document.querySelector("#editTags"), document.querySelector("#editNotes"));
   notify("Blank tags and description filled from the collection.");
