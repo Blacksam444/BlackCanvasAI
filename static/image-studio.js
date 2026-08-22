@@ -89,6 +89,57 @@ function render() {
 }
 
 function choose() { document.querySelector("#fileInput").click(); }
+function isUsableImage(file) {
+  return file && file.type.startsWith("image/") && file.size <= 10 * 1024 * 1024;
+}
+
+function batchTitle(collection, usedTitles, position) {
+  const choices = collectionTitles[collection] || collectionTitles.Unsorted;
+  const base = choices[position % choices.length];
+  let number = position + 1;
+  let title = `${base} — ${String(number).padStart(2, "0")}`;
+  while (usedTitles.has(title.toLowerCase())) {
+    number += 1;
+    title = `${base} — ${String(number).padStart(2, "0")}`;
+  }
+  usedTitles.add(title.toLowerCase());
+  return title;
+}
+
+function openBatchUploader(files) {
+  const usableFiles = files.filter(isUsableImage);
+  if (!usableFiles.length) return notify("Choose image files smaller than 10 MB.");
+  if (usableFiles.length !== files.length) notify("Some files were skipped because they are not supported images or are over 10 MB.");
+  const dialog = document.createElement("dialog");
+  dialog.style.cssText = "max-width:520px;border:1px solid #45396a;border-radius:16px;background:#131117;color:#fff;padding:26px;box-shadow:0 25px 80px #000b";
+  dialog.innerHTML = `<form method="dialog"><h2 style="margin:0 0 8px;font-family:Manrope">Add ${usableFiles.length} artworks</h2><p style="color:#b4afbe;line-height:1.45">Choose one collection for this group. Each artwork will get its own title, tags, and starter description. You can edit any piece later.</p><label style="display:block;margin:18px 0 8px">Collection<select id="batchCollection" style="display:block;width:100%;margin-top:7px;padding:10px"><option>AfroNova</option><option>Quiet Nova</option><option>GraffitiX</option><option>Unsorted</option></select></label><label style="display:flex;gap:9px;align-items:center;margin:15px 0"><input id="batchGalleryVisible" type="checkbox"> Show all of these on my Gallery Site</label><div style="display:flex;justify-content:flex-end;gap:10px;margin-top:24px"><button value="cancel" style="padding:10px 14px">Cancel</button><button id="saveBatchArtwork" value="default" style="padding:10px 14px;background:#875df4;color:white;border:0;border-radius:8px;font-weight:700">Add all artworks</button></div></form>`;
+  document.body.appendChild(dialog);
+  dialog.querySelector("#saveBatchArtwork").onclick = async (event) => {
+    event.preventDefault();
+    const button = event.currentTarget;
+    const collection = dialog.querySelector("#batchCollection").value;
+    const showOnGallery = dialog.querySelector("#batchGalleryVisible").checked;
+    button.disabled = true;
+    button.textContent = "Adding artwork…";
+    const usedTitles = new Set(artworks.map((item) => String(item.title || "").trim().toLowerCase()));
+    const existingCount = artworks.filter((item) => item.collection === collection).length;
+    const detail = collectionDetails[collection] || { tags: "original art, contemporary art, Black Canvas", notes: "An original work from the Black Canvas collection." };
+    let saved = 0;
+    for (let index = 0; index < usableFiles.length; index += 1) {
+      const file = usableFiles[index];
+      const payload = { title: batchTitle(collection, usedTitles, existingCount + index), collection, tags: `${detail.tags}, original art, contemporary Black art`, notes: detail.notes, dimensions: "", medium: "", price: 0, sale_status: "In progress", gallery_visible: showOnGallery, data_url: await toDataUrl(file) };
+      const response = await fetch("/api/artworks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      if (response.ok) saved += 1;
+    }
+    dialog.close();
+    dialog.remove();
+    await load();
+    notify(`${saved} artwork${saved === 1 ? "" : "s"} added with titles and tags.`);
+  };
+  dialog.addEventListener("close", () => dialog.remove());
+  dialog.showModal();
+}
+
 function applySuggestedDetails(collection, tagsInput, notesInput) {
   const suggestion = collectionDetails[collection];
   if (!suggestion) return;
@@ -155,7 +206,12 @@ const toDataUrl = (file) => new Promise((resolve, reject) => {
 });
 
 document.querySelectorAll("#uploadButton,#dropButton").forEach((button) => { button.onclick = choose; });
-document.querySelector("#fileInput").onchange = (event) => prepare(event.target.files[0]);
+document.querySelector("#fileInput").onchange = (event) => {
+  const files = Array.from(event.target.files || []);
+  event.target.value = "";
+  if (files.length > 1) openBatchUploader(files);
+  else if (files.length === 1) prepare(files[0]);
+};
 document.querySelector("#artSaleStatus").onchange = (event) => {
   if (["Ready to list", "Listed"].includes(event.target.value)) document.querySelector("#artGalleryVisible").checked = true;
 };
