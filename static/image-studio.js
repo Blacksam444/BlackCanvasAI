@@ -174,7 +174,15 @@ function createTitleAndTags(prefix = "art") {
   const titleInput = document.querySelector(`#${prefix}Title`);
   const tagsInput = document.querySelector(`#${prefix}Tags`);
   const notesInput = document.querySelector(`#${prefix}Notes`);
-  titleInput.value = choices[currentCount % choices.length];
+  const baseTitle = choices[currentCount % choices.length];
+  let artworkNumber = currentCount + 1;
+  let generatedTitle = `${baseTitle} — ${String(artworkNumber).padStart(2, "0")}`;
+  const usedTitles = new Set(artworks.map((item) => String(item.title || "").trim().toLowerCase()));
+  while (usedTitles.has(generatedTitle.toLowerCase())) {
+    artworkNumber += 1;
+    generatedTitle = `${baseTitle} — ${String(artworkNumber).padStart(2, "0")}`;
+  }
+  titleInput.value = generatedTitle;
   const baseTags = collectionDetails[collection]?.tags || "original art, contemporary art, Black Canvas";
   tagsInput.value = `${baseTags}, original art, contemporary Black art`;
   if (!notesInput.value.trim() && collectionDetails[collection]) notesInput.value = collectionDetails[collection].notes;
