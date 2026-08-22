@@ -57,6 +57,11 @@
     </main>
 
     <footer><span>© <span id="year"></span> Black Canvas</span><a href="/">Black Canvas AI Studio</a></footer>
+    <dialog class="art-dialog" id="artDialog">
+        <button class="dialog-close" id="closeDialog" aria-label="Close artwork details">×</button>
+        <div class="dialog-image"><img id="dialogImage" alt=""></div>
+        <div class="dialog-copy"><p class="eyebrow" id="dialogCollection"></p><h2 id="dialogTitle"></h2><p id="dialogDescription"></p><dl><div><dt>Medium</dt><dd id="dialogMedium">—</dd></div><div><dt>Size</dt><dd id="dialogDimensions">—</dd></div><div><dt>Availability</dt><dd id="dialogAvailability">Available</dd></div></dl><a class="outline" href="/image-studio">View in my studio</a></div>
+    </dialog>
     <script src="/static/gallery.js?v=1"></script>
 </body>
 </html>
