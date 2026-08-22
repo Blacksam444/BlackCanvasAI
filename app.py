@@ -307,7 +307,7 @@ def create_image_prompt(message: str) -> tuple[str, str]:
             f"{source_direction}. Keep the composition focused on the described subject, form, expression, and mood; "
             "if the source is a face, mask, monster head, or close portrait, keep it a close portrait rather than inventing a full body. "
             f"Use {style}. Use a refined palette of {palette}, tactile materials, cinematic directional lighting, "
-            f"strong focal hierarchy, and a {mood} emotional charge. Do not add generic streetwear, a standing pose, "
+            f"strong focal hierarchy, and a {mood} emotional charge. Do not add unrelated clothing, a standing pose, "
             "or unrelated characters unless they are specifically part of the source description. "
             "Museum-quality contemporary artwork with a handmade, expressive finish."
         )
