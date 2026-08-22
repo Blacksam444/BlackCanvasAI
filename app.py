@@ -2729,7 +2729,9 @@ def create_google_photos_session() -> dict[str, str]:
     picker_uri = session.get("pickerUri")
     if not picker_uri or not session.get("id"):
         raise HTTPException(status_code=502, detail="Google Photos did not return a picker. Try again.")
-    return {"id": session["id"], "pickerUri": f"{picker_uri.rstrip('/')}/autoclose"}
+    # Keep Google's picker URI unchanged. Some browser shells invalidate the
+    # short-lived selection session when an extra auto-close suffix is added.
+    return {"id": session["id"], "pickerUri": picker_uri}
 
 
 @app.get("/api/google/photos/selection")
