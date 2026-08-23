@@ -163,7 +163,16 @@ def live_agent_reply(message: str) -> dict[str, object] | None:
         raise HTTPException(status_code=502, detail=f"Live Agent could not respond: {detail[:200]}")
     except URLError:
         raise HTTPException(status_code=502, detail="Live Agent could not reach OpenAI. Please try again.")
+    # The SDK offers ``output_text`` as a convenience property, while the raw
+    # Responses API JSON carries text inside output message content.
     reply = str(result.get("output_text", "")).strip()
+    if not reply:
+        text_parts = []
+        for item in result.get("output", []):
+            for content in item.get("content", []) if isinstance(item, dict) else []:
+                if content.get("type") == "output_text" and content.get("text"):
+                    text_parts.append(str(content["text"]))
+        reply = "\n".join(text_parts).strip()
     if not reply:
         raise HTTPException(status_code=502, detail="Live Agent returned an empty reply. Please try again.")
     record_openai_call()
