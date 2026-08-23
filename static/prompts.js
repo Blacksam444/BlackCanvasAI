@@ -198,6 +198,7 @@ function render() {
     grid.appendChild(card);
   });
   empty.hidden = shown.length > 0;
+  document.querySelector("#shownCount").textContent = `${shown.length} shown`;
   document.querySelector("#promptCount").textContent = prompts.length;
   document.querySelector("#keepCount").textContent = prompts.filter(prompt => prompt.source === "keep").length;
   document.querySelector("#unreviewedCount").textContent = prompts.filter(prompt => !prompt.reviewed).length;
@@ -227,6 +228,12 @@ document.querySelectorAll("#filters button").forEach(button => button.onclick = 
   render();
 });
 document.querySelector("#addPrompt").onclick = () => openEditor();
+document.querySelector("#selectShown").onclick = () => {
+  const shown = visiblePrompts();
+  shown.forEach(prompt => selectedIds.add(prompt.id));
+  render();
+  notify(`${shown.length} ${shown.length === 1 ? "prompt" : "prompts"} selected.`);
+};
 document.querySelector("#cleanPromptCodes").onclick = async () => {
   const button = document.querySelector("#cleanPromptCodes");
   const promptText = document.querySelector("#promptText");
