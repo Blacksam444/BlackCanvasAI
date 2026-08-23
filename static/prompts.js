@@ -39,7 +39,10 @@ function duplicateIds() {
 }
 
 function sourceLabel(source) {
-  return source === "chatgpt" ? "ChatGPT" : source === "drive" ? "Google Drive" : "Manual";
+  if (source === "chatgpt") return "ChatGPT";
+  if (source === "drive") return "Google Drive";
+  if (source === "keep") return "Google Keep";
+  return "Manual";
 }
 
 function reviewInsight(prompt) {
