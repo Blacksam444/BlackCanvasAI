@@ -49,6 +49,7 @@ function reviewInsight(prompt) {
   const key = normalizedText(prompt.text);
   const matches = key ? prompts.filter(item => normalizedText(item.text) === key).length : 0;
   if (matches > 1) return {tone: "warning", text: `Possible duplicate · ${matches} matching copies are in your library`};
+  if (prompt.source === "keep" && (prompt.text || "").length > 5000) return {tone: "strong", text: "Google Keep collection · This entry contains several detailed prompt ideas"};
   if ((prompt.text || "").length < 80) return {tone: "caution", text: "Short entry · Check that this is a complete reusable prompt"};
   if ((prompt.text || "").length > 1200) return {tone: "strong", text: "Detailed prompt · Good candidate for your permanent library"};
   return {tone: "ready", text: "Ready to review · No exact duplicate found"};
@@ -95,6 +96,7 @@ function visiblePrompts() {
       || (filter === "Unreviewed" && !prompt.reviewed)
       || (filter === "Duplicates" && duplicates.has(prompt.id))
       || (filter === "Favorites" && prompt.favorite)
+      || (filter === "Google Keep" && prompt.source === "keep")
       || (filter === "ChatGPT" && prompt.source === "chatgpt")
       || prompt.category === filter;
     const searchable = `${prompt.title} ${prompt.category} ${prompt.text} ${sourceLabel(prompt.source)}`.toLowerCase();
@@ -111,7 +113,7 @@ function updateBulkToolbar() {
 async function load() {
   const response = await fetch("/api/prompts");
   prompts = await response.json();
-  if (requestedReviewMode && ["all", "image", "duplicates", "detailed", "short"].includes(requestedReviewMode)) {
+  if (requestedReviewMode && ["all", "keep", "image", "duplicates", "detailed", "short"].includes(requestedReviewMode)) {
     document.querySelector("#reviewQueueMode").value = requestedReviewMode;
   }
   if (requestedCategory && canonicalCategories.includes(requestedCategory)) {
@@ -182,6 +184,7 @@ function render() {
   });
   empty.hidden = shown.length > 0;
   document.querySelector("#promptCount").textContent = prompts.length;
+  document.querySelector("#keepCount").textContent = prompts.filter(prompt => prompt.source === "keep").length;
   document.querySelector("#unreviewedCount").textContent = prompts.filter(prompt => !prompt.reviewed).length;
   updateBulkToolbar();
 }
@@ -283,7 +286,9 @@ function showReviewPrompt() {
 document.querySelector("#startReviewQueue").onclick = () => {
   const mode = document.querySelector("#reviewQueueMode").value;
   const unreviewed = prompts.filter(prompt => !prompt.reviewed);
-  if (mode === "duplicates") {
+  if (mode === "keep") {
+    reviewQueue = unreviewed.filter(prompt => prompt.source === "keep");
+  } else if (mode === "duplicates") {
     const duplicates = duplicateIds();
     reviewQueue = unreviewed.filter(prompt => duplicates.has(prompt.id));
   } else if (mode === "image") {
