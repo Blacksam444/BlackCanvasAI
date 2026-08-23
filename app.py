@@ -1200,6 +1200,28 @@ def bulk_update_prompts(payload: PromptBulkPayload) -> dict[str, int]:
     return {"updated": cursor.rowcount}
 
 
+@app.post("/api/prompts/bulk-clean")
+def bulk_clean_prompts(payload: PromptBulkPayload) -> dict[str, int]:
+    prompt_ids = list(dict.fromkeys(payload.prompt_ids))[:500]
+    if not prompt_ids:
+        raise HTTPException(status_code=400, detail="Select at least one prompt")
+    placeholders = ",".join("?" for _ in prompt_ids)
+    cleaned = 0
+    changed = 0
+    with connect() as db:
+        items = db.execute(
+            f"SELECT id, text FROM prompts WHERE id IN ({placeholders})",
+            prompt_ids,
+        ).fetchall()
+        for item in items:
+            clean_text = clean_copy_ready_prompt(item["text"])
+            cleaned += 1
+            if clean_text != item["text"]:
+                db.execute("UPDATE prompts SET text = ? WHERE id = ?", (clean_text, item["id"]))
+                changed += 1
+    return {"cleaned": cleaned, "changed": changed}
+
+
 @app.delete("/api/prompts/{prompt_id}")
 def delete_prompt(prompt_id: int) -> dict[str, str]:
     with connect() as db:

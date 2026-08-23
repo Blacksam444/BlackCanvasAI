@@ -284,6 +284,20 @@ document.querySelector("#applyCategory").onclick = () => {
   bulkUpdate({category, reviewed:true}, "prompts organized.");
 };
 document.querySelector("#markReviewed").onclick = () => bulkUpdate({reviewed:true}, "prompts marked reviewed.");
+document.querySelector("#cleanSelected").onclick = async () => {
+  const count = selectedIds.size;
+  if (!count || !window.confirm(`Clean old generator codes from ${count} selected ${count === 1 ? "prompt" : "prompts"}?`)) return;
+  const response = await fetch("/api/prompts/bulk-clean", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({prompt_ids:[...selectedIds]}),
+  });
+  const result = await response.json();
+  if (!response.ok) return notify(result.detail || "Those prompts could not be cleaned.");
+  selectedIds.clear();
+  await load();
+  notify(`${result.changed} ${result.changed === 1 ? "prompt" : "prompts"} cleaned.`);
+};
 document.querySelector("#clearSelection").onclick = () => { selectedIds.clear(); render(); };
 function showReviewPrompt() {
   if (!reviewQueue.length || reviewPosition >= reviewQueue.length) {
