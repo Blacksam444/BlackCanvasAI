@@ -37,6 +37,16 @@ class AgentRouteTests(unittest.TestCase):
         self.assertNotIn("--v", result["generated_prompt"])
         self.assertNotIn("no frame", result["generated_prompt"].lower())
 
+    def test_clean_mode_removes_old_generator_codes_without_adding_variation(self):
+        result = refine_prompt(PromptRefinePayload(
+            prompt="/imagine prompt: Regal Black portrait --ar 4:5 --style raw --stylize 200 --v 8.2",
+            category="AfroNova",
+            mode="clean",
+        ))
+
+        self.assertEqual(result["generated_prompt"], "Regal Black portrait")
+        self.assertEqual(result["prompt_title"], "Clean copy-ready prompt")
+
     @patch("app.dashboard_summary", return_value=STUDIO_SUMMARY)
     def test_weekly_content_plan_has_save_draft_action(self, _summary):
         result = chat_reply(ChatMessage(message="Make me a weekly content plan"))

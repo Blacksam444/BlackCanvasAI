@@ -27,6 +27,16 @@ const notify = message => {
 const escape = text => (text || "").replace(/[&<>"']/g, character => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"})[character]);
 const normalizedText = text => (text || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
+async function cleanPromptText(text, category) {
+  const response = await fetch("/api/prompts/refine", {
+    method: "POST",
+    headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({prompt:text, category, mode:"clean"}),
+  });
+  if (!response.ok) throw new Error("Prompt cleaning failed");
+  return (await response.json()).generated_prompt;
+}
+
 function duplicateIds() {
   const groups = new Map();
   prompts.forEach(prompt => {
@@ -170,8 +180,13 @@ function render() {
       render();
     };
     card.querySelector(".copy").onclick = async () => {
-      await navigator.clipboard.writeText(prompt.text);
-      notify("Prompt copied.");
+      try {
+        await navigator.clipboard.writeText(await cleanPromptText(prompt.text, prompt.category));
+        notify("Clean copy-ready prompt copied.");
+      } catch {
+        await navigator.clipboard.writeText(prompt.text);
+        notify("Prompt copied.");
+      }
     };
     card.querySelector(".use-agent").onclick = () => {
       const request = isLikelyImagePrompt(prompt)
@@ -212,6 +227,20 @@ document.querySelectorAll("#filters button").forEach(button => button.onclick = 
   render();
 });
 document.querySelector("#addPrompt").onclick = () => openEditor();
+document.querySelector("#cleanPromptCodes").onclick = async () => {
+  const button = document.querySelector("#cleanPromptCodes");
+  const promptText = document.querySelector("#promptText");
+  if (!promptText.value.trim()) return notify("Add a prompt first.");
+  button.disabled = true;
+  try {
+    promptText.value = await cleanPromptText(promptText.value, document.querySelector("#promptCategory").value);
+    notify("Old generator codes removed. Review and save.");
+  } catch {
+    notify("Could not clean this prompt.");
+  } finally {
+    button.disabled = false;
+  }
+};
 document.querySelector("#savePrompt").onclick = async event => {
   event.preventDefault();
   const title = document.querySelector("#promptTitle").value.trim();

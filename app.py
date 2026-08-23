@@ -505,7 +505,7 @@ def create_image_prompt(message: str) -> tuple[str, str]:
 
 def clean_copy_ready_prompt(prompt: str) -> str:
     """Remove legacy Midjourney labels and parameters from prompts before reuse."""
-    cleaned = re.sub(r"^\s*/imagine\s+prompt\s*:\s*", "", prompt, flags=re.IGNORECASE)
+    cleaned = re.sub(r"(?:^|\n)\s*/imagine\s+prompt\s*:\s*", "\n", prompt, flags=re.IGNORECASE)
     legacy_graffitix_tail = (
         r"Museum-quality contemporary urban artwork, no digital smoothness, no glossy CGI finish, "
         r"no polished 3D render, no clean vector edges, no random decorative symbols, "
@@ -520,7 +520,11 @@ def clean_copy_ready_prompt(prompt: str) -> str:
     cleaned = re.sub(r"\s+no text, no watermark, no signature, no logo, no frame", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\s+--ar\s+\d+:\d+", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\s+--raw\b", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+--style\s+\S+", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+--stylize\s+\d+(?:\.\d+)?", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+--q\s+\d+(?:\.\d+)?", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\s+--v\s*\d+(?:\.\d+)?", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+--(?:sref|seed|chaos|weird)\s+\S+", "", cleaned, flags=re.IGNORECASE)
     return re.sub(r"\s+", " ", cleaned).strip()
 
 
@@ -919,6 +923,7 @@ def refine_prompt(payload: PromptRefinePayload) -> dict[str, str]:
     prompt = clean_copy_ready_prompt(payload.prompt)
     category = payload.category if payload.category in ("AfroNova", "Quiet Nova", "GraffitiX") else "AfroNova"
     labels = {
+        "clean": "Clean copy-ready prompt",
         "cinematic": "Cinematic variation",
         "detailed": "Detailed variation",
         "simple": "Simplified variation",
@@ -927,7 +932,9 @@ def refine_prompt(payload: PromptRefinePayload) -> dict[str, str]:
     if payload.mode not in labels:
         raise HTTPException(status_code=400, detail="Unknown refinement")
 
-    if payload.mode == "cinematic":
+    if payload.mode == "clean":
+        refined = prompt
+    elif payload.mode == "cinematic":
         refined = prompt + (
             " Frame it like a prestige film still using a 50mm lens, shallow depth of field, subtle film grain, "
             "volumetric atmosphere, cinematic blocking, and controlled highlight roll-off."
