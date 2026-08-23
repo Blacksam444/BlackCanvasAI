@@ -1,74 +1,126 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#0b0a0d">
-    <title>Black Canvas — Art Gallery</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/gallery.css?v=2">
-    <style>
-      .collection{background:radial-gradient(circle at 18% 10%,#fffdf8 0,#eee8de 40%,#ded6ca 100%);box-shadow:inset 0 20px 40px #ffffff80,inset 0 -20px 40px #b8ada055}
-      .collection .section-top h2{font-family:Manrope}.art-grid{gap:42px 30px;padding:24px 1.5vw 58px}.art-card{background:#f7f3ec!important;padding:16px 16px 22px!important;box-shadow:0 3px 0 #b6aa9b,0 17px 28px #4b403333,0 33px 42px #4b40321f;transform:rotate(var(--tilt,0deg));transition:transform .25s ease,box-shadow .25s ease}.art-card:nth-child(3n+1){--tilt:-.45deg}.art-card:nth-child(3n+2){--tilt:.3deg}.art-card:nth-child(3n){--tilt:-.15deg}.art-card:hover{transform:translateY(-8px) rotate(var(--tilt,0deg));box-shadow:0 3px 0 #a79a8b,0 25px 35px #382e273d,0 43px 55px #382e2722}.art-image{border:10px solid #251d19!important;box-shadow:inset 0 0 0 2px #5f4a3c,0 1px 5px #0008!important;background:#161311!important}.art-copy{padding:16px 3px 0!important;background:transparent!important}.art-copy h3{font-family:Manrope}.art-copy:after{content:"Original work · Black Canvas";display:block;margin-top:11px;font-size:9px;letter-spacing:.13em;color:#746b62;text-transform:uppercase}.art-copy small{color:#746b62!important}.empty-state{background:#f7f3ec;border:1px solid #b8ada1;box-shadow:0 15px 28px #4b403322}.contact-card{position:relative}.contact-card:before{content:"";position:absolute;inset:18px;border:1px solid #6e203d;pointer-events:none}
-      @media(max-width:760px){.art-grid{gap:24px 14px;padding:18px 0 42px}.art-card{padding:10px 10px 16px!important}.art-image{border-width:6px!important}}
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#171411">
+  <meta name="description" content="Black Canvas — contemporary artwork by Jeffrey McKay.">
+  <title>Black Canvas — Jeffrey McKay</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Manrope:wght@600;700;800&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/gallery.css?v=3">
 </head>
 <body>
-    <header class="site-header">
-        <a class="wordmark" href="/gallery"><span>BC</span><strong>BLACK CANVAS</strong></a>
-        <nav aria-label="Gallery navigation">
-            <a href="#collection">Collection</a>
-            <a href="#about">About</a><a id="shopNav" href="#collection" hidden>Shop</a>
-            <a href="/">Studio</a>
-        </nav>
-    </header>
+  <header class="site-header">
+    <a class="wordmark" href="/gallery" aria-label="Black Canvas gallery home"><span>BC</span><strong>BLACK CANVAS</strong></a>
+    <nav aria-label="Gallery navigation">
+      <a href="#exhibition">Exhibition</a>
+      <a href="#collection">Works</a>
+      <a href="#about">Artist</a>
+      <a id="shopNav" href="#collection" hidden>Collect</a>
+    </nav>
+    <a class="studio-link" href="/">Private studio <span>↗</span></a>
+  </header>
 
-    <main>
-        <section class="hero">
-            <p class="eyebrow">CONTEMPORARY ART · <span id="artistName">JEFFREY MCKAY</span></p>
-            <h1>Art that refuses<br>to fade into the background.</h1>
-            <p class="intro" id="galleryIntro">Black Canvas is a living archive of color, story, texture, and Black imagination.</p>
-            <a class="primary" href="#collection">View the collection <b>↓</b></a>
-        </section>
+  <main>
+    <section class="hero" id="exhibition">
+      <div class="hero-copy">
+        <p class="kicker">CURRENT EXHIBITION · <span id="year"></span></p>
+        <h1><span>Black</span><br>Canvas</h1>
+        <p class="artist-line">Works by <strong id="artistName">Jeffrey McKay</strong></p>
+        <p class="intro" id="galleryIntro">A living archive of color, story, texture, and Black imagination.</p>
+        <a class="primary" href="#collection">Enter the exhibition <span>↓</span></a>
+      </div>
+      <button class="feature-wall" id="featuredArtwork" type="button" aria-label="Open featured artwork" disabled>
+        <span class="wall-light"></span>
+        <span class="feature-frame"><img id="featuredImage" alt="Featured Black Canvas artwork"></span>
+        <span class="feature-label"><b id="featuredTitle">Selected work</b><small id="featuredMeta">Black Canvas</small></span>
+      </button>
+      <div class="hero-number" aria-hidden="true">01</div>
+    </section>
 
-        <section class="statement" id="about">
-            <span>01</span>
-            <p>Every work begins with a feeling—then becomes a world you can stand inside.</p>
-        </section>
+    <section class="exhibition-strip" aria-label="Exhibition information">
+      <p><span>NOW SHOWING</span> AfroNova · Quiet Nova · GraffitiX</p>
+      <p id="totalWorks">Selected works from the studio archive</p>
+      <a href="#collection">View all works →</a>
+    </section>
 
-        <section class="collection" id="collection">
-            <div class="section-top"><div><p class="eyebrow">SELECTED WORKS</p><h2>In the gallery</h2></div><p id="collectionCount">Loading artwork…</p></div>
-            <div class="filter-row" aria-label="Filter artwork collection">
-                <button class="active" data-filter="all">All work</button>
-                <button data-filter="AfroNova">AfroNova</button>
-                <button data-filter="Quiet Nova">Quiet Nova</button>
-                <button data-filter="GraffitiX">GraffitiX</button>
-            </div>
-            <div class="art-grid" id="artGrid" aria-live="polite"></div>
-            <div class="empty-state" id="emptyState" hidden>
-                <p>Your selected artwork will appear here.</p>
-                <a href="/image-studio">Open Image Studio</a>
-            </div>
-        </section>
+    <section class="artist-statement" id="about">
+      <div class="statement-index">01 / ARTIST STATEMENT</div>
+      <blockquote>“Every work begins with a feeling—then becomes a world you can stand inside.”</blockquote>
+      <div class="statement-copy">
+        <p>Black Canvas brings together imagined futures, ancestral memory, quiet interior worlds, and the raw language of the street.</p>
+        <p>Each collection carries its own visual rhythm while remaining part of one evolving creative archive.</p>
+      </div>
+    </section>
 
-        <section class="contact-card">
-            <p class="eyebrow">STAY CLOSE TO THE WORK</p>
-            <h2>New pieces. New worlds.<br>Same Black Canvas energy.</h2>
-            <p id="galleryLinkNote">Your store and Pinterest links can be added here when you are ready to share them.</p>
-            <div class="gallery-links"><a class="outline" href="/image-studio">Manage gallery artwork</a><a class="outline" id="shopLink" href="#collection" hidden>Shop available work</a><a class="outline" id="pinterestLink" href="#collection" hidden>Follow on Pinterest</a></div>
-        </section>
-    </main>
+    <section class="collection" id="collection">
+      <div class="section-top">
+        <div><p class="kicker">SELECTED WORKS</p><h2>The gallery wall</h2></div>
+        <p id="collectionCount">Loading artwork…</p>
+      </div>
+      <div class="filter-row" aria-label="Filter artwork collection">
+        <button class="active" data-filter="all">All work</button>
+        <button data-filter="AfroNova">AfroNova</button>
+        <button data-filter="Quiet Nova">Quiet Nova</button>
+        <button data-filter="GraffitiX">GraffitiX</button>
+      </div>
+      <div class="art-grid" id="artGrid" aria-live="polite"></div>
+      <div class="empty-state" id="emptyState" hidden>
+        <p>Your selected artwork will appear here.</p>
+        <a href="/image-studio">Open Image Studio</a>
+      </div>
+    </section>
 
-    <footer><span>© <span id="year"></span> Black Canvas</span><a href="/">Black Canvas AI Studio</a></footer>
-    <dialog class="art-dialog" id="artDialog">
-        <button class="dialog-close" id="closeDialog" aria-label="Close artwork details">×</button>
-        <div class="dialog-image"><img id="dialogImage" alt=""></div>
-        <div class="dialog-copy"><p class="eyebrow" id="dialogCollection"></p><h2 id="dialogTitle"></h2><p id="dialogDescription"></p><dl><div><dt>Medium</dt><dd id="dialogMedium">—</dd></div><div><dt>Size</dt><dd id="dialogDimensions">—</dd></div><div><dt>Availability</dt><dd id="dialogAvailability">Available</dd></div></dl><a class="outline" href="/image-studio">View in my studio</a></div>
-    </dialog>
-    <button class="gallery-editor-button" id="openGalleryEditor" hidden>Customize gallery</button>
-    <dialog class="gallery-editor" id="galleryEditor"><form id="galleryEditorForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">YOUR GALLERY SITE</p><h2>Customize the gallery</h2></div><button class="close" value="cancel">×</button></div><label>Artist name<input id="settingArtistName" required></label><label>Gallery introduction<textarea id="settingIntro" rows="3" required></textarea></label><label>Store link (optional)<input id="settingShopUrl" placeholder="https://"></label><label>Pinterest link (optional)<input id="settingPinterestUrl" placeholder="https://"></label><div class="dialog-actions"><button class="cancel" value="cancel">Cancel</button><button class="save-art" id="saveGallerySettings" value="default">Save changes</button></div></form></dialog>
-    <script src="/static/gallery.js?v=1"></script>
+    <section class="collection-notes">
+      <article><span>AFRONOVA</span><h3>Future mythology</h3><p>Regal portraiture, ancestral memory, celestial power, and imagined Black futures.</p></article>
+      <article><span>QUIET NOVA</span><h3>Interior light</h3><p>Stillness, intimate observation, emotional presence, and room for the viewer to breathe.</p></article>
+      <article><span>GRAFFITIX</span><h3>Raw frequency</h3><p>Street energy, symbolic marks, tactile collision, and unapologetic visual rhythm.</p></article>
+    </section>
+
+    <section class="contact-card">
+      <p class="kicker">COLLECT · FOLLOW · RETURN</p>
+      <h2>Live with art that<br>keeps speaking.</h2>
+      <p id="galleryLinkNote">Store and Pinterest links can be added when you are ready to share them.</p>
+      <div class="gallery-links">
+        <a class="outline" id="shopLink" href="#collection" hidden>Collect available work <span>↗</span></a>
+        <a class="outline" id="pinterestLink" href="#collection" hidden>Follow on Pinterest <span>↗</span></a>
+        <a class="outline quiet" href="/image-studio">Manage gallery</a>
+      </div>
+    </section>
+  </main>
+
+  <footer><span>© <span id="footerYear"></span> Black Canvas</span><span>Contemporary art by <b id="footerArtist">Jeffrey McKay</b></span><a href="#exhibition">Back to top ↑</a></footer>
+
+  <dialog class="art-dialog" id="artDialog">
+    <button class="dialog-close" id="closeDialog" aria-label="Close artwork details">×</button>
+    <div class="dialog-image"><img id="dialogImage" alt=""></div>
+    <div class="dialog-copy">
+      <p class="kicker" id="dialogCollection"></p>
+      <h2 id="dialogTitle"></h2>
+      <p id="dialogDescription"></p>
+      <dl>
+        <div><dt>Medium</dt><dd id="dialogMedium">—</dd></div>
+        <div><dt>Size</dt><dd id="dialogDimensions">—</dd></div>
+        <div><dt>Status</dt><dd id="dialogAvailability">Available</dd></div>
+        <div id="dialogPriceRow" hidden><dt>Price</dt><dd id="dialogPrice">—</dd></div>
+      </dl>
+      <div class="dialog-links"><a class="outline" id="dialogShopLink" href="#" hidden>View store <span>↗</span></a><a class="text-link" href="/image-studio">View in private studio</a></div>
+    </div>
+  </dialog>
+
+  <button class="gallery-editor-button" id="openGalleryEditor" hidden>Customize gallery</button>
+  <dialog class="gallery-editor" id="galleryEditor">
+    <form id="galleryEditorForm" method="dialog">
+      <div class="editor-head"><div><p class="kicker">YOUR GALLERY SITE</p><h2>Customize the gallery</h2></div><button class="editor-close" value="cancel">×</button></div>
+      <label>Artist name<input id="settingArtistName" required></label>
+      <label>Gallery introduction<textarea id="settingIntro" rows="3" required></textarea></label>
+      <label>Store link (optional)<input id="settingShopUrl" placeholder="https://"></label>
+      <label>Pinterest link (optional)<input id="settingPinterestUrl" placeholder="https://"></label>
+      <div class="editor-actions"><button class="cancel" value="cancel">Cancel</button><button class="save-settings" id="saveGallerySettings" value="default">Save changes</button></div>
+    </form>
+  </dialog>
+  <script src="/static/gallery.js?v=2"></script>
 </body>
 </html>
