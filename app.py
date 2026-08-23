@@ -108,15 +108,140 @@ def record_openai_call() -> None:
 
 def studio_agent_instructions() -> str:
     return """You are Black Canvas Agent, Jeffrey McKay's skilled creative studio assistant.
-Be specific, warm, decisive, and practical. Use the studio information provided in the user's
-message when relevant. Give direct creative, cataloging, pricing, gallery, and business help.
+Lead with the useful result, not a generic menu of possibilities. Be specific, warm, decisive,
+and practical. Use the studio context and recent conversation when relevant, but never invent
+facts that are not present. Give finished drafts, concrete recommendations, and ordered next actions
+for creative direction, cataloging, pricing, gallery, content, and business work. If Jeffrey asks you
+to make or write something, produce it now instead of telling him how he could produce it.
 For image-generation prompts, output only the usable prompt itself: never begin with '/imagine prompt:',
-never include Midjourney flags such as --ar, --raw, or --v, and do not add unsupported generator settings.
+never include Midjourney flags such as --ar, --raw, --style, --stylize, or --v, and do not add unsupported
+generator settings. Preserve the requested subject and actual visual clues instead of replacing them with
+a generic full-body character or unrelated collection language.
 Do not claim to have performed web browsing, made purchases, contacted people, or changed anything outside
-Black Canvas AI. If a task needs a choice, offer the strongest recommendation first."""
+Black Canvas AI. You may recommend the best workspace action, but do not claim it already happened.
+If a task needs a choice, make the strongest recommendation first and explain the tradeoff briefly."""
 
 
-def live_agent_reply(message: str) -> dict[str, object] | None:
+def agent_actions_for_request(message: str) -> list[dict[str, str]]:
+    topic = message.lower()
+    if any(word in topic for word in ("price", "pricing", "cost", "sell", "selling")):
+        return [{"label": "Open unpriced artwork", "href": "/image-studio?focus=unpriced"}]
+    if any(word in topic for word in ("organize", "review", "prompt library", "duplicate", "import", "google keep")):
+        return [
+            {"label": "Review Google Keep prompts", "href": "/prompts?review=keep"},
+            {"label": "Open Prompt Library", "href": "/prompts"},
+        ]
+    if any(word in topic for word in ("style bible", "brand", "collection rules", "visual voice")):
+        return [{"label": "Open Style Bible", "href": "/style-bible"}]
+    if any(word in topic for word in ("listing", "product description", "product title", "seo")):
+        return [{"label": "Open ready-to-list artwork", "href": "/image-studio?focus=ready"}]
+    if any(word in topic for word in ("gallery", "website", "portfolio")):
+        return [{"label": "Open Gallery Site", "href": "/gallery"}]
+    if any(word in topic for word in ("order", "shipping", "tracking", "fulfillment")):
+        return [{"label": "Open Orders Dashboard", "href": "/image-studio?focus=orders"}]
+    return [
+        {"label": "Open Image Studio", "href": "/image-studio"},
+        {"label": "Open Prompt Library", "href": "/prompts"},
+    ]
+
+
+def relevant_studio_context(message: str, conversation_id: int | None = None) -> dict[str, object]:
+    """Build compact, relevant context for the live agent without sending unrelated private records."""
+    stop_words = {
+        "about", "after", "again", "black", "canvas", "could", "from", "have", "help", "into",
+        "just", "make", "need", "please", "that", "this", "what", "when", "where", "with", "would",
+    }
+    terms = {word for word in re.findall(r"[a-z0-9]+", message.lower()) if len(word) > 3 and word not in stop_words}
+
+    def score(item: dict, fields: tuple[str, ...]) -> int:
+        searchable = " ".join(str(item.get(field, "")) for field in fields).lower()
+        return sum(1 for term in terms if term in searchable)
+
+    prompt_rows = rows(
+        "SELECT id, title, category, text, favorite, source FROM prompts "
+        "ORDER BY favorite DESC, id DESC LIMIT 100"
+    )
+    ranked_prompts = sorted(
+        prompt_rows,
+        key=lambda item: (score(item, ("title", "category", "text")), item["favorite"], item["id"]),
+        reverse=True,
+    )
+    relevant_prompts = [
+        {
+            "title": item["title"], "category": item["category"], "source": item["source"],
+            "text": item["text"][:700],
+        }
+        for item in ranked_prompts[:4]
+        if terms and score(item, ("title", "category", "text")) > 0
+    ]
+
+    artwork_rows = rows(
+        "SELECT id, title, collection, tags, notes, dimensions, medium, price, sale_status "
+        "FROM artworks ORDER BY id DESC LIMIT 100"
+    )
+    ranked_artworks = sorted(
+        artwork_rows,
+        key=lambda item: (score(item, ("title", "collection", "tags", "notes")), item["id"]),
+        reverse=True,
+    )
+    relevant_artworks = [
+        {
+            "id": item["id"], "title": item["title"], "collection": item["collection"],
+            "tags": item["tags"][:400], "notes": item["notes"][:700],
+            "dimensions": item["dimensions"], "medium": item["medium"],
+            "price": item["price"], "sale_status": item["sale_status"],
+        }
+        for item in ranked_artworks[:4]
+        if terms and score(item, ("title", "collection", "tags", "notes")) > 0
+    ]
+
+    style_context = []
+    for item in rows("SELECT name, content FROM styles ORDER BY name"):
+        try:
+            content = json.loads(item["content"])
+        except (TypeError, json.JSONDecodeError):
+            continue
+        style_context.append({
+            "name": item["name"],
+            "statement": content.get("statement") or content.get("tagline") or "",
+            "mood": list(content.get("mood") or [])[:4],
+            "ingredients": list(content.get("ingredients") or [])[:5],
+            "do": list(content.get("dos") or [])[:4],
+            "avoid": list(content.get("donts") or [])[:4],
+        })
+
+    recent_conversation = []
+    if conversation_id:
+        recent_conversation = rows(
+            "SELECT role, text FROM chat_messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 8",
+            (conversation_id,),
+        )
+        recent_conversation.reverse()
+        recent_conversation = [
+            {"role": item["role"], "text": item["text"][:1200]}
+            for item in recent_conversation
+        ]
+        if recent_conversation and recent_conversation[-1]["role"] == "user" and recent_conversation[-1]["text"].strip() == message.strip():
+            recent_conversation.pop()
+
+    studio = dashboard_summary()
+    return {
+        "summary": {
+            "artworks": studio["counts"]["artworks"],
+            "prompts": studio["counts"]["prompts"],
+            "prompts_to_review": studio["counts"]["to_review"],
+            "ready_to_list": studio["studio"]["ready_to_list"],
+            "active_orders": studio["studio"]["active_orders"],
+            "catalog_value": studio["studio"]["catalog_value"],
+        },
+        "relevant_artworks": relevant_artworks,
+        "relevant_prompts": relevant_prompts,
+        "style_bible": style_context,
+        "recent_conversation": recent_conversation,
+    }
+
+
+def live_agent_reply(message: str, conversation_id: int | None = None) -> dict[str, object] | None:
     """Use the Responses API when Jeffrey has connected a local key; otherwise use local tools."""
     api_key = openai_api_key()
     if not api_key:
@@ -130,18 +255,12 @@ def live_agent_reply(message: str) -> dict[str, object] | None:
                 "The local creative tools are still available, and the limit will reset next month."
             )
         }
-    studio = dashboard_summary()
-    compact_studio = {
-        "artworks": studio["counts"]["artworks"],
-        "prompts": studio["counts"]["prompts"],
-        "ready_to_list": studio["studio"]["ready_to_list"],
-        "active_orders": studio["studio"]["active_orders"],
-    }
+    studio_context = relevant_studio_context(message, conversation_id)
     request_body = {
         "model": OPENAI_MODEL,
         "instructions": studio_agent_instructions(),
         "input": (
-            "Black Canvas AI studio snapshot: " + json.dumps(compact_studio) + "\n\n"
+            "Relevant Black Canvas AI workspace context: " + json.dumps(studio_context) + "\n\n"
             "Jeffrey's request: " + message
         ),
         "max_output_tokens": 900,
@@ -176,11 +295,20 @@ def live_agent_reply(message: str) -> dict[str, object] | None:
     if not reply:
         raise HTTPException(status_code=502, detail="Live Agent returned an empty reply. Please try again.")
     record_openai_call()
-    return {"reply": reply, "live_agent": True}
+    return {"reply": reply, "live_agent": True, "actions": agent_actions_for_request(message)}
+
+
+def safe_live_agent_reply(message: str, conversation_id: int | None = None) -> dict[str, object] | None:
+    """Fall back to the local agent instead of showing a dead-end error when the API is briefly unavailable."""
+    try:
+        return live_agent_reply(message, conversation_id)
+    except HTTPException:
+        return None
 
 
 class ChatMessage(BaseModel):
     message: str
+    conversation_id: int | None = None
 
 
 class OpenAIApiKeyPayload(BaseModel):
@@ -649,7 +777,7 @@ def chat_reply(payload: ChatMessage) -> dict[str, object]:
         or bool(re.search(r"\b(create|generate|make)\b.*\b(image|portrait|painting|photo|artwork)\b", topic_lower))
     )
     if explicit_image_prompt:
-        live_reply = live_agent_reply(topic)
+        live_reply = safe_live_agent_reply(topic, payload.conversation_id)
         if live_reply:
             collection, _ = create_image_prompt(topic)
             live_reply.update({
@@ -660,6 +788,9 @@ def chat_reply(payload: ChatMessage) -> dict[str, object]:
             })
             return live_reply
         return image_prompt_chat_response(topic)
+    live_reply = safe_live_agent_reply(topic, payload.conversation_id)
+    if live_reply:
+        return live_reply
     studio = dashboard_summary()
     studio_data = studio["studio"]
     if any(word in topic_lower for word in ("price", "pricing", "cost", "sell", "selling", "etsy", "marketplace")):
@@ -829,11 +960,11 @@ def chat_reply(payload: ChatMessage) -> dict[str, object]:
         }
     creative_triggers = ("portrait", "painting", "photo", "artwork", "afronova", "afro nova", "quiet nova", "graffitix", "graffiti x")
     if any(word in topic_lower for word in creative_triggers):
-        live_reply = live_agent_reply(topic)
+        live_reply = safe_live_agent_reply(topic, payload.conversation_id)
         if live_reply:
             return live_reply
         return image_prompt_chat_response(topic)
-    live_reply = live_agent_reply(topic)
+    live_reply = safe_live_agent_reply(topic, payload.conversation_id)
     if live_reply:
         return live_reply
     return {

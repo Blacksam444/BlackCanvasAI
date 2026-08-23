@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from app import ChatMessage, PromptRefinePayload, artwork_agent_brief, chat_reply, is_likely_image_prompt, refine_prompt
+from app import ChatMessage, PromptRefinePayload, agent_actions_for_request, artwork_agent_brief, chat_reply, is_likely_image_prompt, refine_prompt
 
 
 STUDIO_SUMMARY = {
@@ -15,6 +15,16 @@ STUDIO_SUMMARY = {
 
 
 class AgentRouteTests(unittest.TestCase):
+    def setUp(self):
+        live_agent = patch("app.safe_live_agent_reply", return_value=None)
+        live_agent.start()
+        self.addCleanup(live_agent.stop)
+
+    def test_live_agent_actions_point_to_the_requested_workspace(self):
+        self.assertEqual(agent_actions_for_request("Help me price this artwork")[0]["href"], "/image-studio?focus=unpriced")
+        keep_actions = agent_actions_for_request("Organize my Google Keep prompts")
+        self.assertEqual(keep_actions[0]["href"], "/prompts?review=keep")
+
     def test_image_prompt_detection_keeps_content_drafts_out_of_visual_review(self):
         self.assertTrue(is_likely_image_prompt("Cosmic king portrait", "Unsorted", "Create an image prompt for a regal portrait."))
         self.assertTrue(is_likely_image_prompt("AfroNova idea", "AfroNova", "A short visual thought"))
