@@ -31,6 +31,34 @@ const notify = (message) => {
   setTimeout(() => toast.classList.remove("show"), 1800);
 };
 
+document.head.insertAdjacentHTML("beforeend", `<style>
+  .chat-spellcheck{border:1px solid #5c4a80;border-radius:8px;background:#241d31;color:#ddcffc;padding:8px 10px;font:700 10px "DM Sans";cursor:pointer}
+  .chat-spellcheck:hover{border-color:#9b7cff;color:#fff}.prompt-builder .chat-spellcheck{margin:-4px 0 5px;text-align:left}.composer-spellcheck{display:block;margin:8px auto 0;background:transparent;border-color:#3f354c;color:#a99cb6}
+</style>`);
+
+async function checkSpellingIn(field) {
+  const text = field.value.trim();
+  if (!text) return notify("Type something first, then check spelling.");
+  try {
+    const response = await fetch("/api/spellcheck", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (!response.ok) throw new Error();
+    const result = await response.json();
+    if (!result.changes.length) return notify("No spelling changes found.");
+    const preview = result.changes.slice(0, 6).map((change) => `${change.original} → ${change.replacement}`).join("\n");
+    if (window.confirm(`Possible spelling corrections:\n\n${preview}\n\nApply these corrections?`)) {
+      field.value = result.corrected_text;
+      field.dispatchEvent(new Event("input"));
+      notify("Spelling corrections applied.");
+    }
+  } catch {
+    notify("Could not check spelling just now.");
+  }
+}
+
 function addMessage(role, text, save = true, metadata = {}) {
   welcome.hidden = true;
   const element = document.createElement("article");
@@ -404,11 +432,19 @@ document.querySelectorAll("#newChat,#topNewChat").forEach((button) => {
 document.querySelectorAll("[data-coming]").forEach((button) => { button.onclick = () => notify(`${button.dataset.coming} is next on our build list.`); });
 document.querySelector("#menuButton").onclick = () => document.querySelector("#sidebar").classList.toggle("open");
 function addPromptBuilderControls() {
+  document.querySelector("#builderSubject").closest("label").insertAdjacentHTML(
+    "afterend", '<button class="chat-spellcheck" type="button" id="checkBuilderSpelling">✓ Check spelling</button>',
+  );
   const imageStyleLabel = document.querySelector("#builderStyle").closest("label");
   imageStyleLabel.insertAdjacentHTML("afterend", '<label>Aspect ratio<select id="builderAspectRatio"><option value="4:5">Portrait · 4:5</option><option value="1:1">Square · 1:1</option><option value="3:2">Landscape · 3:2</option><option value="16:9">Widescreen · 16:9</option><option value="9:16">Story / Reel · 9:16</option></select></label>');
   document.querySelector(".builder-create").insertAdjacentHTML("beforebegin", '<div class="graffitix-options" id="graffitixOptions" hidden><p>444 GRAFFITIX DIRECTION</p><label>Pose mechanics<select id="builderPose"><option value="grounded wide stance with both feet planted, rear-leg weight shift, bent front knee, angled hips, and a sharp Z-curve through the torso">Grounded Z-curve stance</option><option value="kinetic street-dance spin with one sneaker planted as a pivot, sweeping leg, dropped hips, and a corkscrew line of action">Kinetic spiral spin</option><option value="confident walking stride with a planted foot, forward swing leg, shifted hips, and counter-rotating shoulders">Forward walking stride</option><option value="low crouched stance with deeply flexed knees, centered weight, forward shoulders, and a compressed S-curve">Low crouched stance</option></select></label><label>Camera construction<select id="builderCamera"><option value="a dramatic low-angle three-quarter camera view that makes the figure monumental">Low-angle three-quarter</option><option value="a pavement-level tracking shot with strong forward perspective">Pavement tracking shot</option><option value="a sharp high-angle Dutch-angle view looking down from above and behind">High Dutch angle</option><option value="a close eye-level frontal view with flat graphic tension">Eye-level frontal</option></select></label><label>Hero symbol<select id="builderHero"><option value="a rough hand-painted hot-magenta 444 across the skull or forehead">Hot-magenta 444</option><option value="a distorted hand-drawn crown in thick red oil stick">Distorted crown</option><option value="a crude hot-magenta X-eye treatment">X-eye treatment</option><option value="a luminous rough-painted nova star glyph in the chest">Nova chest glyph</option><option value="an expressive skull motif with oversized exposed teeth">Expressive skull</option></select></label></div>');
 }
 addPromptBuilderControls();
+document.querySelector("#checkBuilderSpelling").onclick = () => checkSpellingIn(document.querySelector("#builderSubject"));
+document.querySelector(".composer-wrap > p").insertAdjacentHTML(
+  "beforebegin", '<button class="chat-spellcheck composer-spellcheck" type="button" id="checkChatSpelling">✓ Check spelling</button>',
+);
+document.querySelector("#checkChatSpelling").onclick = () => checkSpellingIn(input);
 const updateGraffitiXOptions = () => {
   document.querySelector("#graffitixOptions").hidden = document.querySelector("#builderCollection").value !== "GraffitiX";
 };
