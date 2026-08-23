@@ -644,9 +644,9 @@ def chat_reply(payload: ChatMessage) -> dict[str, object]:
         "image prompt" in topic_lower
         or bool(re.search(r"\b(create|generate|make)\b.*\b(image|portrait|painting|photo|artwork)\b", topic_lower))
     )
-    live_reply = live_agent_reply(topic)
-    if live_reply:
-        if explicit_image_prompt:
+    if explicit_image_prompt:
+        live_reply = live_agent_reply(topic)
+        if live_reply:
             collection, _ = create_image_prompt(topic)
             live_reply.update({
                 "generated_prompt": live_reply["reply"],
@@ -654,8 +654,7 @@ def chat_reply(payload: ChatMessage) -> dict[str, object]:
                                  or "Generated Image Prompt"),
                 "prompt_category": collection,
             })
-        return live_reply
-    if explicit_image_prompt:
+            return live_reply
         return image_prompt_chat_response(topic)
     studio = dashboard_summary()
     studio_data = studio["studio"]
@@ -826,7 +825,13 @@ def chat_reply(payload: ChatMessage) -> dict[str, object]:
         }
     creative_triggers = ("portrait", "painting", "photo", "artwork", "afronova", "afro nova", "quiet nova", "graffitix", "graffiti x")
     if any(word in topic_lower for word in creative_triggers):
+        live_reply = live_agent_reply(topic)
+        if live_reply:
+            return live_reply
         return image_prompt_chat_response(topic)
+    live_reply = live_agent_reply(topic)
+    if live_reply:
+        return live_reply
     return {
         "reply": (
             f"**Black Canvas Agent plan for {topic}**\n\n"
