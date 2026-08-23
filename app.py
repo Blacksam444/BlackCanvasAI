@@ -122,6 +122,19 @@ Black Canvas AI. You may recommend the best workspace action, but do not claim i
 If a task needs a choice, make the strongest recommendation first and explain the tradeoff briefly."""
 
 
+def openai_response_text(result: dict) -> str:
+    """Extract text from the raw Responses API payload."""
+    reply = str(result.get("output_text", "")).strip()
+    if reply:
+        return reply
+    text_parts = []
+    for item in result.get("output", []):
+        for content in item.get("content", []) if isinstance(item, dict) else []:
+            if content.get("type") == "output_text" and content.get("text"):
+                text_parts.append(str(content["text"]))
+    return "\n".join(text_parts).strip()
+
+
 def agent_actions_for_request(message: str) -> list[dict[str, str]]:
     topic = message.lower()
     if any(word in topic for word in ("price", "pricing", "cost", "sell", "selling")):
@@ -282,16 +295,7 @@ def live_agent_reply(message: str, conversation_id: int | None = None) -> dict[s
         raise HTTPException(status_code=502, detail=f"Live Agent could not respond: {detail[:200]}")
     except URLError:
         raise HTTPException(status_code=502, detail="Live Agent could not reach OpenAI. Please try again.")
-    # The SDK offers ``output_text`` as a convenience property, while the raw
-    # Responses API JSON carries text inside output message content.
-    reply = str(result.get("output_text", "")).strip()
-    if not reply:
-        text_parts = []
-        for item in result.get("output", []):
-            for content in item.get("content", []) if isinstance(item, dict) else []:
-                if content.get("type") == "output_text" and content.get("text"):
-                    text_parts.append(str(content["text"]))
-        reply = "\n".join(text_parts).strip()
+    reply = openai_response_text(result)
     if not reply:
         raise HTTPException(status_code=502, detail="Live Agent returned an empty reply. Please try again.")
     record_openai_call()
@@ -2359,13 +2363,138 @@ def artwork_content_kit(artwork_id: int) -> dict:
 
 
 def artwork_image_record(artwork_id: int) -> tuple[dict, Path]:
-    matches = rows("SELECT id, title, filename FROM artworks WHERE id = ?", (artwork_id,))
+    matches = rows(
+        "SELECT id, title, collection, tags, notes, dimensions, medium, price, sale_status, "
+        "gallery_visible, filename FROM artworks WHERE id = ?",
+        (artwork_id,),
+    )
     if not matches:
         raise HTTPException(status_code=404, detail="Artwork not found")
     image_path = UPLOAD_DIR / matches[0]["filename"]
     if not image_path.is_file():
         raise HTTPException(status_code=404, detail="Artwork image file not found")
     return matches[0], image_path
+
+
+def prepared_image_data_url(image_path: Path) -> str:
+    """Create a cost-conscious image input while preserving enough detail for visual analysis."""
+    with Image.open(image_path) as source:
+        image = ImageOps.exif_transpose(source).copy()
+        if getattr(image, "is_animated", False):
+            image.seek(0)
+        if image.mode == "RGBA":
+            background = Image.new("RGB", image.size, "white")
+            background.paste(image, mask=image.getchannel("A"))
+            image = background
+        elif image.mode != "RGB":
+            image = image.convert("RGB")
+        image.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+        buffer = io.BytesIO()
+        image.save(buffer, format="JPEG", quality=88, optimize=True)
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/jpeg;base64,{encoded}"
+
+
+def artwork_visual_request_body(artwork: dict, image_data_url: str, style: dict | None = None) -> dict:
+    """Build a vision-first request; catalog metadata is secondary evidence, never the subject."""
+    catalog_context = {
+        "current_title": artwork.get("title") or "",
+        "current_collection": artwork.get("collection") or "Unsorted",
+        "current_tags": artwork.get("tags") or "",
+        "current_notes": artwork.get("notes") or "",
+    }
+    style_context = style or {}
+    schema = {
+        "type": "object",
+        "properties": {
+            "title": {"type": "string"},
+            "visual_summary": {"type": "string"},
+            "description": {"type": "string"},
+            "tags": {"type": "array", "items": {"type": "string"}},
+            "collection": {"type": "string", "enum": ["AfroNova", "Quiet Nova", "GraffitiX", "Unsorted"]},
+            "generated_prompt": {"type": "string"},
+        },
+        "required": ["title", "visual_summary", "description", "tags", "collection", "generated_prompt"],
+        "additionalProperties": False,
+    }
+    instructions = (
+        "You are Black Canvas AI's expert artwork analyst and prompt reverse-engineer. "
+        "Analyze the actual pixels before reading the catalog context. Identify the visible subject, crop, pose, "
+        "facial or object features, palette, lighting, background, materials, mark-making, mood, and composition. "
+        "Never replace a close-up face with a full-body figure, never invent clothing or symbols that are not visible, "
+        "and never use the filename or an old generic title as visual evidence. Suggest a distinctive artwork title, "
+        "an accurate collector-friendly description, 8 to 14 useful comma-free tags, the best collection, and one "
+        "detailed copy-ready image prompt that could recreate the visible image. The prompt must start directly with "
+        "the subject; do not include '/imagine prompt:' or generator codes such as --ar, --raw, --style, or --v. "
+        "Use the collection Style Bible only as a restrained finishing layer after the image has been described accurately."
+    )
+    return {
+        "model": OPENAI_MODEL,
+        "instructions": instructions,
+        "input": [{
+            "role": "user",
+            "content": [
+                {"type": "input_text", "text": (
+                    "First inspect the attached artwork itself. Then use this secondary catalog context only to refine "
+                    f"the result: {json.dumps(catalog_context)}. Relevant Style Bible: {json.dumps(style_context)}"
+                )},
+                {"type": "input_image", "image_url": image_data_url, "detail": "high"},
+            ],
+        }],
+        "text": {"format": {"type": "json_schema", "name": "artwork_visual_analysis", "strict": True, "schema": schema}},
+        "max_output_tokens": 1400,
+        "store": False,
+    }
+
+
+def analyze_artwork_pixels(artwork: dict, image_path: Path) -> dict:
+    api_key = openai_api_key()
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Connect the Live Agent first so Black Canvas AI can see the artwork.")
+    _, calls = openai_call_count()
+    if calls >= OPENAI_MONTHLY_CALL_LIMIT:
+        raise HTTPException(status_code=429, detail="The monthly Live Agent safety limit has been reached.")
+
+    style = {}
+    style_rows = rows("SELECT content FROM styles WHERE name = ?", (artwork.get("collection") or "",))
+    if style_rows:
+        try:
+            style = json.loads(style_rows[0]["content"])
+        except (TypeError, json.JSONDecodeError):
+            style = {}
+    request_body = artwork_visual_request_body(artwork, prepared_image_data_url(image_path), style)
+    request = Request(
+        "https://api.openai.com/v1/responses",
+        data=json.dumps(request_body).encode("utf-8"),
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=75) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        detail = error.read().decode("utf-8", errors="replace")
+        raise HTTPException(status_code=502, detail=f"The visual analyst could not respond: {detail[:240]}")
+    except URLError:
+        raise HTTPException(status_code=502, detail="The visual analyst could not reach OpenAI. Please try again.")
+
+    output = openai_response_text(result)
+    if not output:
+        raise HTTPException(status_code=502, detail="The visual analyst returned an empty result. Please try again.")
+    try:
+        analysis = json.loads(output)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=502, detail="The visual analyst returned an unreadable result. Please try again.")
+    analysis["generated_prompt"] = clean_copy_ready_prompt(str(analysis.get("generated_prompt") or ""))
+    analysis["tags"] = [str(tag).strip() for tag in analysis.get("tags", []) if str(tag).strip()][:14]
+    record_openai_call()
+    return analysis
+
+
+@app.post("/api/artworks/{artwork_id}/visual-analysis")
+def artwork_visual_analysis(artwork_id: int) -> dict:
+    artwork, image_path = artwork_image_record(artwork_id)
+    return analyze_artwork_pixels(artwork, image_path)
 
 
 @app.get("/api/artworks/{artwork_id}/print-info")

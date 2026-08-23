@@ -342,12 +342,78 @@ document.querySelector("#saveArtwork").onclick = async (event) => {
 };
 
 document.querySelector("#editArtwork").onclick = openEditDialog;
-document.querySelector("#createArtworkPrompt").onclick = () => {
+document.querySelector("#createArtworkPrompt").onclick = async () => {
   const artwork = artworks.find((item) => item.id === selectedId);
   if (!artwork) return;
-  const details = [artwork.notes, artwork.tags ? `Visual details: ${artwork.tags}` : ""].filter(Boolean).join(". ");
-  const request = `Create an image prompt for ${artwork.title} in the ${artwork.collection} style${details ? `. Use this creative direction: ${details}` : ""}.`;
-  window.location.href = `/chat?q=${encodeURIComponent(request)}`;
+  const button = document.querySelector("#createArtworkPrompt");
+  button.disabled = true;
+  button.textContent = "Inspecting the actual image…";
+  try {
+    const response = await fetch(`/api/artworks/${artwork.id}/visual-analysis`, { method: "POST" });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || "The image could not be analyzed.");
+    document.querySelector("#analysisImage").src = artwork.url;
+    document.querySelector("#analysisTitle").value = result.title || artwork.title;
+    document.querySelector("#analysisCollection").value = result.collection || artwork.collection || "Unsorted";
+    document.querySelector("#analysisTags").value = (result.tags || []).join(", ");
+    document.querySelector("#analysisDescription").value = result.description || "";
+    document.querySelector("#analysisSummary").textContent = result.visual_summary || "";
+    document.querySelector("#analysisPrompt").value = result.generated_prompt || "";
+    document.querySelector("#detailDialog").close();
+    document.querySelector("#visualAnalysisDialog").showModal();
+  } catch (error) {
+    notify(error.message || "The image could not be analyzed just now.");
+  } finally {
+    button.disabled = false;
+    button.textContent = "✦ Create prompt from artwork";
+  }
+};
+document.querySelector("#closeVisualAnalysis").onclick = () => document.querySelector("#visualAnalysisDialog").close();
+document.querySelector("#copyVisualPrompt").onclick = async () => {
+  const prompt = document.querySelector("#analysisPrompt").value.trim();
+  if (!prompt) return notify("There is no prompt to copy yet.");
+  await navigator.clipboard.writeText(prompt);
+  notify("Image prompt copied.");
+};
+document.querySelector("#saveVisualPrompt").onclick = () => {
+  const prompt = document.querySelector("#analysisPrompt").value.trim();
+  const title = document.querySelector("#analysisTitle").value.trim() || "Artwork image prompt";
+  const category = document.querySelector("#analysisCollection").value || "Unsorted";
+  if (!prompt) return notify("There is no prompt to save yet.");
+  window.location.href = `/prompts?new=1&title=${encodeURIComponent(`${title} — Image Prompt`)}&category=${encodeURIComponent(category)}&text=${encodeURIComponent(prompt)}`;
+};
+document.querySelector("#applyVisualDetails").onclick = async () => {
+  const artwork = artworks.find((item) => item.id === selectedId);
+  if (!artwork) return;
+  const button = document.querySelector("#applyVisualDetails");
+  const payload = {
+    title: document.querySelector("#analysisTitle").value.trim(),
+    collection: document.querySelector("#analysisCollection").value,
+    tags: document.querySelector("#analysisTags").value.trim(),
+    notes: document.querySelector("#analysisDescription").value.trim(),
+    dimensions: artwork.dimensions || "",
+    medium: artwork.medium || "",
+    price: Number(artwork.price) || 0,
+    sale_status: artwork.sale_status || "In progress",
+    gallery_visible: Boolean(artwork.gallery_visible),
+  };
+  if (!payload.title) return notify("Review the title before applying it.");
+  button.disabled = true;
+  button.textContent = "Applying…";
+  try {
+    const response = await fetch(`/api/artworks/${artwork.id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new Error();
+    document.querySelector("#visualAnalysisDialog").close();
+    await load();
+    notify("Title, tags, and description applied.");
+  } catch {
+    notify("Those details could not be applied just now.");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Apply title, tags & description";
+  }
 };
 document.querySelector("#askArtworkAgent").onclick = () => {
   if (!selectedId) return;

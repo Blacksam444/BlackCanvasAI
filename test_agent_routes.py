@@ -1,7 +1,17 @@
 import unittest
 from unittest.mock import patch
 
-from app import ChatMessage, PromptRefinePayload, agent_actions_for_request, artwork_agent_brief, chat_reply, is_likely_image_prompt, refine_prompt
+from app import (
+    ChatMessage,
+    PromptRefinePayload,
+    agent_actions_for_request,
+    artwork_agent_brief,
+    artwork_visual_request_body,
+    chat_reply,
+    is_likely_image_prompt,
+    openai_response_text,
+    refine_prompt,
+)
 
 
 STUDIO_SUMMARY = {
@@ -29,6 +39,29 @@ class AgentRouteTests(unittest.TestCase):
         self.assertTrue(is_likely_image_prompt("Cosmic king portrait", "Unsorted", "Create an image prompt for a regal portrait."))
         self.assertTrue(is_likely_image_prompt("AfroNova idea", "AfroNova", "A short visual thought"))
         self.assertFalse(is_likely_image_prompt("Friday caption", "Content", "Share a process clip and invite a comment."))
+
+    def test_visual_analysis_sends_the_actual_image_and_requires_structured_details(self):
+        artwork = {
+            "title": "Old Generic Title",
+            "collection": "GraffitiX",
+            "tags": "street art",
+            "notes": "",
+        }
+        body = artwork_visual_request_body(artwork, "data:image/jpeg;base64,abc", {"mood": ["raw"]})
+
+        content = body["input"][0]["content"]
+        self.assertEqual(content[1]["type"], "input_image")
+        self.assertEqual(content[1]["image_url"], "data:image/jpeg;base64,abc")
+        schema = body["text"]["format"]["schema"]
+        self.assertIn("title", schema["required"])
+        self.assertIn("generated_prompt", schema["required"])
+        self.assertIn("visual_summary", schema["required"])
+        self.assertIn("actual pixels", body["instructions"])
+        self.assertIn("never invent clothing", body["instructions"])
+
+    def test_raw_responses_api_text_is_extracted(self):
+        result = {"output": [{"content": [{"type": "output_text", "text": "{\"title\":\"Seen Image\"}"}]}]}
+        self.assertEqual(openai_response_text(result), '{"title":"Seen Image"}')
 
     def test_refiner_removes_legacy_model_code_from_old_prompts(self):
         result = refine_prompt(PromptRefinePayload(
