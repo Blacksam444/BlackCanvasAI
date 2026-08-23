@@ -270,11 +270,15 @@ document.querySelector("#fillCollectionDetails").onclick = () => {
 };
 
 const artworkSpellLabels = {
-  artTags: "Tags", artNotes: "Description", editTags: "Tags", editNotes: "Description",
+  artTitle: "Title", artMedium: "Medium", artTags: "Tags", artNotes: "Description",
+  editTitle: "Title", editMedium: "Medium", editTags: "Tags", editNotes: "Description",
 };
 let artworkSpellCorrections = new Map();
 const artworkSpellingDialog = document.querySelector("#artSpellingDialog");
 document.querySelectorAll(".check-art-spelling").forEach((button) => {
+  if (button.dataset.fields === "artTags,artNotes") button.dataset.fields = "artTitle,artMedium,artTags,artNotes";
+  if (button.dataset.fields === "editTags,editNotes") button.dataset.fields = "editTitle,editMedium,editTags,editNotes";
+  button.textContent = "✓ Check all writing";
   button.onclick = async () => {
     const ids = button.dataset.fields.split(",");
     const fields = ids.map((id) => ({ id, text: document.querySelector(`#${id}`).value.trim() })).filter((field) => field.text);
@@ -299,7 +303,7 @@ document.querySelectorAll(".check-art-spelling").forEach((button) => {
       notify("Could not check spelling just now.");
     } finally {
       button.disabled = false;
-      button.textContent = "✓ Check tags & description";
+      button.textContent = "✓ Check all writing";
     }
   };
 });

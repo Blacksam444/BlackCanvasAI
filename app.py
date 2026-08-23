@@ -1282,6 +1282,11 @@ def spellcheck_text(payload: SpellCheckPayload) -> dict:
         "afronova", "graffitix", "midjourney", "afrofuturist", "afrofuturism",
         "streetart", "chatgpt", "blackcanvas", "neon", "scribbles", "xeyes",
     }
+    common_creative_corrections = {
+        "ancsstral": "ancestral", "enegy": "energy", "afrofutursim": "afrofuturism",
+        "afrofuturistm": "afrofuturism", "graffitti": "graffiti", "portriat": "portrait",
+        "cosimc": "cosmic", "beutiful": "beautiful", "colrs": "colors",
+    }
     changes: list[dict[str, str]] = []
 
     def correct_word(match: re.Match) -> str:
@@ -1289,6 +1294,12 @@ def spellcheck_text(payload: SpellCheckPayload) -> dict:
         lowered = word.lower()
         if len(word) < 4 or lowered in protected or word.isupper() or any(char.isdigit() for char in word):
             return word
+        if lowered in common_creative_corrections:
+            correction = common_creative_corrections[lowered]
+            if word[0].isupper():
+                correction = correction.capitalize()
+            changes.append({"original": word, "replacement": correction})
+            return correction
         if lowered not in checker.unknown([lowered]):
             return word
         correction = checker.correction(lowered)
