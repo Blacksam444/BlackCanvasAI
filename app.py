@@ -2395,7 +2395,9 @@ def prepared_image_data_url(image_path: Path) -> str:
     return f"data:image/jpeg;base64,{encoded}"
 
 
-def artwork_visual_request_body(artwork: dict, image_data_url: str, style: dict | None = None) -> dict:
+def artwork_visual_request_body(
+    artwork: dict, image_data_url: str, style: dict | None = None, existing_titles: list[str] | None = None
+) -> dict:
     """Build a vision-first request; catalog metadata is secondary evidence, never the subject."""
     catalog_context = {
         "current_title": artwork.get("title") or "",
@@ -2404,6 +2406,7 @@ def artwork_visual_request_body(artwork: dict, image_data_url: str, style: dict 
         "current_notes": artwork.get("notes") or "",
     }
     style_context = style or {}
+    unavailable_titles = [title for title in (existing_titles or []) if title][:100]
     schema = {
         "type": "object",
         "properties": {
@@ -2426,7 +2429,8 @@ def artwork_visual_request_body(artwork: dict, image_data_url: str, style: dict 
         "an accurate collector-friendly description, 8 to 14 useful comma-free tags, the best collection, and one "
         "detailed copy-ready image prompt that could recreate the visible image. The prompt must start directly with "
         "the subject; do not include '/imagine prompt:' or generator codes such as --ar, --raw, --style, or --v. "
-        "Use the collection Style Bible only as a restrained finishing layer after the image has been described accurately."
+        "Use the collection Style Bible only as a restrained finishing layer after the image has been described accurately. "
+        "The suggested title must be distinctive and must not repeat any title in the supplied unavailable-title list."
     )
     return {
         "model": OPENAI_MODEL,
@@ -2436,7 +2440,8 @@ def artwork_visual_request_body(artwork: dict, image_data_url: str, style: dict 
             "content": [
                 {"type": "input_text", "text": (
                     "First inspect the attached artwork itself. Then use this secondary catalog context only to refine "
-                    f"the result: {json.dumps(catalog_context)}. Relevant Style Bible: {json.dumps(style_context)}"
+                    f"the result: {json.dumps(catalog_context)}. Relevant Style Bible: {json.dumps(style_context)}. "
+                    f"Unavailable titles: {json.dumps(unavailable_titles)}"
                 )},
                 {"type": "input_image", "image_url": image_data_url, "detail": "high"},
             ],
@@ -2462,7 +2467,12 @@ def analyze_artwork_pixels(artwork: dict, image_path: Path) -> dict:
             style = json.loads(style_rows[0]["content"])
         except (TypeError, json.JSONDecodeError):
             style = {}
-    request_body = artwork_visual_request_body(artwork, prepared_image_data_url(image_path), style)
+    existing_titles = [
+        item["title"] for item in rows("SELECT title FROM artworks WHERE id != ? ORDER BY id DESC", (artwork["id"],))
+    ]
+    request_body = artwork_visual_request_body(
+        artwork, prepared_image_data_url(image_path), style, existing_titles
+    )
     request = Request(
         "https://api.openai.com/v1/responses",
         data=json.dumps(request_body).encode("utf-8"),

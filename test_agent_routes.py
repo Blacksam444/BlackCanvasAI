@@ -47,7 +47,9 @@ class AgentRouteTests(unittest.TestCase):
             "tags": "street art",
             "notes": "",
         }
-        body = artwork_visual_request_body(artwork, "data:image/jpeg;base64,abc", {"mood": ["raw"]})
+        body = artwork_visual_request_body(
+            artwork, "data:image/jpeg;base64,abc", {"mood": ["raw"]}, ["Concrete Crown"]
+        )
 
         content = body["input"][0]["content"]
         self.assertEqual(content[1]["type"], "input_image")
@@ -58,6 +60,8 @@ class AgentRouteTests(unittest.TestCase):
         self.assertIn("visual_summary", schema["required"])
         self.assertIn("actual pixels", body["instructions"])
         self.assertIn("never invent clothing", body["instructions"])
+        self.assertIn("Concrete Crown", content[0]["text"])
+        self.assertIn("must not repeat", body["instructions"])
 
     def test_raw_responses_api_text_is_extracted(self):
         result = {"output": [{"content": [{"type": "output_text", "text": "{\"title\":\"Seen Image\"}"}]}]}

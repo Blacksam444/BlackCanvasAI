@@ -415,6 +415,85 @@ document.querySelector("#applyVisualDetails").onclick = async () => {
     button.textContent = "Apply title, tags & description";
   }
 };
+
+function hasGenericArtworkTitle(artwork) {
+  const title = String(artwork.title || "").trim();
+  return !title
+    || /(?:—|-)\s*\d{1,3}$/i.test(title)
+    || /^(untitled|new visual direction|black canvas study)/i.test(title)
+    || /[a-f0-9]{8}-[a-f0-9-]{12,}/i.test(title)
+    || /^blacksam\d*[_-]/i.test(title);
+}
+
+function updateBulkNamingCount() {
+  const checked = [...document.querySelectorAll("#bulkNamingList input:checked")];
+  document.querySelector("#bulkNamingCount").textContent = `${checked.length} selected`;
+  document.querySelector("#runBulkNaming").disabled = checked.length === 0;
+}
+
+document.querySelector("#openBulkNaming").onclick = () => {
+  const candidates = artworks.filter(hasGenericArtworkTitle);
+  const list = document.querySelector("#bulkNamingList");
+  if (!candidates.length) {
+    list.innerHTML = '<p class="bulk-naming-empty">No numbered, filename-style, or untitled artwork was found.</p>';
+  } else {
+    list.innerHTML = candidates.map((artwork, index) => `
+      <label class="bulk-naming-item">
+        <input type="checkbox" value="${artwork.id}" ${index < 10 ? "checked" : ""}>
+        <img src="${artwork.url}" alt="">
+        <span><strong>${escapeHtml(artwork.title)}</strong><small>${escapeHtml(artwork.collection)}</small></span>
+      </label>`).join("");
+  }
+  list.querySelectorAll("input").forEach((input) => {
+    input.onchange = () => {
+      const checked = [...list.querySelectorAll("input:checked")];
+      if (checked.length > 10) {
+        input.checked = false;
+        notify("Choose up to 10 artworks at a time.");
+      }
+      updateBulkNamingCount();
+    };
+  });
+  updateBulkNamingCount();
+  document.querySelector("#bulkNamingDialog").showModal();
+};
+document.querySelector("#closeBulkNaming").onclick = () => document.querySelector("#bulkNamingDialog").close();
+document.querySelector("#runBulkNaming").onclick = async () => {
+  const ids = [...document.querySelectorAll("#bulkNamingList input:checked")].map((input) => Number(input.value));
+  if (!ids.length) return;
+  const button = document.querySelector("#runBulkNaming");
+  button.disabled = true;
+  let renamed = 0;
+  let failed = 0;
+  for (let index = 0; index < ids.length; index += 1) {
+    const artwork = artworks.find((item) => item.id === ids[index]);
+    if (!artwork) continue;
+    button.textContent = `Naming ${index + 1} of ${ids.length}…`;
+    try {
+      const analysisResponse = await fetch(`/api/artworks/${artwork.id}/visual-analysis`, { method: "POST" });
+      const analysis = await analysisResponse.json();
+      if (!analysisResponse.ok || !analysis.title) throw new Error();
+      const payload = {
+        title: analysis.title.trim(), collection: artwork.collection, tags: artwork.tags || "", notes: artwork.notes || "",
+        dimensions: artwork.dimensions || "", medium: artwork.medium || "", price: Number(artwork.price) || 0,
+        sale_status: artwork.sale_status || "In progress", gallery_visible: Boolean(artwork.gallery_visible),
+      };
+      const updateResponse = await fetch(`/api/artworks/${artwork.id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+      });
+      if (!updateResponse.ok) throw new Error();
+      artwork.title = payload.title;
+      renamed += 1;
+    } catch {
+      failed += 1;
+    }
+  }
+  document.querySelector("#bulkNamingDialog").close();
+  await load();
+  button.disabled = false;
+  button.textContent = "Create unique titles";
+  notify(failed ? `${renamed} renamed; ${failed} could not be named.` : `${renamed} artworks now have unique titles.`);
+};
 document.querySelector("#askArtworkAgent").onclick = () => {
   if (!selectedId) return;
   window.location.href = `/chat?artwork=${selectedId}`;
