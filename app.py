@@ -1164,11 +1164,21 @@ def dashboard_summary() -> dict:
         artwork_rows = [dict(item) for item in db.execute(
             "SELECT id, title, collection, notes FROM artworks ORDER BY id DESC LIMIT 3"
         ).fetchall()]
-        prompt_of_day = db.execute(
-            "SELECT id, title, category, text FROM prompts "
-            "ORDER BY favorite DESC, id DESC LIMIT 1 OFFSET ?",
-            ((datetime.now().timetuple().tm_yday - 1) % max(prompt_count, 1),),
-        ).fetchone() if prompt_count else None
+        prompt_spotlights = [dict(item) for item in db.execute(
+            "SELECT id, title, category, text FROM prompts WHERE reviewed = 1 "
+            "AND category IN ('AfroNova', 'Quiet Nova', 'GraffitiX') "
+            "AND LENGTH(TRIM(text)) BETWEEN 60 AND 1600 "
+            "ORDER BY favorite DESC, id DESC"
+        ).fetchall()]
+        if not prompt_spotlights:
+            prompt_spotlights = [dict(item) for item in db.execute(
+                "SELECT id, title, category, text FROM prompts WHERE reviewed = 1 "
+                "AND LENGTH(TRIM(text)) BETWEEN 60 AND 1600 ORDER BY favorite DESC, id DESC"
+            ).fetchall()]
+        if prompt_spotlights:
+            spotlight_start = (datetime.now().timetuple().tm_yday - 1) % len(prompt_spotlights)
+            prompt_spotlights = prompt_spotlights[spotlight_start:] + prompt_spotlights[:spotlight_start]
+        prompt_of_day = prompt_spotlights[0] if prompt_spotlights else None
 
     activity = [
         {"kind": "prompt", "id": item["id"], "title": item["title"],
@@ -1218,6 +1228,7 @@ def dashboard_summary() -> dict:
             "goal_percent": min(round(float(monthly_revenue or 0) / monthly_goal * 100, 1), 100) if monthly_goal else 0,
         },
         "prompt_of_day": dict(prompt_of_day) if prompt_of_day else None,
+        "prompt_spotlights": prompt_spotlights[:8],
         "recent": activity[:3],
         "priorities": priorities[:4],
     }

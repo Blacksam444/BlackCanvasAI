@@ -1,4 +1,6 @@
 const toast = document.querySelector("#toast");
+let promptSpotlights = [];
+let currentSpotlight = 0;
 const showToast = (message) => {
   toast.textContent = message;
   toast.classList.add("show");
@@ -35,6 +37,19 @@ document.querySelector("#copyPrompt").addEventListener("click", async () => {
   showToast("Prompt copied.");
 });
 
+function showPromptSpotlight(index) {
+  if (!promptSpotlights.length) return;
+  currentSpotlight = (index + promptSpotlights.length) % promptSpotlights.length;
+  const prompt = promptSpotlights[currentSpotlight];
+  document.querySelector("#dailyPrompt").textContent = prompt.text;
+  document.querySelector("#dailyCategory").textContent = prompt.category;
+}
+
+document.querySelector("#anotherPrompt").addEventListener("click", () => {
+  showPromptSpotlight(currentSpotlight + 1);
+  showToast("A new creative spark from your library.");
+});
+
 document.querySelector("#menuButton").addEventListener("click", () => {
   document.querySelector("#sidebar").classList.toggle("open");
 });
@@ -66,12 +81,14 @@ async function loadDashboard() {
     const goalRemaining = Math.max(data.studio.monthly_goal - data.studio.monthly_revenue, 0);
     document.querySelector("#goalRemaining").textContent = goalRemaining ? `${dashboardMoney(goalRemaining)} remaining this month` : "Monthly goal reached!";
     document.querySelector("#studioPriorities").innerHTML = data.priorities.map((priority) => `<a href="${priority.href}" class="priority-card ${priority.tone}"><span>${escapeDashboardHtml(priority.icon)}</span><div><strong>${escapeDashboardHtml(priority.title)}</strong><small>${escapeDashboardHtml(priority.detail)}</small></div>${priority.count ? `<b>${priority.count}</b>` : ""}<em>›</em></a>`).join("");
-    if (data.prompt_of_day) {
-      document.querySelector("#dailyPrompt").textContent = data.prompt_of_day.text;
-      document.querySelector("#dailyCategory").textContent = data.prompt_of_day.category;
+    promptSpotlights = data.prompt_spotlights || (data.prompt_of_day ? [data.prompt_of_day] : []);
+    if (promptSpotlights.length) {
+      showPromptSpotlight(0);
+      document.querySelector("#anotherPrompt").disabled = promptSpotlights.length < 2;
     } else {
       document.querySelector("#dailyPrompt").textContent = "Save your first prompt to see it featured here.";
       document.querySelector("#copyPrompt").disabled = true;
+      document.querySelector("#anotherPrompt").disabled = true;
     }
     const activity = document.querySelector("#recentActivity");
     if (!data.recent.length) {

@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Manrope:wght@600;700;800&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/gallery.css?v=3">
+  <link rel="stylesheet" href="/static/gallery.css?v=4">
 </head>
 <body>
   <header class="site-header">
@@ -43,7 +43,7 @@
     <section class="exhibition-strip" aria-label="Exhibition information">
       <p><span>NOW SHOWING</span> AfroNova · Quiet Nova · GraffitiX</p>
       <p id="totalWorks">Selected works from the studio archive</p>
-      <a href="#collection">View all works →</a>
+      <div><button id="surpriseMe" type="button">Surprise me ✦</button><a href="#collection">View all works →</a></div>
     </section>
 
     <section class="artist-statement" id="about">
@@ -65,6 +65,7 @@
         <button data-filter="AfroNova">AfroNova</button>
         <button data-filter="Quiet Nova">Quiet Nova</button>
         <button data-filter="GraffitiX">GraffitiX</button>
+        <button class="surprise-filter" id="surpriseFilter" type="button">✦ Pick one for me</button>
       </div>
       <div class="art-grid" id="artGrid" aria-live="polite"></div>
       <div class="empty-state" id="emptyState" hidden>
@@ -95,11 +96,14 @@
 
   <dialog class="art-dialog" id="artDialog">
     <button class="dialog-close" id="closeDialog" aria-label="Close artwork details">×</button>
+    <button class="dialog-step dialog-previous" id="previousArtwork" aria-label="Previous artwork">←</button>
+    <button class="dialog-step dialog-next" id="nextArtwork" aria-label="Next artwork">→</button>
     <div class="dialog-image"><img id="dialogImage" alt=""></div>
     <div class="dialog-copy">
-      <p class="kicker" id="dialogCollection"></p>
+      <div class="dialog-position"><p class="kicker" id="dialogCollection"></p><span id="dialogPosition"></span></div>
       <h2 id="dialogTitle"></h2>
       <p id="dialogDescription"></p>
+      <div class="dialog-tags" id="dialogTags"></div>
       <dl>
         <div><dt>Medium</dt><dd id="dialogMedium">—</dd></div>
         <div><dt>Size</dt><dd id="dialogDimensions">—</dd></div>
@@ -121,6 +125,6 @@
       <div class="editor-actions"><button class="cancel" value="cancel">Cancel</button><button class="save-settings" id="saveGallerySettings" value="default">Save changes</button></div>
     </form>
   </dialog>
-  <script src="/static/gallery.js?v=2"></script>
+  <script src="/static/gallery.js?v=3"></script>
 </body>
 </html>

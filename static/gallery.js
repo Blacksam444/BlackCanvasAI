@@ -6,6 +6,7 @@ const featuredArtwork = document.getElementById('featuredArtwork');
 let artwork = [];
 let selected = 'all';
 let gallerySettings = {};
+let dialogIndex = 0;
 
 const escapeHtml = (value = '') => String(value).replace(/[&<>'\"]/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));
 const frameClass = (collection = '') => `frame-${collection.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'black-canvas'}`;
@@ -28,6 +29,15 @@ function render() {
   emptyState.hidden = items.length !== 0;
 }
 
+function dailySpotlight(items) {
+  if (!items.length) return null;
+  const favorites = items.filter((item) => item.favorite);
+  const choices = favorites.length ? favorites : items;
+  const start = new Date(new Date().getFullYear(), 0, 0);
+  const day = Math.floor((new Date() - start) / 86400000);
+  return choices[day % choices.length];
+}
+
 function setFeatured(item) {
   if (!item) return;
   featuredArtwork.disabled = false;
@@ -41,11 +51,14 @@ function setFeatured(item) {
 function showArtwork(id) {
   const item = artwork.find((artworkItem) => artworkItem.id === Number(id));
   if (!item) return;
+  dialogIndex = artwork.indexOf(item);
   document.getElementById('dialogImage').src = item.url;
   document.getElementById('dialogImage').alt = item.title || 'Black Canvas artwork';
   document.getElementById('dialogCollection').textContent = item.collection || 'Black Canvas';
   document.getElementById('dialogTitle').textContent = item.title || 'Untitled work';
   document.getElementById('dialogDescription').textContent = item.notes || 'A selected work from the Black Canvas collection.';
+  document.getElementById('dialogPosition').textContent = `${String(dialogIndex + 1).padStart(2, '0')} / ${String(artwork.length).padStart(2, '0')}`;
+  document.getElementById('dialogTags').innerHTML = String(item.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean).slice(0, 7).map((tag) => `<span>${escapeHtml(tag)}</span>`).join('');
   document.getElementById('dialogMedium').textContent = item.medium || 'Original artwork';
   document.getElementById('dialogDimensions').textContent = item.dimensions || 'Details available soon';
   document.getElementById('dialogAvailability').textContent = ['Ready to list', 'Listed'].includes(item.sale_status) ? 'Available to collect' : 'Currently in the studio';
@@ -55,7 +68,22 @@ function showArtwork(id) {
   const shopLink = document.getElementById('dialogShopLink');
   shopLink.href = gallerySettings.shop_url || '#';
   shopLink.hidden = !gallerySettings.shop_url;
-  dialog.showModal();
+  if (!dialog.open) dialog.showModal();
+}
+
+function stepArtwork(direction) {
+  if (!artwork.length) return;
+  dialogIndex = (dialogIndex + direction + artwork.length) % artwork.length;
+  showArtwork(artwork[dialogIndex].id);
+}
+
+function openSurpriseArtwork() {
+  const choices = visibleArtwork();
+  if (!choices.length) return;
+  const currentId = Number(featuredArtwork.dataset.artworkId || 0);
+  const alternatives = choices.length > 1 ? choices.filter((item) => item.id !== currentId) : choices;
+  const item = alternatives[Math.floor(Math.random() * alternatives.length)];
+  showArtwork(item.id);
 }
 
 grid.addEventListener('click', (event) => {
@@ -64,7 +92,16 @@ grid.addEventListener('click', (event) => {
 });
 featuredArtwork.addEventListener('click', () => showArtwork(featuredArtwork.dataset.artworkId));
 document.getElementById('closeDialog').addEventListener('click', () => dialog.close());
+document.getElementById('previousArtwork').addEventListener('click', () => stepArtwork(-1));
+document.getElementById('nextArtwork').addEventListener('click', () => stepArtwork(1));
+document.getElementById('surpriseMe').addEventListener('click', openSurpriseArtwork);
+document.getElementById('surpriseFilter').addEventListener('click', openSurpriseArtwork);
 dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
+document.addEventListener('keydown', (event) => {
+  if (!dialog.open) return;
+  if (event.key === 'ArrowLeft') stepArtwork(-1);
+  if (event.key === 'ArrowRight') stepArtwork(1);
+});
 
 document.querySelectorAll('[data-filter]').forEach((button) => {
   button.addEventListener('click', () => {
@@ -76,7 +113,7 @@ document.querySelectorAll('[data-filter]').forEach((button) => {
 
 fetch('/api/artworks').then((response) => response.ok ? response.json() : []).then((items) => {
   artwork = items.filter((item) => item.filename && item.gallery_visible && item.sale_status !== 'Sold' && item.sale_status !== 'Not for sale');
-  setFeatured(artwork[0]);
+  setFeatured(dailySpotlight(artwork));
   document.getElementById('totalWorks').textContent = `${artwork.length} ${artwork.length === 1 ? 'work' : 'works'} from the studio archive`;
   render();
 }).catch(() => { count.textContent = 'Artwork will appear here'; emptyState.hidden = false; });
