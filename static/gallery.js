@@ -21,9 +21,10 @@ function render() {
   count.textContent = `${items.length} ${items.length === 1 ? 'work' : 'works'} on view`;
   grid.innerHTML = items.map((item, index) => {
     const extra = [item.medium, item.dimensions].filter(Boolean).join(' · ') || item.collection;
+    const status = ['Ready to list', 'Listed'].includes(item.sale_status) ? 'Available' : 'Studio archive';
     return `<button class="art-card ${frameClass(item.collection)} position-${index % 7}" type="button" data-artwork-id="${item.id}">
       <span class="frame-shell"><span class="art-image"><img src="${item.url}" alt="${escapeHtml(item.title || 'Black Canvas artwork')}" loading="lazy"></span></span>
-      <span class="art-copy"><span class="work-number">${String(index + 1).padStart(2, '0')}</span><span><small>${escapeHtml(item.collection || 'Black Canvas')}</small><strong>${escapeHtml(item.title || 'Untitled work')}</strong><em>${escapeHtml(extra)}</em></span></span>
+      <span class="art-copy"><span class="work-number">${String(index + 1).padStart(2, '0')}</span><span class="placard-body"><small>${escapeHtml(item.collection || 'Black Canvas')}</small><strong>${escapeHtml(item.title || 'Untitled work')}</strong><em>${escapeHtml(extra)}</em><span class="placard-status">${status}</span></span></span>
     </button>`;
   }).join('');
   emptyState.hidden = items.length !== 0;
