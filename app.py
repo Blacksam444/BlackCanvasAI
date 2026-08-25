@@ -400,6 +400,8 @@ class GallerySettingsPayload(BaseModel):
     intro: str = "Black Canvas is a living archive of color, story, texture, and Black imagination."
     shop_url: str = ""
     pinterest_url: str = ""
+    instagram_url: str = ""
+    contact_email: str = ""
 
 
 class PrintExportPayload(BaseModel):
@@ -716,9 +718,11 @@ def get_gallery_settings() -> dict[str, str]:
 @app.put("/api/gallery-settings")
 def update_gallery_settings(payload: GallerySettingsPayload) -> dict[str, str]:
     settings = {key: value.strip() for key, value in payload.model_dump().items()}
-    for key in ("shop_url", "pinterest_url"):
+    for key in ("shop_url", "pinterest_url", "instagram_url"):
         if settings[key] and not re.match(r"https?://", settings[key], re.IGNORECASE):
             raise HTTPException(status_code=400, detail="Links need to begin with https://")
+    if settings["contact_email"] and not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", settings["contact_email"]):
+        raise HTTPException(status_code=400, detail="Please enter a valid contact email")
     with connect() as db:
         db.execute(
             "INSERT INTO studio_settings(key, value) VALUES ('gallery_settings', ?) "

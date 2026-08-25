@@ -83,10 +83,12 @@
     <section class="contact-card">
       <p class="kicker">COLLECT · FOLLOW · RETURN</p>
       <h2>Live with art that<br>keeps speaking.</h2>
-      <p id="galleryLinkNote">Store and Pinterest links can be added when you are ready to share them.</p>
+      <p id="galleryLinkNote">Store, social, and contact links can be added when you are ready to share them.</p>
       <div class="gallery-links">
         <a class="outline" id="shopLink" href="#collection" hidden>Collect available work <span>↗</span></a>
         <a class="outline" id="pinterestLink" href="#collection" hidden>Follow on Pinterest <span>↗</span></a>
+        <a class="outline" id="instagramLink" href="#collection" hidden>Follow on Instagram <span>↗</span></a>
+        <a class="outline" id="contactLink" href="#collection" hidden>Contact the artist <span>↗</span></a>
         <a class="outline quiet" href="/image-studio">Manage gallery</a>
       </div>
     </section>
@@ -122,9 +124,11 @@
       <label>Gallery introduction<textarea id="settingIntro" rows="3" required></textarea></label>
       <label>Store link (optional)<input id="settingShopUrl" placeholder="https://"></label>
       <label>Pinterest link (optional)<input id="settingPinterestUrl" placeholder="https://"></label>
+      <label>Instagram link (optional)<input id="settingInstagramUrl" placeholder="https://www.instagram.com/yourname/"></label>
+      <label>Public contact email (optional)<input id="settingContactEmail" type="email" placeholder="artist@example.com"></label>
       <div class="editor-actions"><button class="cancel" value="cancel">Cancel</button><button class="save-settings" id="saveGallerySettings" value="default">Save changes</button></div>
     </form>
   </dialog>
-  <script src="/static/gallery.js?v=3"></script>
+  <script src="/static/gallery.js?v=4"></script>
 </body>
 </html>

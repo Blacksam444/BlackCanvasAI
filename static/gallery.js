@@ -137,7 +137,11 @@ function applyGallerySettings(settings) {
   setExternalLink(document.getElementById('shopNav'), settings.shop_url);
   setExternalLink(document.getElementById('shopLink'), settings.shop_url);
   setExternalLink(document.getElementById('pinterestLink'), settings.pinterest_url);
-  document.getElementById('galleryLinkNote').hidden = Boolean(settings.shop_url || settings.pinterest_url);
+  setExternalLink(document.getElementById('instagramLink'), settings.instagram_url);
+  const contactLink = document.getElementById('contactLink');
+  contactLink.href = settings.contact_email ? `mailto:${settings.contact_email}` : '#collection';
+  contactLink.hidden = !settings.contact_email;
+  document.getElementById('galleryLinkNote').hidden = Boolean(settings.shop_url || settings.pinterest_url || settings.instagram_url || settings.contact_email);
 }
 fetch('/api/gallery-settings').then((response) => response.ok ? response.json() : null).then((settings) => { if (settings) applyGallerySettings(settings); });
 
@@ -149,6 +153,8 @@ if (new URLSearchParams(window.location.search).get('edit') === '1') {
     document.getElementById('settingIntro').value = gallerySettings.intro || '';
     document.getElementById('settingShopUrl').value = gallerySettings.shop_url || '';
     document.getElementById('settingPinterestUrl').value = gallerySettings.pinterest_url || '';
+    document.getElementById('settingInstagramUrl').value = gallerySettings.instagram_url || '';
+    document.getElementById('settingContactEmail').value = gallerySettings.contact_email || '';
     galleryEditor.showModal();
   });
   document.getElementById('saveGallerySettings').addEventListener('click', async (event) => {
@@ -158,9 +164,11 @@ if (new URLSearchParams(window.location.search).get('edit') === '1') {
       intro: document.getElementById('settingIntro').value,
       shop_url: document.getElementById('settingShopUrl').value,
       pinterest_url: document.getElementById('settingPinterestUrl').value,
+      instagram_url: document.getElementById('settingInstagramUrl').value,
+      contact_email: document.getElementById('settingContactEmail').value,
     };
     const response = await fetch('/api/gallery-settings', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(settings)});
-    if (!response.ok) return alert('Please make sure links begin with https://');
+    if (!response.ok) return alert('Please check the links and contact email, then try again.');
     applyGallerySettings(await response.json());
     galleryEditor.close();
   });
