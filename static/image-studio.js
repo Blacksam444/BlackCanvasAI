@@ -4,6 +4,7 @@ let saleStatusFilter = "All statuses";
 let query = "";
 let pendingFile = null;
 let selectedId = null;
+let currentContentKit = {};
 let focusMode = new URLSearchParams(window.location.search).get("focus") || "";
 const requestedArtworkId = Number(new URLSearchParams(window.location.search).get("artwork")) || null;
 const requestedTool = new URLSearchParams(window.location.search).get("tool");
@@ -507,7 +508,14 @@ document.querySelector("#createContentKit").onclick = async () => {
     const response = await fetch(`/api/artworks/${selectedId}/content-kit`);
     if (!response.ok) throw new Error();
     const kit = await response.json();
+    currentContentKit = kit;
     document.querySelector("#contentKitTitle").textContent = `${kit.artwork_title} Content Kit`;
+    document.querySelector("#kitPinterestTitle").value = kit.pinterest_title;
+    document.querySelector("#kitPinterestDescription").value = kit.pinterest_description;
+    document.querySelector("#kitPinterestTopics").value = kit.pinterest_topics.join(", ");
+    document.querySelector("#kitPinterestBoard").value = kit.pinterest_board;
+    document.querySelector("#kitPinterestDestination").value = kit.pinterest_destination || "";
+    document.querySelector("#kitPinterestAltText").value = kit.pinterest_alt_text;
     document.querySelector("#kitInstagram").value = kit.instagram;
     document.querySelector("#kitTikTokHook").value = kit.tiktok_hook;
     document.querySelector("#kitTikTokCaption").value = kit.tiktok_caption;
@@ -524,6 +532,22 @@ document.querySelector("#createContentKit").onclick = async () => {
   }
 };
 document.querySelector("#closeContentKit").onclick = () => document.querySelector("#contentKitDialog").close();
+document.querySelector("#openPinterest").onclick = () => {
+  window.open(currentContentKit.pinterest_profile || "https://www.pinterest.com/", "_blank", "noopener");
+  notify("In Pinterest, choose Create, then Pin.");
+};
+document.querySelector("#downloadPinterestImage").onclick = () => {
+  const artwork = artworks.find((item) => item.id === selectedId);
+  if (!artwork?.url) return notify("The artwork image could not be found.");
+  const extension = artwork.url.match(/\.(png|jpe?g|webp)$/i)?.[1] || "png";
+  const link = document.createElement("a");
+  link.href = artwork.url;
+  link.download = `${(artwork.title || "black-canvas-artwork").replace(/[^a-z0-9]+/gi, "-")}-Pinterest.${extension}`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  notify("Artwork downloaded for Pinterest.");
+};
 document.querySelectorAll("[data-copy]").forEach((button) => {
   button.onclick = async () => {
     await navigator.clipboard.writeText(document.querySelector(`#${button.dataset.copy}`).value);

@@ -6,6 +6,7 @@ from app import (
     PromptRefinePayload,
     agent_actions_for_request,
     artwork_agent_brief,
+    artwork_content_kit,
     artwork_visual_request_body,
     chat_reply,
     is_likely_image_prompt,
@@ -178,6 +179,32 @@ class AgentRouteTests(unittest.TestCase):
 
         pricing_action = next(action for action in result["actions"] if action["label"] == "Open Pricing Calculator")
         self.assertEqual(pricing_action["href"], "/image-studio?artwork=15&tool=pricing")
+
+    def test_content_kit_includes_a_complete_pinterest_workflow(self):
+        artwork = {
+            "id": 16,
+            "title": "Celestial Crown",
+            "collection": "AfroNova",
+            "tags": "afrofuturism, gold, portrait",
+            "notes": "A regal portrait shaped by ancestral light.",
+            "dimensions": "24 × 30 inches",
+            "medium": "Digital mixed media",
+            "price": 450,
+            "sale_status": "Ready to list",
+        }
+        links = {
+            "shop_url": "https://www.etsy.com/shop/444GraffitiX",
+            "pinterest_url": "https://www.pinterest.com/celestialhue316/",
+        }
+        with patch("app.rows", return_value=[artwork]), patch("app.get_gallery_settings", return_value=links):
+            kit = artwork_content_kit(16)
+
+        self.assertLessEqual(len(kit["pinterest_title"]), 100)
+        self.assertLessEqual(len(kit["pinterest_description"]), 800)
+        self.assertLessEqual(len(kit["pinterest_topics"]), 10)
+        self.assertEqual(kit["pinterest_destination"], links["shop_url"])
+        self.assertEqual(kit["pinterest_profile"], links["pinterest_url"])
+        self.assertEqual(kit["pinterest_board"], "AfroNova")
 
 
 class ArtworkQuery:

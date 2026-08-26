@@ -2338,6 +2338,7 @@ def artwork_content_kit(artwork_id: int) -> dict:
         "Unsorted": ("original vision, story, and creative expression", "distinctive"),
     }
     story, tone = collection_tones.get(collection, collection_tones["Unsorted"])
+    tone_article = "an" if tone[:1].lower() in "aeiou" else "a"
     hashtag_words = raw_tags + [collection, "BlackArt", "ContemporaryArt", "OriginalArtwork", "ArtCollector"]
     hashtags: list[str] = []
     for tag in hashtag_words:
@@ -2355,10 +2356,22 @@ def artwork_content_kit(artwork_id: int) -> dict:
     ]
     listing_facts_text = "\n".join(item for item in listing_facts if item)
     listing_facts_block = f"{listing_facts_text}\n\n" if listing_facts_text else ""
+    gallery_settings = get_gallery_settings()
+    pinterest_title = f"{title} | {collection} Contemporary Black Art"[:100]
+    pinterest_description = (
+        f'“{title}” is {tone_article} {tone} work from Jeffrey McKay’s {collection} collection, '
+        f"exploring {story}. {notes} Discover more original artwork from Black Canvas."
+    )[:800]
+    pinterest_topics = list(dict.fromkeys(
+        raw_tags + [collection, "Black art", "Contemporary art", "Wall art", "Art collectors"]
+    ))[:10]
+    pinterest_alt_text = (
+        f'Artwork titled “{title}” by Jeffrey McKay from the {collection} collection. {notes}'
+    )[:500]
     return {
         "artwork_title": title,
         "instagram": (
-            f"{title}. A {tone} piece from the {collection} collection, shaped by {story}.\n\n"
+            f"{title}. {tone_article.capitalize()} {tone} piece from the {collection} collection, shaped by {story}.\n\n"
             f"{notes}\n\nWhat feeling or story does this piece bring up for you?\n\n{hashtag_line}"
         ),
         "tiktok_hook": f"Watch how “{title}” turns {story} into a finished work of art.",
@@ -2374,6 +2387,13 @@ def artwork_content_kit(artwork_id: int) -> dict:
             "and shipping information before purchasing."
         ),
         "listing_tags": etsy_tags,
+        "pinterest_title": pinterest_title,
+        "pinterest_description": pinterest_description,
+        "pinterest_topics": pinterest_topics,
+        "pinterest_alt_text": pinterest_alt_text,
+        "pinterest_destination": gallery_settings.get("shop_url", ""),
+        "pinterest_profile": gallery_settings.get("pinterest_url", ""),
+        "pinterest_board": collection if collection != "Unsorted" else "Black Canvas Art",
     }
 
 
