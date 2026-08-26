@@ -191,6 +191,7 @@ class AgentRouteTests(unittest.TestCase):
             "medium": "Digital mixed media",
             "price": 450,
             "sale_status": "Ready to list",
+            "listing_url": "https://www.etsy.com/listing/123456789/celestial-crown",
         }
         links = {
             "shop_url": "https://www.etsy.com/shop/444GraffitiX",
@@ -202,7 +203,7 @@ class AgentRouteTests(unittest.TestCase):
         self.assertLessEqual(len(kit["pinterest_title"]), 100)
         self.assertLessEqual(len(kit["pinterest_description"]), 800)
         self.assertLessEqual(len(kit["pinterest_topics"]), 10)
-        self.assertEqual(kit["pinterest_destination"], links["shop_url"])
+        self.assertEqual(kit["pinterest_destination"], artwork["listing_url"])
         self.assertEqual(kit["pinterest_profile"], links["pinterest_url"])
         self.assertEqual(kit["pinterest_board"], "AfroNova")
 

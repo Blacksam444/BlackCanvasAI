@@ -67,8 +67,10 @@ function showArtwork(id) {
   priceRow.hidden = !(Number(item.price) > 0 && ['Ready to list', 'Listed'].includes(item.sale_status));
   document.getElementById('dialogPrice').textContent = Number(item.price) > 0 ? money(item.price) : 'Inquire';
   const shopLink = document.getElementById('dialogShopLink');
-  shopLink.href = gallerySettings.shop_url || '#';
-  shopLink.hidden = !gallerySettings.shop_url;
+  const exactListing = item.listing_url || '';
+  shopLink.href = exactListing || gallerySettings.shop_url || '#';
+  shopLink.textContent = exactListing ? 'View this piece on Etsy ↗' : 'Visit the Etsy shop ↗';
+  shopLink.hidden = !(exactListing || gallerySettings.shop_url);
   if (!dialog.open) dialog.showModal();
 }
 

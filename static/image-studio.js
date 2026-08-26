@@ -195,6 +195,7 @@ function openEditDialog() {
   document.querySelector("#editPrice").value = artwork.price || 0;
   document.querySelector("#editSaleStatus").value = artwork.sale_status || "In progress";
   document.querySelector("#editGalleryVisible").checked = Boolean(artwork.gallery_visible);
+  document.querySelector("#editListingUrl").value = artwork.listing_url || "";
   if (document.querySelector("#detailDialog").open) document.querySelector("#detailDialog").close();
   document.querySelector("#editDialog").showModal();
 }
@@ -397,6 +398,7 @@ document.querySelector("#applyVisualDetails").onclick = async () => {
     price: Number(artwork.price) || 0,
     sale_status: artwork.sale_status || "In progress",
     gallery_visible: Boolean(artwork.gallery_visible),
+    listing_url: artwork.listing_url || "",
   };
   if (!payload.title) return notify("Review the title before applying it.");
   button.disabled = true;
@@ -478,6 +480,7 @@ document.querySelector("#runBulkNaming").onclick = async () => {
         title: analysis.title.trim(), collection: artwork.collection, tags: artwork.tags || "", notes: artwork.notes || "",
         dimensions: artwork.dimensions || "", medium: artwork.medium || "", price: Number(artwork.price) || 0,
         sale_status: artwork.sale_status || "In progress", gallery_visible: Boolean(artwork.gallery_visible),
+        listing_url: artwork.listing_url || "",
       };
       const updateResponse = await fetch(`/api/artworks/${artwork.id}`, {
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
@@ -1226,10 +1229,14 @@ document.querySelector("#saveArtworkDetails").onclick = async (event) => {
     price: Number(document.querySelector("#editPrice").value) || 0,
     sale_status: document.querySelector("#editSaleStatus").value,
     gallery_visible: document.querySelector("#editGalleryVisible").checked,
+    listing_url: document.querySelector("#editListingUrl").value.trim(),
   };
   if (!payload.title) return document.querySelector("#editTitle").focus();
   const response = await fetch(`/api/artworks/${selectedId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-  if (!response.ok) return notify("The artwork details could not be saved.");
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    return notify(error.detail || "The artwork details could not be saved.");
+  }
   document.querySelector("#editDialog").close();
   await load();
   notify("Artwork details updated.");

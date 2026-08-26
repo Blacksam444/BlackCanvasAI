@@ -380,6 +380,7 @@ class ArtworkPayload(BaseModel):
     price: float = 0
     sale_status: str = "In progress"
     gallery_visible: bool = False
+    listing_url: str = ""
     data_url: str
 
 
@@ -393,6 +394,7 @@ class ArtworkDetailsPayload(BaseModel):
     price: float = 0
     sale_status: str = "In progress"
     gallery_visible: bool = False
+    listing_url: str = ""
 
 
 class GallerySettingsPayload(BaseModel):
@@ -1559,7 +1561,7 @@ def dismiss_style_update(update_id: int) -> dict[str, str]:
 
 @app.get("/api/artworks")
 def list_artworks() -> list[dict]:
-    items = rows("SELECT id, title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, sale_price, sold_date, sales_channel, buyer_name, sale_notes, fulfillment_status, shipping_carrier, tracking_number, gallery_visible, filename, created_at FROM artworks ORDER BY id DESC")
+    items = rows("SELECT id, title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, sale_price, sold_date, sales_channel, buyer_name, sale_notes, fulfillment_status, shipping_carrier, tracking_number, gallery_visible, listing_url, filename, created_at FROM artworks ORDER BY id DESC")
     for item in items:
         item["url"] = f"/uploads/{item['filename']}"
     return items
@@ -2323,7 +2325,7 @@ def artwork_buyer_kit(artwork_id: int) -> dict:
 
 @app.get("/api/artworks/{artwork_id}/content-kit")
 def artwork_content_kit(artwork_id: int) -> dict:
-    matches = rows("SELECT id, title, collection, tags, notes, dimensions, medium, price, sale_status FROM artworks WHERE id = ?", (artwork_id,))
+    matches = rows("SELECT id, title, collection, tags, notes, dimensions, medium, price, sale_status, listing_url FROM artworks WHERE id = ?", (artwork_id,))
     if not matches:
         raise HTTPException(status_code=404, detail="Artwork not found")
     artwork = matches[0]
@@ -2391,7 +2393,7 @@ def artwork_content_kit(artwork_id: int) -> dict:
         "pinterest_description": pinterest_description,
         "pinterest_topics": pinterest_topics,
         "pinterest_alt_text": pinterest_alt_text,
-        "pinterest_destination": gallery_settings.get("shop_url", ""),
+        "pinterest_destination": artwork.get("listing_url", "") or gallery_settings.get("shop_url", ""),
         "pinterest_profile": gallery_settings.get("pinterest_url", ""),
         "pinterest_board": collection if collection != "Unsorted" else "Black Canvas Art",
     }
@@ -2798,13 +2800,16 @@ def create_artwork(payload: ArtworkPayload) -> dict:
     image_bytes = base64.b64decode(match.group(2), validate=True)
     if len(image_bytes) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Image must be smaller than 10 MB")
+    listing_url = payload.listing_url.strip()
+    if listing_url and not re.match(r"https://(?:www\.)?etsy\.com/", listing_url, re.IGNORECASE):
+        raise HTTPException(status_code=400, detail="The Etsy listing link needs to begin with https://www.etsy.com/")
     extension = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif"}[match.group(1)]
     filename = f"{uuid.uuid4().hex}{extension}"
     (UPLOAD_DIR / filename).write_bytes(image_bytes)
     artwork_id = execute(
-        "INSERT INTO artworks(title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, gallery_visible, filename) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO artworks(title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, gallery_visible, listing_url, filename) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (payload.title.strip(), payload.collection, payload.tags.strip(), payload.notes.strip(), int(payload.favorite),
-         payload.dimensions.strip(), payload.medium.strip(), max(payload.price, 0), payload.sale_status, int(payload.gallery_visible), filename),
+         payload.dimensions.strip(), payload.medium.strip(), max(payload.price, 0), payload.sale_status, int(payload.gallery_visible), listing_url, filename),
     )
     return {"id": artwork_id, "url": f"/uploads/{filename}"}
 
@@ -2820,18 +2825,21 @@ def update_artwork(artwork_id: int, payload: ArtworkDetailsPayload) -> dict:
     title = payload.title.strip()
     if not title:
         raise HTTPException(status_code=400, detail="Artwork title is required")
+    listing_url = payload.listing_url.strip()
+    if listing_url and not re.match(r"https://(?:www\.)?etsy\.com/", listing_url, re.IGNORECASE):
+        raise HTTPException(status_code=400, detail="The Etsy listing link needs to begin with https://www.etsy.com/")
     with connect() as db:
         cursor = db.execute(
-            "UPDATE artworks SET title = ?, collection = ?, tags = ?, notes = ?, dimensions = ?, medium = ?, price = ?, sale_status = ?, gallery_visible = ? WHERE id = ?",
+            "UPDATE artworks SET title = ?, collection = ?, tags = ?, notes = ?, dimensions = ?, medium = ?, price = ?, sale_status = ?, gallery_visible = ?, listing_url = ? WHERE id = ?",
             (title, payload.collection, payload.tags.strip(), payload.notes.strip(), payload.dimensions.strip(),
-             payload.medium.strip(), max(payload.price, 0), payload.sale_status, int(payload.gallery_visible), artwork_id),
+             payload.medium.strip(), max(payload.price, 0), payload.sale_status, int(payload.gallery_visible), listing_url, artwork_id),
         )
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Artwork not found")
     return {"id": artwork_id, "title": title, "collection": payload.collection,
             "tags": payload.tags.strip(), "notes": payload.notes.strip(), "dimensions": payload.dimensions.strip(),
             "medium": payload.medium.strip(), "price": max(payload.price, 0), "sale_status": payload.sale_status,
-            "gallery_visible": payload.gallery_visible}
+            "gallery_visible": payload.gallery_visible, "listing_url": listing_url}
 
 
 @app.delete("/api/artworks/{artwork_id}")
@@ -3176,7 +3184,7 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
             if existing or not image_path.exists():
                 continue
             db.execute(
-                "INSERT INTO artworks(title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, sale_price, sold_date, sales_channel, buyer_name, sale_notes, fulfillment_status, shipping_carrier, tracking_number, pricing_data, filename, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO artworks(title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, sale_price, sold_date, sales_channel, buyer_name, sale_notes, fulfillment_status, shipping_carrier, tracking_number, pricing_data, listing_url, filename, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     artwork.get("title", "Restored artwork"), artwork.get("collection", "Unsorted"), artwork.get("tags", ""),
                     artwork.get("notes", ""), int(bool(artwork.get("favorite"))), artwork.get("dimensions", ""),
@@ -3185,7 +3193,7 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
                     artwork.get("sold_date", ""), artwork.get("sales_channel", ""), artwork.get("buyer_name", ""),
                     artwork.get("sale_notes", ""), artwork.get("fulfillment_status", "Not started"),
                     artwork.get("shipping_carrier", ""), artwork.get("tracking_number", ""),
-                    artwork.get("pricing_data", "{}"), filename,
+                    artwork.get("pricing_data", "{}"), artwork.get("listing_url", ""), filename,
                     artwork.get("created_at") or datetime.now(timezone.utc).isoformat(),
                 ),
             )
