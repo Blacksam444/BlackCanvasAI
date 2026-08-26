@@ -533,8 +533,8 @@ document.querySelector("#createContentKit").onclick = async () => {
 };
 document.querySelector("#closeContentKit").onclick = () => document.querySelector("#contentKitDialog").close();
 document.querySelector("#openPinterest").onclick = () => {
-  window.open(currentContentKit.pinterest_profile || "https://www.pinterest.com/", "_blank", "noopener");
-  notify("In Pinterest, choose Create, then Pin.");
+  window.open("https://www.pinterest.com/pin-creation-tool/", "_blank", "noopener");
+  notify("Pinterest Create Pin opened. Upload the artwork, paste the fields, then Publish.");
 };
 document.querySelector("#downloadPinterestImage").onclick = () => {
   const artwork = artworks.find((item) => item.id === selectedId);
