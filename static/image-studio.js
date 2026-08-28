@@ -277,6 +277,14 @@ const artworkSpellLabels = {
 };
 let artworkSpellCorrections = new Map();
 const artworkSpellingDialog = document.querySelector("#artSpellingDialog");
+function showArtworkSpellingReview(results) {
+  artworkSpellCorrections = new Map(results.filter((result) => result.changes.length).map((result) => [result.id, result.corrected_text]));
+  const changes = results.flatMap((result) => result.changes.map((change) => ({ ...change, field: artworkSpellLabels[result.id] })));
+  if (!changes.length) return notify("No spelling changes found.");
+  document.querySelector("#artSpellingSummary").textContent = `${changes.length} possible correction${changes.length === 1 ? "" : "s"} found.`;
+  document.querySelector("#artSpellingChanges").innerHTML = changes.map((change) => `<span><b>${escapeHtml(change.field)}:</b> ${escapeHtml(change.original)} → ${escapeHtml(change.replacement)}</span>`).join("");
+  artworkSpellingDialog.showModal();
+}
 document.querySelectorAll(".check-art-spelling").forEach((button) => {
   if (button.dataset.fields === "artTags,artNotes") button.dataset.fields = "artTitle,artMedium,artTags,artNotes";
   if (button.dataset.fields === "editTags,editNotes") button.dataset.fields = "editTitle,editMedium,editTags,editNotes";
@@ -295,12 +303,7 @@ document.querySelectorAll(".check-art-spelling").forEach((button) => {
         if (!response.ok) throw new Error();
         return { ...field, ...(await response.json()) };
       }));
-      artworkSpellCorrections = new Map(results.filter((result) => result.changes.length).map((result) => [result.id, result.corrected_text]));
-      const changes = results.flatMap((result) => result.changes.map((change) => ({ ...change, field: artworkSpellLabels[result.id] })));
-      if (!changes.length) return notify("No spelling changes found.");
-      document.querySelector("#artSpellingSummary").textContent = `${changes.length} possible correction${changes.length === 1 ? "" : "s"} found.`;
-      document.querySelector("#artSpellingChanges").innerHTML = changes.map((change) => `<span><b>${escapeHtml(change.field)}:</b> ${escapeHtml(change.original)} → ${escapeHtml(change.replacement)}</span>`).join("");
-      artworkSpellingDialog.showModal();
+      showArtworkSpellingReview(results);
     } catch {
       notify("Could not check spelling just now.");
     } finally {
@@ -309,6 +312,32 @@ document.querySelectorAll(".check-art-spelling").forEach((button) => {
     }
   };
 });
+const automaticArtworkSpellTimers = new Map();
+function watchArtworkSpelling(field) {
+  field.addEventListener("input", () => {
+    clearTimeout(automaticArtworkSpellTimers.get(field.id));
+    document.querySelector(`#autoSpell-${field.id}`)?.remove();
+    automaticArtworkSpellTimers.set(field.id, setTimeout(async () => {
+      const text = field.value.trim();
+      if (text.length < 4) return;
+      try {
+        const response = await fetch("/api/spellcheck", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.changes.length || field.value.trim() !== text) return;
+        const notice = document.createElement("button");
+        notice.type = "button";
+        notice.id = `autoSpell-${field.id}`;
+        notice.className = "inline-spell-status";
+        notice.textContent = `✦ ${result.changes.length} spelling suggestion${result.changes.length === 1 ? "" : "s"} ready`;
+        notice.onclick = () => showArtworkSpellingReview([{ id: field.id, text, ...result }]);
+        field.insertAdjacentElement("afterend", notice);
+      } catch { /* The manual check button remains available if a local request fails. */ }
+    }, 900));
+  });
+}
+document.querySelectorAll("#artTitle,#artMedium,#artTags,#artNotes,#editTitle,#editMedium,#editTags,#editNotes").forEach(watchArtworkSpelling);
 const closeArtworkSpelling = () => { artworkSpellCorrections.clear(); artworkSpellingDialog.close(); };
 document.querySelector("#closeArtSpelling").onclick = closeArtworkSpelling;
 document.querySelector("#cancelArtSpelling").onclick = closeArtworkSpelling;

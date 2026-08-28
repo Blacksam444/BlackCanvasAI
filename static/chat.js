@@ -59,6 +59,41 @@ async function checkSpellingIn(field) {
   }
 }
 
+function showChatSpellingSuggestion(field, result) {
+  const preview = result.changes.slice(0, 6).map((change) => `${change.original} → ${change.replacement}`).join("\n");
+  if (window.confirm(`Possible spelling corrections:\n\n${preview}\n\nApply these corrections?`)) {
+    field.value = result.corrected_text;
+    field.dispatchEvent(new Event("input"));
+    notify("Spelling corrections applied.");
+  }
+}
+
+function watchChatSpelling(field) {
+  let timer;
+  field.addEventListener("input", () => {
+    clearTimeout(timer);
+    document.querySelector(`#autoSpell-${field.id}`)?.remove();
+    timer = setTimeout(async () => {
+      const text = field.value.trim();
+      if (text.length < 4) return;
+      try {
+        const response = await fetch("/api/spellcheck", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.changes.length || field.value.trim() !== text) return;
+        const notice = document.createElement("button");
+        notice.type = "button";
+        notice.id = `autoSpell-${field.id}`;
+        notice.className = "chat-spellcheck auto-spell-status";
+        notice.textContent = `✦ ${result.changes.length} spelling suggestion${result.changes.length === 1 ? "" : "s"} ready`;
+        notice.onclick = () => showChatSpellingSuggestion(field, result);
+        field.insertAdjacentElement("afterend", notice);
+      } catch { /* The manual spell-check button remains available. */ }
+    }, 900);
+  });
+}
+
 function addMessage(role, text, save = true, metadata = {}) {
   welcome.hidden = true;
   const element = document.createElement("article");
@@ -445,6 +480,8 @@ document.querySelector(".composer-wrap > p").insertAdjacentHTML(
   "beforebegin", '<button class="chat-spellcheck composer-spellcheck" type="button" id="checkChatSpelling">✓ Check spelling</button>',
 );
 document.querySelector("#checkChatSpelling").onclick = () => checkSpellingIn(input);
+watchChatSpelling(document.querySelector("#builderSubject"));
+watchChatSpelling(input);
 const updateGraffitiXOptions = () => {
   document.querySelector("#graffitixOptions").hidden = document.querySelector("#builderCollection").value !== "GraffitiX";
 };
