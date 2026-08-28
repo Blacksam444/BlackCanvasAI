@@ -219,6 +219,12 @@ class AgentRouteTests(unittest.TestCase):
         }))
         self.assertFalse(chatgpt_candidate_is_prompt({"role": "user", "text": "Okay, that worked great."}))
 
+    def test_spellcheck_knows_common_art_catalog_typos(self):
+        from app import spellcheck_text, SpellCheckPayload
+
+        result = spellcheck_text(SpellCheckPayload(text="Add a discripton for this artowrk."))
+        self.assertEqual(result["corrected_text"], "Add a description for this artwork.")
+
 
 class ArtworkQuery:
     def __init__(self, artwork):

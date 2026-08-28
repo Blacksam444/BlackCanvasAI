@@ -1467,6 +1467,11 @@ def spellcheck_text(payload: SpellCheckPayload) -> dict:
         "ancsstral": "ancestral", "enegy": "energy", "afrofutursim": "afrofuturism",
         "afrofuturistm": "afrofuturism", "graffitti": "graffiti", "portriat": "portrait",
         "cosimc": "cosmic", "beutiful": "beautiful", "colrs": "colors",
+        "discripton": "description", "discription": "description", "descripton": "description",
+        "discriptions": "descriptions", "discriptons": "descriptions", "descriptons": "descriptions",
+        "artowrk": "artwork", "artwrk": "artwork", "calander": "calendar",
+        "definately": "definitely", "seperate": "separate", "recieve": "receive",
+        "thier": "their", "wierd": "weird", "teh": "the",
     }
     changes: list[dict[str, str]] = []
 
@@ -1565,6 +1570,41 @@ def list_artworks() -> list[dict]:
     for item in items:
         item["url"] = f"/uploads/{item['filename']}"
     return items
+
+
+@app.get("/api/gallery-artworks")
+def list_gallery_artworks() -> list[dict]:
+    """Public gallery data: no private order details and no full-resolution file URLs."""
+    items = rows(
+        "SELECT id, title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, listing_url "
+        "FROM artworks WHERE gallery_visible = 1 AND sale_status NOT IN ('Sold', 'Not for sale') ORDER BY id DESC"
+    )
+    for item in items:
+        item["url"] = f"/api/gallery-artworks/{item['id']}/image"
+    return items
+
+
+@app.get("/api/gallery-artworks/{artwork_id}/image")
+def gallery_artwork_image(artwork_id: int) -> Response:
+    """Serve a screen-quality gallery preview, keeping the original upload private."""
+    matches = rows("SELECT filename FROM artworks WHERE id = ? AND gallery_visible = 1", (artwork_id,))
+    if not matches:
+        raise HTTPException(status_code=404, detail="Artwork not found")
+    image_path = UPLOAD_DIR / matches[0]["filename"]
+    if not image_path.exists():
+        raise HTTPException(status_code=404, detail="Artwork image not found")
+    try:
+        with Image.open(image_path) as source:
+            preview = ImageOps.exif_transpose(source).convert("RGB")
+            preview.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+            image_bytes = io.BytesIO()
+            preview.save(image_bytes, format="JPEG", quality=86, optimize=True)
+    except (OSError, ValueError) as error:
+        raise HTTPException(status_code=400, detail="Artwork preview could not be prepared") from error
+    return Response(
+        content=image_bytes.getvalue(), media_type="image/jpeg",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @app.get("/api/artworks/{artwork_id}/agent-brief")

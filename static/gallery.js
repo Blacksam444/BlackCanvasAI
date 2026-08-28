@@ -13,6 +13,8 @@ const frameClass = (collection = '') => `frame-${collection.toLowerCase().replac
 const money = (value) => new Intl.NumberFormat('en-US', {style:'currency', currency:'USD', maximumFractionDigits:0}).format(value);
 
 function visibleArtwork() {
+  if (selected === 'available') return artwork.filter((item) => ['Ready to list', 'Listed'].includes(item.sale_status));
+  if (selected === 'archive') return artwork.filter((item) => !['Ready to list', 'Listed'].includes(item.sale_status));
   return artwork.filter((item) => selected === 'all' || item.collection === selected);
 }
 
@@ -114,12 +116,20 @@ document.querySelectorAll('[data-filter]').forEach((button) => {
   });
 });
 
-fetch('/api/artworks').then((response) => response.ok ? response.json() : []).then((items) => {
-  artwork = items.filter((item) => item.filename && item.gallery_visible && item.sale_status !== 'Sold' && item.sale_status !== 'Not for sale');
+fetch('/api/gallery-artworks').then((response) => response.ok ? response.json() : []).then((items) => {
+  artwork = items;
   setFeatured(dailySpotlight(artwork));
   document.getElementById('totalWorks').textContent = `${artwork.length} ${artwork.length === 1 ? 'work' : 'works'} from the studio archive`;
   render();
 }).catch(() => { count.textContent = 'Artwork will appear here'; emptyState.hidden = false; });
+
+// A public gallery can discourage easy downloading, but screenshots can never be fully prevented by a website.
+document.addEventListener('contextmenu', (event) => {
+  if (event.target.closest('.art-image, .dialog-image, .feature-frame')) event.preventDefault();
+});
+document.addEventListener('dragstart', (event) => {
+  if (event.target.closest('.art-image img, .dialog-image img, .feature-frame img')) event.preventDefault();
+});
 
 const year = new Date().getFullYear();
 document.getElementById('year').textContent = year;

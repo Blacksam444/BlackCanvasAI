@@ -6,6 +6,7 @@
 .frame-shell{position:relative;isolation:isolate;background:linear-gradient(135deg,#6c5846 0,#2a211b 22%,#604b3a 49%,#211a16 74%,#725c47 100%);border:7px ridge #584535;padding:16px;box-shadow:inset 0 0 0 2px #b3926b66,inset 0 0 0 8px #17110dcc,0 4px 2px #0005,12px 19px 20px #493c3033,24px 34px 42px #493c3024;transform:translateZ(0);transition:transform .35s ease,box-shadow .35s ease}
 .frame-shell:before{content:"";position:absolute;inset:7px;border:1px solid #e4c99c45;box-shadow:inset 3px 3px 5px #fff2,inset -4px -4px 7px #0008;pointer-events:none;z-index:2}
 .art-image{position:relative;box-shadow:inset 0 0 9px #000b}
+.art-image img,.dialog-image img,.feature-frame img{-webkit-user-drag:none;user-select:none}
 .art-image:after{content:"";position:absolute;inset:0;background:linear-gradient(118deg,#fff0 0 42%,#fff9 48%,#fff0 54%);opacity:.09;mix-blend-mode:screen;pointer-events:none}
 .art-card:hover .frame-shell,.art-card:focus-visible .frame-shell{transform:translateY(-7px) rotateX(.5deg);box-shadow:inset 0 0 0 2px #b3926b66,inset 0 0 0 8px #17110dcc,0 5px 3px #0005,16px 27px 27px #493c3040,30px 45px 55px #493c3029}
 .frame-afronova .frame-shell{padding:20px;background:linear-gradient(135deg,#d0b56f,#725624 18%,#d5bc79 35%,#80632d 57%,#e0c982 76%,#6c501e);border:8px ridge #a78744;box-shadow:inset 0 0 0 3px #f3dda080,inset 0 0 0 11px #46310f99,0 4px 2px #0005,13px 21px 23px #67532f42,28px 38px 45px #67532f26}
