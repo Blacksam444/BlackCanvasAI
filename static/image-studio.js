@@ -490,6 +490,45 @@ document.querySelector("#openBulkNaming").onclick = () => {
   document.querySelector("#bulkNamingDialog").showModal();
 };
 document.querySelector("#closeBulkNaming").onclick = () => document.querySelector("#bulkNamingDialog").close();
+function updateBulkOrganizerCount() {
+  const selected = document.querySelectorAll("#bulkOrganizerList input:checked").length;
+  document.querySelector("#bulkOrganizerCount").textContent = `${selected} selected`;
+  document.querySelector("#applyBulkOrganizer").disabled = selected === 0;
+}
+document.querySelector("#openBulkOrganizer").onclick = () => {
+  const list = document.querySelector("#bulkOrganizerList");
+  list.innerHTML = artworks.map((artwork) => `<label class="bulk-organizer-item"><input type="checkbox" value="${artwork.id}"><img src="${artwork.url}" alt=""><span><strong>${escapeHtml(artwork.title || "Untitled artwork")}</strong><small>${escapeHtml(artwork.collection)} · ${escapeHtml(artwork.sale_status || "In progress")}</small></span></label>`).join("");
+  list.querySelectorAll("input").forEach((input) => { input.onchange = updateBulkOrganizerCount; });
+  document.querySelector("#bulkCollection").value = "";
+  document.querySelector("#bulkSaleStatus").value = "";
+  document.querySelector("#bulkGalleryVisible").value = "";
+  document.querySelector("#bulkAddTags").value = "";
+  updateBulkOrganizerCount();
+  document.querySelector("#bulkOrganizeDialog").showModal();
+};
+document.querySelector("#closeBulkOrganizer").onclick = () => document.querySelector("#bulkOrganizeDialog").close();
+document.querySelector("#selectShownArtworks").onclick = () => {
+  document.querySelectorAll("#bulkOrganizerList input").forEach((input) => { input.checked = true; });
+  updateBulkOrganizerCount();
+};
+document.querySelector("#applyBulkOrganizer").onclick = async () => {
+  const artwork_ids = [...document.querySelectorAll("#bulkOrganizerList input:checked")].map((input) => Number(input.value));
+  const collection = document.querySelector("#bulkCollection").value || null;
+  const sale_status = document.querySelector("#bulkSaleStatus").value || null;
+  const galleryChoice = document.querySelector("#bulkGalleryVisible").value;
+  const payload = { artwork_ids, collection, sale_status, gallery_visible: galleryChoice === "" ? null : galleryChoice === "true", add_tags: document.querySelector("#bulkAddTags").value.trim() };
+  if (!collection && !sale_status && payload.gallery_visible === null && !payload.add_tags) return notify("Choose at least one change first.");
+  const button = document.querySelector("#applyBulkOrganizer");
+  button.disabled = true; button.textContent = "Updating...";
+  try {
+    const response = await fetch("/api/artworks/bulk-update", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    const result = await response.json();
+    if (!response.ok) throw Error(result.detail || "Could not update the selected artwork.");
+    document.querySelector("#bulkOrganizeDialog").close();
+    await load();
+    notify(`${result.updated} artwork${result.updated === 1 ? "" : "s"} updated.`);
+  } catch (error) { notify(error.message); } finally { button.disabled = false; button.textContent = "Apply selected changes"; }
+};
 document.querySelector("#runBulkNaming").onclick = async () => {
   const ids = [...document.querySelectorAll("#bulkNamingList input:checked")].map((input) => Number(input.value));
   if (!ids.length) return;

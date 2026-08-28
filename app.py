@@ -346,6 +346,14 @@ class PromptBulkPayload(BaseModel):
     reviewed: bool | None = None
 
 
+class ArtworkBulkPayload(BaseModel):
+    artwork_ids: list[int]
+    collection: str | None = None
+    sale_status: str | None = None
+    gallery_visible: bool | None = None
+    add_tags: str = ""
+
+
 class StylePayload(BaseModel):
     content: dict
 
@@ -1570,6 +1578,42 @@ def list_artworks() -> list[dict]:
     for item in items:
         item["url"] = f"/uploads/{item['filename']}"
     return items
+
+
+@app.post("/api/artworks/bulk-update")
+def bulk_update_artworks(payload: ArtworkBulkPayload) -> dict[str, int]:
+    artwork_ids = list(dict.fromkeys(payload.artwork_ids))[:100]
+    if not artwork_ids:
+        raise HTTPException(status_code=400, detail="Select at least one artwork")
+    valid_collections = {"Unsorted", "AfroNova", "Quiet Nova", "GraffitiX"}
+    valid_statuses = {"In progress", "Ready to list", "Listed", "Sold", "Not for sale"}
+    if payload.collection is not None and payload.collection not in valid_collections:
+        raise HTTPException(status_code=400, detail="Choose a valid collection")
+    if payload.sale_status is not None and payload.sale_status not in valid_statuses:
+        raise HTTPException(status_code=400, detail="Choose a valid sales status")
+    if payload.collection is None and payload.sale_status is None and payload.gallery_visible is None and not payload.add_tags.strip():
+        raise HTTPException(status_code=400, detail="Choose at least one change")
+    placeholders = ",".join("?" for _ in artwork_ids)
+    with connect() as db:
+        items = db.execute(f"SELECT id, tags FROM artworks WHERE id IN ({placeholders})", artwork_ids).fetchall()
+        for item in items:
+            updates, values = [], []
+            if payload.collection is not None:
+                updates.append("collection = ?"); values.append(payload.collection)
+            if payload.sale_status is not None:
+                updates.append("sale_status = ?"); values.append(payload.sale_status)
+            if payload.gallery_visible is not None:
+                updates.append("gallery_visible = ?"); values.append(int(payload.gallery_visible))
+            if payload.add_tags.strip():
+                existing = [tag.strip() for tag in str(item["tags"] or "").split(",") if tag.strip()]
+                seen = {tag.lower() for tag in existing}
+                for tag in payload.add_tags.split(","):
+                    clean_tag = tag.strip()
+                    if clean_tag and clean_tag.lower() not in seen:
+                        existing.append(clean_tag); seen.add(clean_tag.lower())
+                updates.append("tags = ?"); values.append(", ".join(existing))
+            db.execute(f"UPDATE artworks SET {', '.join(updates)} WHERE id = ?", (*values, item["id"]))
+    return {"updated": len(items)}
 
 
 @app.get("/api/gallery-artworks")
