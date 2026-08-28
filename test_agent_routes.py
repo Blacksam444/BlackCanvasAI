@@ -8,6 +8,7 @@ from app import (
     artwork_agent_brief,
     artwork_content_kit,
     artwork_visual_request_body,
+    chatgpt_candidate_is_prompt,
     chat_reply,
     is_likely_image_prompt,
     openai_response_text,
@@ -206,6 +207,17 @@ class AgentRouteTests(unittest.TestCase):
         self.assertEqual(kit["pinterest_destination"], artwork["listing_url"])
         self.assertEqual(kit["pinterest_profile"], links["pinterest_url"])
         self.assertEqual(kit["pinterest_board"], "AfroNova")
+
+    def test_chatgpt_auto_import_keeps_regular_conversation_out(self):
+        self.assertTrue(chatgpt_candidate_is_prompt({
+            "role": "assistant",
+            "text": "Here is a copy-ready image prompt: a Black cosmic queen in gold armor, painted with luminous celestial textures.",
+        }))
+        self.assertTrue(chatgpt_candidate_is_prompt({
+            "role": "user",
+            "text": "Create an image prompt for an AfroNova portrait with gold, ancestral symbols, and a deep blue background.",
+        }))
+        self.assertFalse(chatgpt_candidate_is_prompt({"role": "user", "text": "Okay, that worked great."}))
 
 
 class ArtworkQuery:

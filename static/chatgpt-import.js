@@ -6,6 +6,7 @@ const historyCount = document.querySelector("#historyCount");
 let promptCandidates = [];
 let historyFilter = "likely";
 const selectedCandidateIds = new Set();
+const autoImportButton = document.querySelector("#autoImportHistory");
 
 const imageWords = ["image", "artwork", "portrait", "painting", "illustration", "photograph", "visual", "canvas", "midjourney", "dall-e", "afronova", "quiet nova", "graffitix", "afrofutur", "cosmic", "street art"];
 const businessWords = ["business", "etsy", "tiktok", "content", "caption", "marketing", "pricing", "price", "listing", "product", "brand", "sales", "social media", "video", "reel", "customer"];
@@ -87,6 +88,14 @@ function showCandidateResults(result) {
   historyBrowser.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+async function autoImportDetectedPrompts() {
+  const response = await fetch("/api/chatgpt/auto-import", { method: "POST" });
+  const result = await response.json();
+  if (!response.ok) throw Error(result.detail || "Could not auto-save the detected prompts.");
+  notify(`${result.imported} new prompt${result.imported === 1 ? "" : "s"} saved automatically (${result.detected} detected).`);
+  return result;
+}
+
 historyInput.onchange = async event => {
   const file = event.target.files[0];
   if (!file) return;
@@ -100,13 +109,21 @@ historyInput.onchange = async event => {
     const result = await response.json();
     if (!response.ok) throw Error(result.detail || "The export could not be scanned.");
     showCandidateResults(result);
-    notify(`${result.count} messages reviewed. Likely prompts are shown first.`);
+    await autoImportDetectedPrompts();
   } catch (error) {
     promptCandidates = [];
     const message = document.createElement("p");
     message.className = "history-empty";
     message.textContent = error.message;
     historyCandidates.replaceChildren(message);
+  }
+};
+
+autoImportButton.onclick = async () => {
+  try {
+    await autoImportDetectedPrompts();
+  } catch (error) {
+    notify(error.message);
   }
 };
 

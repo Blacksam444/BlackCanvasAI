@@ -2865,6 +2865,48 @@ def download_backup() -> JSONResponse:
 
 CHATGPT_IMPORT_CACHE = UPLOAD_DIR.parent / "chatgpt_import_candidates.json"
 
+CHATGPT_PROMPT_WORDS = (
+    "prompt", "midjourney", "dall-e", "dalle", "image generator", "image prompt",
+    "style bible", "listing title", "listing description", "listing tags", "caption",
+    "content plan", "creative brief", "brand voice",
+)
+CHATGPT_VISUAL_WORDS = (
+    "artwork", "portrait", "painting", "illustration", "canvas", "graffiti", "afronova",
+    "quiet nova", "graffitix", "afrofutur", "composition", "photograph", "visual",
+)
+
+
+def chatgpt_candidate_is_prompt(candidate: dict) -> bool:
+    """Keep useful creative directions while leaving ordinary chat out of auto-save."""
+    text = str(candidate.get("text") or "").strip()
+    if len(text) < 35:
+        return False
+    searchable = text.lower()
+    prompt_hits = sum(word in searchable for word in CHATGPT_PROMPT_WORDS)
+    visual_hits = sum(word in searchable for word in CHATGPT_VISUAL_WORDS)
+    action = bool(re.match(r"^\s*(create|generate|write|design|develop|draft|make|give me|help me|produce|build|compose|turn|rewrite|imagine|describe|plan|outline)\b", text, re.IGNORECASE))
+    role = str(candidate.get("role") or "user")
+    if role == "assistant":
+        return prompt_hits > 0 or (visual_hits >= 2 and len(text) >= 120)
+    return prompt_hits > 0 or (action and visual_hits > 0)
+
+
+def auto_import_chatgpt_candidates(candidates: list[dict]) -> tuple[int, int]:
+    detected = 0
+    imported = 0
+    with connect() as db:
+        for candidate in candidates:
+            if not chatgpt_candidate_is_prompt(candidate):
+                continue
+            detected += 1
+            title = str(candidate.get("conversation") or "ChatGPT prompt")[:120]
+            cursor = db.execute(
+                "INSERT OR IGNORE INTO prompts(title, category, text, favorite, source, reviewed) VALUES (?, 'ChatGPT Import', ?, 0, 'chatgpt', 0)",
+                (title, str(candidate.get("text") or "").strip()),
+            )
+            imported += max(cursor.rowcount, 0)
+    return detected, imported
+
 
 def chatgpt_candidates(conversations: list[dict]) -> list[dict[str, str | float]]:
     candidates: list[dict[str, str | float]] = []
@@ -2873,7 +2915,8 @@ def chatgpt_candidates(conversations: list[dict]) -> list[dict[str, str | float]
         conversation_title = str(conversation.get("title") or "Untitled conversation")
         for node_id, node in (conversation.get("mapping") or {}).items():
             message = (node or {}).get("message") or {}
-            if (message.get("author") or {}).get("role") != "user":
+            role = str((message.get("author") or {}).get("role") or "")
+            if role not in {"user", "assistant"}:
                 continue
             parts = (message.get("content") or {}).get("parts") or []
             text = "\n".join(part for part in parts if isinstance(part, str)).strip()
@@ -2885,6 +2928,7 @@ def chatgpt_candidates(conversations: list[dict]) -> list[dict[str, str | float]
                 "id": candidate_id,
                 "conversation": conversation_title,
                 "text": text,
+                "role": role,
                 "created_at": float(message.get("create_time") or 0),
             })
     candidates.sort(key=lambda item: float(item["created_at"]), reverse=True)
@@ -2924,6 +2968,15 @@ async def preview_chatgpt_export(export_file: UploadFile = File(...)) -> dict:
     candidates = chatgpt_candidates(conversations)
     CHATGPT_IMPORT_CACHE.write_text(json.dumps(candidates), encoding="utf-8")
     return {"count": len(candidates), "candidates": candidates}
+
+
+@app.post("/api/chatgpt/auto-import")
+def auto_import_chatgpt_prompts() -> dict[str, int]:
+    if not CHATGPT_IMPORT_CACHE.exists():
+        raise HTTPException(status_code=400, detail="Upload the ChatGPT export first")
+    candidates = json.loads(CHATGPT_IMPORT_CACHE.read_text(encoding="utf-8"))
+    detected, imported = auto_import_chatgpt_candidates(candidates)
+    return {"detected": detected, "imported": imported}
 
 
 @app.get("/api/chatgpt/import-candidates")
