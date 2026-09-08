@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: black-canvas-gallery
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: BLACKCANVAS_PUBLIC_GALLERY_ONLY
+        value: "true"
+      - key: BLACKCANVAS_DATA_DIR
+        value: /opt/render/project/src/data
+      - key: BLACKCANVAS_RELEASE_TOKEN
+        generateValue: true
+    disk:
+      name: black-canvas-gallery-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 5
