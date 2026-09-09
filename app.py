@@ -855,36 +855,38 @@ async def install_gallery_release_package(request: Request, package: UploadFile 
     provided_token = request.headers.get("x-blackcanvas-release-token", "")
     if not release_token or not secrets.compare_digest(provided_token, release_token):
         raise HTTPException(status_code=403, detail="Release authorization is required")
-    package_bytes = await package.read()
-    if len(package_bytes) > 500 * 1024 * 1024:
+    package.file.seek(0, os.SEEK_END)
+    package_size = package.file.tell()
+    package.file.seek(0)
+    if package_size > 500 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="The gallery release package is too large")
     try:
-        with zipfile.ZipFile(io.BytesIO(package_bytes)) as archive:
+        with zipfile.ZipFile(package.file) as archive:
             manifest = json.loads(archive.read("gallery.json"))
             artworks = manifest.get("artworks", [])
             settings = manifest.get("gallery_settings", {})
             if not isinstance(artworks, list) or len(artworks) > 500 or not isinstance(settings, dict):
                 raise ValueError("Invalid gallery release package")
-            prepared: list[tuple[dict, bytes]] = []
+            filenames: set[str] = set()
             for artwork in artworks:
                 filename = Path(str(artwork.get("filename", ""))).name
-                if not filename or filename != artwork.get("filename"):
+                if not filename or filename != artwork.get("filename") or filename in filenames:
                     raise ValueError("Invalid artwork filename")
-                image_bytes = archive.read(f"images/{filename}")
-                if not image_bytes or len(image_bytes) > 25 * 1024 * 1024:
+                filenames.add(filename)
+                image_info = archive.getinfo(f"images/{filename}")
+                if image_info.file_size <= 0 or image_info.file_size > 25 * 1024 * 1024:
                     raise ValueError("Invalid artwork image")
-                prepared.append((artwork, image_bytes))
     except (KeyError, ValueError, zipfile.BadZipFile, json.JSONDecodeError) as error:
         raise HTTPException(status_code=400, detail="That gallery release package could not be read") from error
 
     for image_path in UPLOAD_DIR.iterdir():
         if image_path.is_file():
             image_path.unlink()
-    with connect() as db:
+    with zipfile.ZipFile(package.file) as archive, connect() as db:
         db.execute("DELETE FROM artworks")
-        for artwork, image_bytes in prepared:
+        for artwork in artworks:
             filename = Path(str(artwork["filename"])).name
-            (UPLOAD_DIR / filename).write_bytes(image_bytes)
+            (UPLOAD_DIR / filename).write_bytes(archive.read(f"images/{filename}"))
             db.execute(
                 "INSERT INTO artworks(title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, gallery_visible, listing_url, filename) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)",
@@ -903,7 +905,7 @@ async def install_gallery_release_package(request: Request, package: UploadFile 
             "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             (json.dumps({key: str(settings.get(key, value)) for key, value in GallerySettingsPayload().model_dump().items()}),),
         )
-    return {"artworks": len(prepared)}
+    return {"artworks": len(artworks)}
 
 
 @app.put("/api/gallery-settings")
