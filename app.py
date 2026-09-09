@@ -387,6 +387,7 @@ class InquiryPayload(BaseModel):
 class ArtworkBulkPayload(BaseModel):
     artwork_ids: list[int]
     collection: str | None = None
+    medium: str | None = None
     sale_status: str | None = None
     gallery_visible: bool | None = None
     add_tags: str = ""
@@ -1885,7 +1886,10 @@ def bulk_update_artworks(payload: ArtworkBulkPayload) -> dict[str, int]:
         raise HTTPException(status_code=400, detail="Choose a valid collection")
     if payload.sale_status is not None and payload.sale_status not in valid_statuses:
         raise HTTPException(status_code=400, detail="Choose a valid sales status")
-    if payload.collection is None and payload.sale_status is None and payload.gallery_visible is None and not payload.add_tags.strip():
+    medium = payload.medium.strip() if payload.medium is not None else None
+    if medium is not None and len(medium) > 120:
+        raise HTTPException(status_code=400, detail="Keep the medium under 120 characters")
+    if payload.collection is None and medium is None and payload.sale_status is None and payload.gallery_visible is None and not payload.add_tags.strip():
         raise HTTPException(status_code=400, detail="Choose at least one change")
     placeholders = ",".join("?" for _ in artwork_ids)
     with connect() as db:
@@ -1894,6 +1898,8 @@ def bulk_update_artworks(payload: ArtworkBulkPayload) -> dict[str, int]:
             updates, values = [], []
             if payload.collection is not None:
                 updates.append("collection = ?"); values.append(payload.collection)
+            if medium is not None:
+                updates.append("medium = ?"); values.append(medium)
             if payload.sale_status is not None:
                 updates.append("sale_status = ?"); values.append(payload.sale_status)
             if payload.gallery_visible is not None:

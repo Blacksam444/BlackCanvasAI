@@ -568,6 +568,7 @@ document.querySelector("#openBulkOrganizer").onclick = () => {
   list.innerHTML = artworks.map((artwork) => `<label class="bulk-organizer-item"><input type="checkbox" value="${artwork.id}"><img src="${artwork.url}" alt=""><span><strong>${escapeHtml(artwork.title || "Untitled artwork")}</strong><small>${escapeHtml(artwork.collection)} · ${escapeHtml(artwork.sale_status || "In progress")}</small></span></label>`).join("");
   list.querySelectorAll("input").forEach((input) => { input.onchange = updateBulkOrganizerCount; });
   document.querySelector("#bulkCollection").value = "";
+  document.querySelector("#bulkMedium").value = "";
   document.querySelector("#bulkSaleStatus").value = "";
   document.querySelector("#bulkGalleryVisible").value = "";
   document.querySelector("#bulkAddTags").value = "";
@@ -582,10 +583,11 @@ document.querySelector("#selectShownArtworks").onclick = () => {
 document.querySelector("#applyBulkOrganizer").onclick = async () => {
   const artwork_ids = [...document.querySelectorAll("#bulkOrganizerList input:checked")].map((input) => Number(input.value));
   const collection = document.querySelector("#bulkCollection").value || null;
+  const medium = document.querySelector("#bulkMedium").value.trim() || null;
   const sale_status = document.querySelector("#bulkSaleStatus").value || null;
   const galleryChoice = document.querySelector("#bulkGalleryVisible").value;
-  const payload = { artwork_ids, collection, sale_status, gallery_visible: galleryChoice === "" ? null : galleryChoice === "true", add_tags: document.querySelector("#bulkAddTags").value.trim() };
-  if (!collection && !sale_status && payload.gallery_visible === null && !payload.add_tags) return notify("Choose at least one change first.");
+  const payload = { artwork_ids, collection, medium, sale_status, gallery_visible: galleryChoice === "" ? null : galleryChoice === "true", add_tags: document.querySelector("#bulkAddTags").value.trim() };
+  if (!collection && !medium && !sale_status && payload.gallery_visible === null && !payload.add_tags) return notify("Choose at least one change first.");
   const button = document.querySelector("#applyBulkOrganizer");
   button.disabled = true; button.textContent = "Updating...";
   try {
