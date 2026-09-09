@@ -216,6 +216,7 @@ function applyGallerySettings(settings) {
   document.getElementById('privateStudioLink').hidden = publicMode;
   document.getElementById('manageGalleryLink').hidden = publicMode;
   document.getElementById('dialogStudioLink').hidden = publicMode;
+  document.getElementById('emptyStudioLink').hidden = publicMode;
   const artistName = settings.artist_name || 'Jeffrey McKay';
   document.getElementById('artistName').textContent = artistName;
   document.getElementById('footerArtist').textContent = artistName;
