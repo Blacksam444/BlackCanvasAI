@@ -249,9 +249,62 @@ function createTitleAndTags(prefix = "art") {
 document.querySelector("#editSaleStatus").onchange = (event) => {
   if (["Ready to list", "Listed"].includes(event.target.value)) document.querySelector("#editGalleryVisible").checked = true;
 };
+const studioDropOverlay = document.querySelector("#studioDropOverlay");
+let studioDragDepth = 0;
+function droppedArtworkFiles(event) {
+  return Array.from(event.dataTransfer?.files || []).filter((file) => file.type.startsWith("image/"));
+}
+function addDroppedArtwork(event) {
+  const files = droppedArtworkFiles(event);
+  if (!files.length) return notify("Drop image files here to add them to Image Studio.");
+  if (files.length > 1) openBatchUploader(files);
+  else prepare(files[0]);
+}
+function hideStudioDropTarget() {
+  studioDragDepth = 0;
+  drop.classList.remove("dragging");
+  studioDropOverlay.hidden = true;
+}
+document.querySelector("#closeStudioDropOverlay").onclick = hideStudioDropTarget;
+studioDropOverlay.addEventListener("click", (event) => {
+  if (event.target === studioDropOverlay) hideStudioDropTarget();
+});
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !studioDropOverlay.hidden) hideStudioDropTarget();
+});
+
+// The whole Image Studio accepts a drop, even after the first artwork is added.
+window.addEventListener("dragenter", (event) => {
+  if (!event.dataTransfer?.types.includes("Files")) return;
+  event.preventDefault();
+  studioDragDepth += 1;
+  drop.classList.add("dragging");
+  studioDropOverlay.hidden = false;
+});
+window.addEventListener("dragover", (event) => {
+  if (!event.dataTransfer?.types.includes("Files")) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "copy";
+});
+window.addEventListener("dragleave", (event) => {
+  if (!event.dataTransfer?.types.includes("Files")) return;
+  studioDragDepth = Math.max(0, studioDragDepth - 1);
+  if (!studioDragDepth) hideStudioDropTarget();
+});
+window.addEventListener("drop", (event) => {
+  if (!event.dataTransfer?.types.includes("Files")) return;
+  event.preventDefault();
+  hideStudioDropTarget();
+  addDroppedArtwork(event);
+});
 drop.ondragover = (event) => { event.preventDefault(); drop.classList.add("dragging"); };
 drop.ondragleave = () => drop.classList.remove("dragging");
-drop.ondrop = (event) => { event.preventDefault(); drop.classList.remove("dragging"); prepare(event.dataTransfer.files[0]); };
+drop.ondrop = (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  hideStudioDropTarget();
+  addDroppedArtwork(event);
+};
 document.querySelector("#artCollection").onchange = (event) => applySuggestedDetails(event.target.value, document.querySelector("#artTags"), document.querySelector("#artNotes"));
 const titleTagButton = document.createElement("button");
 titleTagButton.type = "button";
@@ -457,6 +510,8 @@ function hasGenericArtworkTitle(artwork) {
     || /^blacksam\d*[_-]/i.test(title);
 }
 
+let bulkNamingSuggestions = [];
+
 function updateBulkNamingCount() {
   const checked = [...document.querySelectorAll("#bulkNamingList input:checked")];
   document.querySelector("#bulkNamingCount").textContent = `${checked.length} selected`;
@@ -490,6 +545,19 @@ document.querySelector("#openBulkNaming").onclick = () => {
   document.querySelector("#bulkNamingDialog").showModal();
 };
 document.querySelector("#closeBulkNaming").onclick = () => document.querySelector("#bulkNamingDialog").close();
+document.querySelector("#closeBulkNamingReview").onclick = () => document.querySelector("#bulkNamingReviewDialog").close();
+document.querySelector("#closeInquiries").onclick = () => document.querySelector("#inquiriesDialog").close();
+document.querySelector("#openInquiries").onclick = async () => {
+  const list = document.querySelector("#inquiriesList");
+  list.innerHTML = '<p class="inquiries-empty">Loading collector messages…</p>';
+  document.querySelector("#inquiriesDialog").showModal();
+  try {
+    const response = await fetch("/api/inquiries");
+    if (!response.ok) throw new Error();
+    const inquiries = await response.json();
+    list.innerHTML = inquiries.length ? inquiries.map((inquiry) => `<article class="inquiry-card"><div><span>${escapeHtml(inquiry.inquiry_type)}</span><strong>${escapeHtml(inquiry.name)}</strong><a href="mailto:${escapeHtml(inquiry.email)}">${escapeHtml(inquiry.email)}</a></div><small>${escapeHtml(inquiry.artwork_title || "General inquiry")}${inquiry.budget ? ` · Budget: ${escapeHtml(inquiry.budget)}` : ""}</small><p>${escapeHtml(inquiry.message)}</p></article>`).join("") : '<p class="inquiries-empty">No collector inquiries yet. When the gallery is online, messages from the inquiry page will appear here.</p>';
+  } catch { list.innerHTML = '<p class="inquiries-empty">Could not load collector inquiries just now.</p>'; }
+};
 function updateBulkOrganizerCount() {
   const selected = document.querySelectorAll("#bulkOrganizerList input:checked").length;
   document.querySelector("#bulkOrganizerCount").textContent = `${selected} selected`;
@@ -534,7 +602,7 @@ document.querySelector("#runBulkNaming").onclick = async () => {
   if (!ids.length) return;
   const button = document.querySelector("#runBulkNaming");
   button.disabled = true;
-  let renamed = 0;
+  const suggestions = [];
   let failed = 0;
   for (let index = 0; index < ids.length; index += 1) {
     const artwork = artworks.find((item) => item.id === ids[index]);
@@ -544,27 +612,59 @@ document.querySelector("#runBulkNaming").onclick = async () => {
       const analysisResponse = await fetch(`/api/artworks/${artwork.id}/visual-analysis`, { method: "POST" });
       const analysis = await analysisResponse.json();
       if (!analysisResponse.ok || !analysis.title) throw new Error();
-      const payload = {
-        title: analysis.title.trim(), collection: artwork.collection, tags: artwork.tags || "", notes: artwork.notes || "",
-        dimensions: artwork.dimensions || "", medium: artwork.medium || "", price: Number(artwork.price) || 0,
-        sale_status: artwork.sale_status || "In progress", gallery_visible: Boolean(artwork.gallery_visible),
-        listing_url: artwork.listing_url || "",
-      };
-      const updateResponse = await fetch(`/api/artworks/${artwork.id}`, {
-        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
-      });
-      if (!updateResponse.ok) throw new Error();
-      artwork.title = payload.title;
-      renamed += 1;
+      suggestions.push({ id: artwork.id, originalTitle: artwork.title, title: analysis.title.trim() });
     } catch {
       failed += 1;
     }
   }
-  document.querySelector("#bulkNamingDialog").close();
-  await load();
   button.disabled = false;
-  button.textContent = "Create unique titles";
-  notify(failed ? `${renamed} renamed; ${failed} could not be named.` : `${renamed} artworks now have unique titles.`);
+  button.textContent = "Suggest unique titles";
+  if (!suggestions.length) return notify("No title suggestions were created. Please try again.");
+  bulkNamingSuggestions = suggestions;
+  const list = document.querySelector("#bulkNamingReviewList");
+  list.innerHTML = suggestions.map((suggestion) => {
+    const artwork = artworks.find((item) => item.id === suggestion.id);
+    return `<label class="bulk-naming-item"><img src="${artwork?.url || ""}" alt=""><span><small>Was: ${escapeHtml(suggestion.originalTitle)}</small><input type="text" data-artwork-id="${suggestion.id}" value="${escapeHtml(suggestion.title)}" spellcheck="true" lang="en"></span></label>`;
+  }).join("");
+  document.querySelector("#bulkNamingReviewCount").textContent = `${suggestions.length} title${suggestions.length === 1 ? "" : "s"} ready`;
+  document.querySelector("#bulkNamingDialog").close();
+  document.querySelector("#bulkNamingReviewDialog").showModal();
+  if (failed) notify(`${suggestions.length} suggestions ready; ${failed} could not be named.`);
+};
+document.querySelector("#saveBulkNaming").onclick = async () => {
+  const entries = [...document.querySelectorAll("#bulkNamingReviewList input")]
+    .map((input) => ({ id: Number(input.dataset.artworkId), title: input.value.trim() }))
+    .filter((item) => item.title);
+  if (!entries.length) return notify("Keep at least one title before saving.");
+  const normalized = entries.map((item) => item.title.toLowerCase());
+  if (new Set(normalized).size !== normalized.length) return notify("Two suggested titles are the same. Change one before saving.");
+  const button = document.querySelector("#saveBulkNaming");
+  button.disabled = true;
+  button.textContent = "Saving…";
+  let saved = 0;
+  let failed = 0;
+  for (const entry of entries) {
+    const artwork = artworks.find((item) => item.id === entry.id);
+    if (!artwork) continue;
+    const payload = {
+      title: entry.title, collection: artwork.collection, tags: artwork.tags || "", notes: artwork.notes || "",
+      dimensions: artwork.dimensions || "", medium: artwork.medium || "", price: Number(artwork.price) || 0,
+      sale_status: artwork.sale_status || "In progress", gallery_visible: Boolean(artwork.gallery_visible),
+      listing_url: artwork.listing_url || "",
+    };
+    try {
+      const response = await fetch(`/api/artworks/${entry.id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error();
+      saved += 1;
+    } catch { failed += 1; }
+  }
+  await load();
+  document.querySelector("#bulkNamingReviewDialog").close();
+  button.disabled = false;
+  button.textContent = "Save these titles";
+  notify(failed ? `${saved} titles saved; ${failed} could not be saved.` : `${saved} artwork titles saved.`);
 };
 document.querySelector("#askArtworkAgent").onclick = () => {
   if (!selectedId) return;

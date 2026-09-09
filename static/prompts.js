@@ -50,6 +50,7 @@ function duplicateIds() {
 
 function sourceLabel(source) {
   if (source === "chatgpt") return "ChatGPT";
+  if (source === "agent") return "Black Canvas Agent";
   if (source === "drive") return "Google Drive";
   if (source === "keep") return "Google Keep";
   return "Manual";
@@ -304,6 +305,20 @@ document.querySelector("#cleanSelected").onclick = async () => {
   selectedIds.clear();
   await load();
   notify(`${result.changed} ${result.changed === 1 ? "prompt" : "prompts"} cleaned.`);
+};
+document.querySelector("#deleteSelected").onclick = async () => {
+  const count = selectedIds.size;
+  if (!count || !window.confirm(`Remove ${count} selected ${count === 1 ? "prompt" : "prompts"} from your library? This cannot be undone.`)) return;
+  const response = await fetch("/api/prompts/bulk-delete", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({prompt_ids:[...selectedIds]}),
+  });
+  const result = await response.json();
+  if (!response.ok) return notify(result.detail || "Those prompts could not be removed.");
+  selectedIds.clear();
+  await load();
+  notify(`${result.removed} ${result.removed === 1 ? "prompt" : "prompts"} removed.`);
 };
 document.querySelector("#clearSelection").onclick = () => { selectedIds.clear(); render(); };
 function showReviewPrompt() {

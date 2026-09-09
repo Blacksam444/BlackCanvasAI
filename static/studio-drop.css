@@ -1,0 +1,78 @@
+.studio-drop-overlay {
+  position: fixed;
+  inset: 12px;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  border: 2px dashed #ae94ff;
+  border-radius: 22px;
+  background: #100d18ef;
+  backdrop-filter: blur(7px);
+  pointer-events: auto;
+}
+
+.studio-drop-overlay[hidden] {
+  display: none;
+}
+
+.studio-drop-overlay > div {
+  position: relative;
+  max-width: 420px;
+  padding: 38px 42px;
+  text-align: center;
+  border: 1px solid #6f57b3;
+  border-radius: 20px;
+  background: #1a1427;
+  box-shadow: 0 24px 70px #000a;
+}
+
+.studio-drop-overlay button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #7b67ad;
+  border-radius: 50%;
+  background: #211a31;
+  color: #fff;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.studio-drop-overlay span {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin: auto;
+  border-radius: 18px;
+  background: #8b65f4;
+  color: #fff;
+  font-size: 30px;
+}
+
+.studio-drop-overlay strong {
+  display: block;
+  margin: 16px 0 8px;
+  font: 800 21px Manrope;
+}
+
+.studio-drop-overlay p {
+  margin: 0;
+  color: #c3bbd0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.studio-drop-overlay small {
+  display: block;
+  margin-top: 18px;
+  color: #a99dbc;
+  font-size: 11px;
+}
+
+@media (max-width: 680px) {
+  .studio-drop-overlay { inset: 8px; }
+  .studio-drop-overlay > div { margin: 20px; padding: 30px 24px; }
+}

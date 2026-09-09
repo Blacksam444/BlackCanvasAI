@@ -4,7 +4,34 @@ const count = document.getElementById('collectionCount');
 const dialog = document.getElementById('artDialog');
 const featuredArtwork = document.getElementById('featuredArtwork');
 let artwork = [];
-let selected = 'all';
+const collectionExhibitions = {
+  AfroNova: {
+    title: '<span>Afro</span><br>Nova',
+    intro: 'A world of future royalty, celestial color, ancestral memory, and unapologetic Black imagination.',
+    quote: '“The future is not a place we wait for—it is a world we crown ourselves inside.”',
+    first: 'AfroNova places Black identity at the center of imagined futures: luminous, regal, rooted, and expansive.',
+    second: 'These works move between portraiture, mythology, and the cosmos—each one carrying a private sense of power.',
+    heading: 'AfroNova exhibition',
+  },
+  'Quiet Nova': {
+    title: '<span>Quiet</span><br>Nova',
+    intro: 'Interior light, presence, tenderness, and the quiet worlds that exist beneath the noise.',
+    quote: '“Stillness is not absence. It is the space where a life becomes visible.”',
+    first: 'Quiet Nova honors the emotional weight of an unguarded moment, a familiar room, or a gaze held long enough to be felt.',
+    second: 'The collection leaves room for softness, detail, and the kind of strength that does not need to announce itself.',
+    heading: 'Quiet Nova exhibition',
+  },
+  GraffitiX: {
+    title: '<span>Graffiti</span><br>X',
+    intro: 'Raw color, street rhythm, symbolic marks, and a visual language that refuses to stay inside the lines.',
+    quote: '“A mark becomes a message when it carries the pressure of the hand that made it.”',
+    first: 'GraffitiX is built from collision: gesture, portraiture, scratched surfaces, paint, symbols, and the memory of a city wall.',
+    second: 'Every work keeps the figure emotionally present while the surrounding marks make noise, record history, and leave a trace.',
+    heading: 'GraffitiX exhibition',
+  },
+};
+const requestedCollection = new URLSearchParams(window.location.search).get('collection');
+let selected = Object.prototype.hasOwnProperty.call(collectionExhibitions, requestedCollection) ? requestedCollection : 'all';
 let gallerySettings = {};
 let dialogIndex = 0;
 
@@ -12,10 +39,43 @@ const escapeHtml = (value = '') => String(value).replace(/[&<>'\"]/g, (character
 const frameClass = (collection = '') => `frame-${collection.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'black-canvas'}`;
 const money = (value) => new Intl.NumberFormat('en-US', {style:'currency', currency:'USD', maximumFractionDigits:0}).format(value);
 
+function applyExhibition() {
+  const exhibition = collectionExhibitions[selected];
+  document.body.classList.remove('collection-afronova', 'collection-quiet-nova', 'collection-graffitix');
+  if (!exhibition) {
+    document.getElementById('heroKicker').innerHTML = `CURRENT EXHIBITION · <span id="year">${new Date().getFullYear()}</span>`;
+    document.getElementById('heroTitle').innerHTML = '<span>Black</span><br>Canvas';
+    document.getElementById('galleryIntro').textContent = 'A living archive of color, story, texture, and Black imagination.';
+    document.getElementById('statementQuote').textContent = '“Every work begins with a feeling—then becomes a world you can stand inside.”';
+    document.getElementById('statementFirst').textContent = 'Black Canvas brings together imagined futures, ancestral memory, quiet interior worlds, and the raw language of the street.';
+    document.getElementById('statementSecond').textContent = 'Each collection carries its own visual rhythm while remaining part of one evolving creative archive.';
+    document.getElementById('collectionKicker').textContent = 'SELECTED WORKS';
+    document.getElementById('collectionHeading').textContent = 'The gallery wall';
+    return;
+  }
+  document.body.classList.add(`collection-${selected.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`);
+  document.getElementById('heroKicker').innerHTML = `COLLECTION EXHIBITION · <span id="year">${new Date().getFullYear()}</span>`;
+  document.getElementById('heroTitle').innerHTML = exhibition.title;
+  document.getElementById('galleryIntro').textContent = exhibition.intro;
+  document.getElementById('statementQuote').textContent = exhibition.quote;
+  document.getElementById('statementFirst').textContent = exhibition.first;
+  document.getElementById('statementSecond').textContent = exhibition.second;
+  document.getElementById('collectionKicker').textContent = 'SELECTED COLLECTION';
+  document.getElementById('collectionHeading').textContent = exhibition.heading;
+}
+
 function visibleArtwork() {
   if (selected === 'available') return artwork.filter((item) => ['Ready to list', 'Listed'].includes(item.sale_status));
+  if (selected === 'sold') return artwork.filter((item) => item.sale_status === 'Sold');
   if (selected === 'archive') return artwork.filter((item) => !['Ready to list', 'Listed'].includes(item.sale_status));
   return artwork.filter((item) => selected === 'all' || item.collection === selected);
+}
+
+function publicArtworkStatus(item) {
+  if (['Ready to list', 'Listed'].includes(item.sale_status)) return 'Available to collect';
+  if (item.sale_status === 'Sold') return 'Collected';
+  if (item.sale_status === 'Not for sale') return 'Not for sale';
+  return 'In the studio';
 }
 
 function render() {
@@ -23,7 +83,7 @@ function render() {
   count.textContent = `${items.length} ${items.length === 1 ? 'work' : 'works'} on view`;
   grid.innerHTML = items.map((item, index) => {
     const extra = [item.medium, item.dimensions].filter(Boolean).join(' · ') || item.collection;
-    const status = ['Ready to list', 'Listed'].includes(item.sale_status) ? 'Available' : 'Studio archive';
+    const status = publicArtworkStatus(item);
     return `<button class="art-card ${frameClass(item.collection)} position-${index % 7}" type="button" data-artwork-id="${item.id}">
       <span class="frame-shell"><span class="art-image"><img src="${item.url}" alt="${escapeHtml(item.title || 'Black Canvas artwork')}" loading="lazy"></span></span>
       <span class="art-copy"><span class="work-number">${String(index + 1).padStart(2, '0')}</span><span class="placard-body"><small>${escapeHtml(item.collection || 'Black Canvas')}</small><strong>${escapeHtml(item.title || 'Untitled work')}</strong><em>${escapeHtml(extra)}</em><span class="placard-status">${status}</span></span></span>
@@ -64,15 +124,16 @@ function showArtwork(id) {
   document.getElementById('dialogTags').innerHTML = String(item.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean).slice(0, 7).map((tag) => `<span>${escapeHtml(tag)}</span>`).join('');
   document.getElementById('dialogMedium').textContent = item.medium || 'Original artwork';
   document.getElementById('dialogDimensions').textContent = item.dimensions || 'Details available soon';
-  document.getElementById('dialogAvailability').textContent = ['Ready to list', 'Listed'].includes(item.sale_status) ? 'Available to collect' : 'Currently in the studio';
+  document.getElementById('dialogAvailability').textContent = publicArtworkStatus(item);
   const priceRow = document.getElementById('dialogPriceRow');
   priceRow.hidden = !(Number(item.price) > 0 && ['Ready to list', 'Listed'].includes(item.sale_status));
   document.getElementById('dialogPrice').textContent = Number(item.price) > 0 ? money(item.price) : 'Inquire';
   const shopLink = document.getElementById('dialogShopLink');
   const exactListing = item.listing_url || '';
   shopLink.href = exactListing || gallerySettings.shop_url || '#';
-  shopLink.textContent = exactListing ? 'View this piece on Etsy ↗' : 'Visit the Etsy shop ↗';
+  shopLink.textContent = exactListing ? 'View this piece in store ↗' : 'Visit the shop ↗';
   shopLink.hidden = !(exactListing || gallerySettings.shop_url);
+  document.getElementById('dialogInquiryLink').href = `/inquire?artwork=${encodeURIComponent(item.id)}`;
   if (!dialog.open) dialog.showModal();
 }
 
@@ -112,13 +173,21 @@ document.querySelectorAll('[data-filter]').forEach((button) => {
   button.addEventListener('click', () => {
     selected = button.dataset.filter;
     document.querySelectorAll('[data-filter]').forEach((item) => item.classList.toggle('active', item === button));
+    const url = new URL(window.location.href);
+    if (collectionExhibitions[selected]) url.searchParams.set('collection', selected);
+    else url.searchParams.delete('collection');
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    applyExhibition();
+    setFeatured(dailySpotlight(visibleArtwork()));
     render();
   });
 });
 
 fetch('/api/gallery-artworks').then((response) => response.ok ? response.json() : []).then((items) => {
   artwork = items;
-  setFeatured(dailySpotlight(artwork));
+  applyExhibition();
+  document.querySelectorAll('[data-filter]').forEach((button) => button.classList.toggle('active', button.dataset.filter === selected));
+  setFeatured(dailySpotlight(visibleArtwork()));
   document.getElementById('totalWorks').textContent = `${artwork.length} ${artwork.length === 1 ? 'work' : 'works'} from the studio archive`;
   render();
 }).catch(() => { count.textContent = 'Artwork will appear here'; emptyState.hidden = false; });
@@ -143,6 +212,10 @@ function setExternalLink(element, url) {
 }
 function applyGallerySettings(settings) {
   gallerySettings = settings;
+  const publicMode = settings.public_mode === true;
+  document.getElementById('privateStudioLink').hidden = publicMode;
+  document.getElementById('manageGalleryLink').hidden = publicMode;
+  document.getElementById('dialogStudioLink').hidden = publicMode;
   const artistName = settings.artist_name || 'Jeffrey McKay';
   document.getElementById('artistName').textContent = artistName;
   document.getElementById('footerArtist').textContent = artistName;

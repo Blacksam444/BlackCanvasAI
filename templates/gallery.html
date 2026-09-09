@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Manrope:wght@600;700;800&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/gallery.css?v=5">
+  <link rel="stylesheet" href="/static/gallery.css?v=6">
 </head>
 <body>
   <header class="site-header">
@@ -20,14 +20,14 @@
       <a href="#about">Artist</a>
       <a id="shopNav" href="#collection" hidden>Collect</a>
     </nav>
-    <a class="studio-link" href="/">Private studio <span>↗</span></a>
+    <a class="studio-link" id="privateStudioLink" href="/">Private studio <span>↗</span></a>
   </header>
 
   <main>
     <section class="hero" id="exhibition">
       <div class="hero-copy">
-        <p class="kicker">CURRENT EXHIBITION · <span id="year"></span></p>
-        <h1><span>Black</span><br>Canvas</h1>
+        <p class="kicker" id="heroKicker">CURRENT EXHIBITION · <span id="year"></span></p>
+        <h1 id="heroTitle"><span>Black</span><br>Canvas</h1>
         <p class="artist-line">Works by <strong id="artistName">Jeffrey McKay</strong></p>
         <p class="intro" id="galleryIntro">A living archive of color, story, texture, and Black imagination.</p>
         <a class="primary" href="#collection">Enter the exhibition <span>↓</span></a>
@@ -48,16 +48,16 @@
 
     <section class="artist-statement" id="about">
       <div class="statement-index">01 / ARTIST STATEMENT</div>
-      <blockquote>“Every work begins with a feeling—then becomes a world you can stand inside.”</blockquote>
+      <blockquote id="statementQuote">“Every work begins with a feeling—then becomes a world you can stand inside.”</blockquote>
       <div class="statement-copy">
-        <p>Black Canvas brings together imagined futures, ancestral memory, quiet interior worlds, and the raw language of the street.</p>
-        <p>Each collection carries its own visual rhythm while remaining part of one evolving creative archive.</p>
+        <p id="statementFirst">Black Canvas brings together imagined futures, ancestral memory, quiet interior worlds, and the raw language of the street.</p>
+        <p id="statementSecond">Each collection carries its own visual rhythm while remaining part of one evolving creative archive.</p>
       </div>
     </section>
 
     <section class="collection" id="collection">
       <div class="section-top">
-        <div><p class="kicker">SELECTED WORKS</p><h2>The gallery wall</h2></div>
+        <div><p class="kicker" id="collectionKicker">SELECTED WORKS</p><h2 id="collectionHeading">The gallery wall</h2></div>
         <p id="collectionCount">Loading artwork…</p>
       </div>
       <div class="filter-row" aria-label="Filter artwork collection">
@@ -66,6 +66,7 @@
         <button data-filter="Quiet Nova">Quiet Nova</button>
         <button data-filter="GraffitiX">GraffitiX</button>
         <button data-filter="available">Available now</button>
+        <button data-filter="sold">Collected works</button>
         <button data-filter="archive">Studio archive</button>
         <button class="surprise-filter" id="surpriseFilter" type="button">✦ Pick one for me</button>
       </div>
@@ -77,9 +78,9 @@
     </section>
 
     <section class="collection-notes">
-      <article><span>AFRONOVA</span><h3>Future mythology</h3><p>Regal portraiture, ancestral memory, celestial power, and imagined Black futures.</p></article>
-      <article><span>QUIET NOVA</span><h3>Interior light</h3><p>Stillness, intimate observation, emotional presence, and room for the viewer to breathe.</p></article>
-      <article><span>GRAFFITIX</span><h3>Raw frequency</h3><p>Street energy, symbolic marks, tactile collision, and unapologetic visual rhythm.</p></article>
+      <article><span>AFRONOVA</span><h3>Future mythology</h3><p>Regal portraiture, ancestral memory, celestial power, and imagined Black futures.</p><a href="/gallery?collection=AfroNova#collection">Enter AfroNova →</a></article>
+      <article><span>QUIET NOVA</span><h3>Interior light</h3><p>Stillness, intimate observation, emotional presence, and room for the viewer to breathe.</p><a href="/gallery?collection=Quiet%20Nova#collection">Enter Quiet Nova →</a></article>
+      <article><span>GRAFFITIX</span><h3>Raw frequency</h3><p>Street energy, symbolic marks, tactile collision, and unapologetic visual rhythm.</p><a href="/gallery?collection=GraffitiX#collection">Enter GraffitiX →</a></article>
     </section>
 
     <section class="contact-card">
@@ -91,7 +92,8 @@
         <a class="outline" id="pinterestLink" href="#collection" hidden>Follow on Pinterest <span>↗</span></a>
         <a class="outline" id="instagramLink" href="#collection" hidden>Follow on Instagram <span>↗</span></a>
         <a class="outline" id="contactLink" href="#collection" hidden>Contact the artist <span>↗</span></a>
-        <a class="outline quiet" href="/image-studio">Manage gallery</a>
+        <a class="outline" href="/inquire">Inquire or commission <span>↗</span></a>
+        <a class="outline quiet" id="manageGalleryLink" href="/image-studio">Manage gallery</a>
       </div>
     </section>
   </main>
@@ -114,7 +116,7 @@
         <div><dt>Status</dt><dd id="dialogAvailability">Available</dd></div>
         <div id="dialogPriceRow" hidden><dt>Price</dt><dd id="dialogPrice">—</dd></div>
       </dl>
-      <div class="dialog-links"><a class="outline" id="dialogShopLink" href="#" hidden>View store <span>↗</span></a><a class="text-link" href="/image-studio">View in private studio</a></div>
+      <div class="dialog-links"><a class="outline" id="dialogShopLink" href="#" hidden>View store <span>↗</span></a><a class="text-link" id="dialogInquiryLink" href="/inquire">Inquire about this work →</a><a class="text-link" id="dialogStudioLink" href="/image-studio">View in private studio</a></div>
     </div>
   </dialog>
 
@@ -131,6 +133,6 @@
       <div class="editor-actions"><button class="cancel" value="cancel">Cancel</button><button class="save-settings" id="saveGallerySettings" value="default">Save changes</button></div>
     </form>
   </dialog>
-  <script src="/static/gallery.js?v=6"></script>
+  <script src="/static/gallery.js?v=9"></script>
 </body>
 </html>

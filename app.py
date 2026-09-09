@@ -4,6 +4,7 @@ import io
 import json
 import os
 import re
+import secrets
 import shutil
 import sqlite3
 import uuid
@@ -13,7 +14,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from urllib.parse import quote, urlencode
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -26,12 +27,13 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 from spellchecker import SpellChecker
 
-from storage import UPLOAD_DIR, backup_data, connect, execute, initialize, rows
+from storage import DATA_DIR, UPLOAD_DIR, backup_data, connect, execute, initialize, rows
 
 BASE_DIR = Path(__file__).resolve().parent
 OPENAI_ENV_FILE = BASE_DIR / ".env"
 OPENAI_MODEL = "gpt-5.6-luna"
 OPENAI_MONTHLY_CALL_LIMIT = 250
+PUBLIC_GALLERY_ONLY = os.environ.get("BLACKCANVAS_PUBLIC_GALLERY_ONLY", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def is_likely_image_prompt(title: str, category: str, text: str) -> bool:
@@ -51,6 +53,31 @@ initialize()
 app = FastAPI(title="Black Canvas AI")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+
+
+@app.middleware("http")
+async def protect_public_gallery(request: Request, call_next):
+    """When hosted as the public gallery, never expose private studio routes or original uploads."""
+    path = request.url.path
+    if PUBLIC_GALLERY_ONLY:
+        if path == "/":
+            return RedirectResponse("/gallery", status_code=307)
+        public_route = (
+            path in {"/gallery", "/inquire", "/api/gallery-settings", "/api/health", "/favicon.ico"}
+            or path.startswith("/static/")
+            or path.startswith("/api/gallery-artworks")
+            or path.startswith("/api/inquiry-artwork/")
+            or (path == "/api/inquiries" and request.method == "POST")
+            or (path == "/api/gallery-release-package" and request.method == "POST")
+        )
+        if not public_route:
+            return JSONResponse(status_code=404, content={"detail": "Not found"})
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    return response
 
 
 def dashboard_file() -> FileResponse:
@@ -344,6 +371,15 @@ class PromptBulkPayload(BaseModel):
     prompt_ids: list[int]
     category: str | None = None
     reviewed: bool | None = None
+
+
+class InquiryPayload(BaseModel):
+    artwork_id: int | None = None
+    inquiry_type: str = "Artwork inquiry"
+    name: str
+    email: str
+    message: str
+    budget: str = ""
 
 
 class ArtworkBulkPayload(BaseModel):
@@ -711,18 +747,163 @@ def gallery() -> FileResponse:
     )
 
 
+@app.get("/api/health")
+def health() -> dict[str, str]:
+    """Small public-safe health check for the hosting provider."""
+    return {"status": "ok", "mode": "public-gallery" if PUBLIC_GALLERY_ONLY else "studio"}
+
+
+@app.get("/inquire")
+def inquire() -> FileResponse:
+    """Public collector and commission inquiry form."""
+    return FileResponse(
+        BASE_DIR / "templates" / "inquire.html",
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
+
+
+@app.get("/api/inquiry-artwork/{artwork_id}")
+def inquiry_artwork(artwork_id: int) -> dict[str, object]:
+    matches = rows(
+        "SELECT id, title, collection FROM artworks WHERE id = ? AND gallery_visible = 1",
+        (artwork_id,),
+    )
+    if not matches:
+        raise HTTPException(status_code=404, detail="Artwork not found")
+    return matches[0]
+
+
+@app.post("/api/inquiries")
+def create_inquiry(payload: InquiryPayload) -> dict[str, object]:
+    name = re.sub(r"\s+", " ", payload.name).strip()[:100]
+    email = payload.email.strip().lower()[:254]
+    message = payload.message.strip()[:3000]
+    inquiry_type = re.sub(r"\s+", " ", payload.inquiry_type).strip()[:80] or "Artwork inquiry"
+    budget = re.sub(r"\s+", " ", payload.budget).strip()[:120]
+    if len(name) < 2 or not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email) or len(message) < 8:
+        raise HTTPException(status_code=400, detail="Please add your name, a valid email, and a short message.")
+    artwork_id = payload.artwork_id
+    if artwork_id is not None:
+        artwork = rows("SELECT id FROM artworks WHERE id = ? AND gallery_visible = 1", (artwork_id,))
+        if not artwork:
+            artwork_id = None
+    inquiry_id = execute(
+        "INSERT INTO inquiries(artwork_id, inquiry_type, name, email, message, budget) VALUES (?, ?, ?, ?, ?, ?)",
+        (artwork_id, inquiry_type, name, email, message, budget),
+    )
+    return {"id": inquiry_id, "message": "Thank you—your inquiry has been received by Jeffrey's studio."}
+
+
+@app.get("/api/inquiries")
+def list_inquiries() -> list[dict[str, object]]:
+    return rows(
+        "SELECT i.id, i.artwork_id, i.inquiry_type, i.name, i.email, i.message, i.budget, i.status, i.created_at, "
+        "COALESCE(a.title, '') AS artwork_title FROM inquiries i LEFT JOIN artworks a ON a.id = i.artwork_id "
+        "ORDER BY CASE i.status WHEN 'New' THEN 0 ELSE 1 END, i.id DESC"
+    )
+
+
 @app.get("/api/gallery-settings")
-def get_gallery_settings() -> dict[str, str]:
+def get_gallery_settings() -> dict[str, str | bool]:
     defaults = GallerySettingsPayload().model_dump()
     with connect() as db:
         setting = db.execute("SELECT value FROM studio_settings WHERE key = 'gallery_settings'").fetchone()
     if not setting:
-        return defaults
+        return {**defaults, "public_mode": PUBLIC_GALLERY_ONLY}
     try:
         saved = json.loads(setting["value"])
     except json.JSONDecodeError:
-        return defaults
-    return {key: str(saved.get(key, value)) for key, value in defaults.items()}
+        return {**defaults, "public_mode": PUBLIC_GALLERY_ONLY}
+    return {**{key: str(saved.get(key, value)) for key, value in defaults.items()}, "public_mode": PUBLIC_GALLERY_ONLY}
+
+
+@app.get("/api/gallery-release-package")
+def download_gallery_release_package() -> FileResponse:
+    """Create a package containing only visitor-safe artwork and gallery settings."""
+    if PUBLIC_GALLERY_ONLY:
+        raise HTTPException(status_code=404, detail="Not found")
+    visible = rows(
+        "SELECT title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, gallery_visible, listing_url, filename "
+        "FROM artworks WHERE gallery_visible = 1 AND sale_status NOT IN ('Sold', 'Not for sale') ORDER BY id DESC"
+    )
+    settings = get_gallery_settings()
+    settings.pop("public_mode", None)
+    release_dir = DATA_DIR / "gallery-releases"
+    release_dir.mkdir(parents=True, exist_ok=True)
+    package_path = release_dir / "black-canvas-gallery-release.zip"
+    manifest = {
+        "version": 1,
+        "gallery_settings": settings,
+        "artworks": [dict(item) for item in visible],
+    }
+    with zipfile.ZipFile(package_path, "w", zipfile.ZIP_DEFLATED) as package:
+        package.writestr("gallery.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+        for item in visible:
+            filename = Path(str(item["filename"])).name
+            image_path = UPLOAD_DIR / filename
+            if image_path.is_file():
+                package.write(image_path, f"images/{filename}")
+    return FileResponse(package_path, media_type="application/zip", filename=package_path.name)
+
+
+@app.post("/api/gallery-release-package")
+async def install_gallery_release_package(request: Request, package: UploadFile = File(...)) -> dict[str, int]:
+    """Install a gallery-only package on the public host, protected by a one-time secret."""
+    if not PUBLIC_GALLERY_ONLY:
+        raise HTTPException(status_code=404, detail="Not found")
+    release_token = os.environ.get("BLACKCANVAS_RELEASE_TOKEN", "").strip()
+    provided_token = request.headers.get("x-blackcanvas-release-token", "")
+    if not release_token or not secrets.compare_digest(provided_token, release_token):
+        raise HTTPException(status_code=403, detail="Release authorization is required")
+    package_bytes = await package.read()
+    if len(package_bytes) > 500 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="The gallery release package is too large")
+    try:
+        with zipfile.ZipFile(io.BytesIO(package_bytes)) as archive:
+            manifest = json.loads(archive.read("gallery.json"))
+            artworks = manifest.get("artworks", [])
+            settings = manifest.get("gallery_settings", {})
+            if not isinstance(artworks, list) or len(artworks) > 500 or not isinstance(settings, dict):
+                raise ValueError("Invalid gallery release package")
+            prepared: list[tuple[dict, bytes]] = []
+            for artwork in artworks:
+                filename = Path(str(artwork.get("filename", ""))).name
+                if not filename or filename != artwork.get("filename"):
+                    raise ValueError("Invalid artwork filename")
+                image_bytes = archive.read(f"images/{filename}")
+                if not image_bytes or len(image_bytes) > 25 * 1024 * 1024:
+                    raise ValueError("Invalid artwork image")
+                prepared.append((artwork, image_bytes))
+    except (KeyError, ValueError, zipfile.BadZipFile, json.JSONDecodeError) as error:
+        raise HTTPException(status_code=400, detail="That gallery release package could not be read") from error
+
+    for image_path in UPLOAD_DIR.iterdir():
+        if image_path.is_file():
+            image_path.unlink()
+    with connect() as db:
+        db.execute("DELETE FROM artworks")
+        for artwork, image_bytes in prepared:
+            filename = Path(str(artwork["filename"])).name
+            (UPLOAD_DIR / filename).write_bytes(image_bytes)
+            db.execute(
+                "INSERT INTO artworks(title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, gallery_visible, listing_url, filename) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)",
+                (
+                    str(artwork.get("title", "Untitled work")).strip() or "Untitled work",
+                    str(artwork.get("collection", "Unsorted")).strip() or "Unsorted",
+                    str(artwork.get("tags", "")).strip(), str(artwork.get("notes", "")).strip(),
+                    int(bool(artwork.get("favorite"))), str(artwork.get("dimensions", "")).strip(),
+                    str(artwork.get("medium", "")).strip(), max(float(artwork.get("price", 0) or 0), 0),
+                    str(artwork.get("sale_status", "In progress")).strip() or "In progress",
+                    str(artwork.get("listing_url", "")).strip(), filename,
+                ),
+            )
+        db.execute(
+            "INSERT INTO studio_settings(key, value) VALUES ('gallery_settings', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (json.dumps({key: str(settings.get(key, value)) for key, value in GallerySettingsPayload().model_dump().items()}),),
+        )
+    return {"artworks": len(prepared)}
 
 
 @app.put("/api/gallery-settings")
@@ -786,26 +967,106 @@ def image_prompt_chat_response(topic: str) -> dict[str, object]:
     }
 
 
+def save_generated_prompt(result: dict[str, object]) -> dict[str, object]:
+    """Keep agent-created image prompts in the library without asking Jeffrey to save a second time."""
+    prompt = clean_copy_ready_prompt(str(result.get("generated_prompt") or ""))
+    if not prompt:
+        return result
+    title = re.sub(r"\s+", " ", str(result.get("prompt_title") or "Generated Image Prompt")).strip()[:120]
+    category = str(result.get("prompt_category") or "Unsorted").strip()[:60] or "Unsorted"
+    with connect() as db:
+        existing = db.execute("SELECT id FROM prompts WHERE text = ? LIMIT 1", (prompt,)).fetchone()
+        if existing:
+            prompt_id = existing["id"]
+            save_status = "already_saved"
+        else:
+            cursor = db.execute(
+                "INSERT INTO prompts(title, category, text, favorite, source, reviewed) VALUES (?, ?, ?, 0, 'agent', 1)",
+                (title, category, prompt),
+            )
+            prompt_id = cursor.lastrowid
+            save_status = "saved"
+    result.update({
+        "generated_prompt": prompt,
+        "prompt_title": title,
+        "prompt_category": category,
+        "prompt_saved": True,
+        "prompt_save_status": save_status,
+        "prompt_id": prompt_id,
+    })
+    return result
+
+
+def looks_like_prompt_build_request(message: str) -> bool:
+    """Recognize the everyday ways Jeffrey asks the agent to make an image prompt."""
+    text = message.lower()
+    asks_to_make = bool(re.search(r"\b(create|generate|make|build|write|rewrite|refine|remix|develop|design)\b", text))
+    mentions_prompt = bool(re.search(r"\b(prompt|midjourney|image|portrait|painting|artwork)\b", text))
+    return asks_to_make and mentions_prompt
+
+
+def chat_prompt_title(request: str, fallback: str = "Saved Black Canvas Prompt") -> str:
+    idea = clean_image_idea(request)
+    title = re.sub(r"\s+", " ", idea).strip().title()[:90]
+    return title or fallback
+
+
+def recover_chat_prompts() -> dict[str, int]:
+    """Bring prior genuine prompt replies from the local Black Canvas chat into the library once."""
+    imported = 0
+    checked = 0
+    rejected_openers = (
+        "i can't", "i cannot", "the saved draft is missing", "upload the reference",
+        "**black canvas agent brief", "**black canvas pricing direction",
+    )
+    with connect() as db:
+        messages = db.execute(
+            "SELECT m.conversation_id, m.role, m.text, c.title FROM chat_messages m "
+            "JOIN conversations c ON c.id = m.conversation_id ORDER BY m.conversation_id, m.id"
+        ).fetchall()
+        latest_request: dict[int, str] = {}
+        for message in messages:
+            text = str(message["text"] or "").strip()
+            if message["role"] == "user":
+                latest_request[message["conversation_id"]] = text
+                continue
+            if message["role"] != "assistant" or len(text) < 120:
+                continue
+            request = latest_request.get(message["conversation_id"], "")
+            conversation_title = str(message["title"] or "")
+            context = f"{conversation_title} {request}"
+            if not looks_like_prompt_build_request(context):
+                continue
+            if text.lower().startswith(rejected_openers):
+                continue
+            checked += 1
+            category = prompt_collection(context)[0]
+            title = chat_prompt_title(request or conversation_title)
+            cursor = db.execute(
+                "INSERT OR IGNORE INTO prompts(title, category, text, favorite, source, reviewed) VALUES (?, ?, ?, 0, 'agent', 1)",
+                (title, category, clean_copy_ready_prompt(text)),
+            )
+            imported += max(cursor.rowcount, 0)
+    return {"checked": checked, "imported": imported}
+
+
 @app.post("/api/chat")
 def chat_reply(payload: ChatMessage) -> dict[str, object]:
     topic = payload.message.strip()
     topic_lower = topic.lower()
-    explicit_image_prompt = (
-        "image prompt" in topic_lower
-        or bool(re.search(r"\b(create|generate|make)\b.*\b(image|portrait|painting|photo|artwork)\b", topic_lower))
-    )
+    explicit_image_prompt = "image prompt" in topic_lower or looks_like_prompt_build_request(topic)
     if explicit_image_prompt:
         live_reply = safe_live_agent_reply(topic, payload.conversation_id)
         if live_reply:
             collection, _ = create_image_prompt(topic)
             live_reply.update({
-                "generated_prompt": live_reply["reply"],
+                "generated_prompt": clean_copy_ready_prompt(str(live_reply["reply"])),
                 "prompt_title": (re.sub(r"\s+", " ", clean_image_idea(topic)).strip().title()[:70]
                                  or "Generated Image Prompt"),
                 "prompt_category": collection,
             })
-            return live_reply
-        return image_prompt_chat_response(topic)
+            return save_generated_prompt(live_reply)
+        return save_generated_prompt(image_prompt_chat_response(topic))
     live_reply = safe_live_agent_reply(topic, payload.conversation_id)
     if live_reply:
         return live_reply
@@ -1110,17 +1371,22 @@ def refine_prompt(payload: PromptRefinePayload) -> dict[str, str]:
         )
 
     refined = re.sub(r"\s+", " ", refined).strip()
-    return {
+    return save_generated_prompt({
         "reply": f"**{labels[payload.mode]}**\n\n{refined}",
         "generated_prompt": refined,
         "prompt_title": labels[payload.mode],
         "prompt_category": category,
-    }
+    })
 
 
 @app.get("/api/prompts")
 def list_prompts() -> list[dict]:
     return rows("SELECT id, title, category, text, favorite, source, reviewed FROM prompts ORDER BY id DESC")
+
+
+@app.post("/api/prompts/recover-chat")
+def recover_saved_chat_prompts() -> dict[str, int]:
+    return recover_chat_prompts()
 
 
 @app.get("/api/dashboard")
@@ -1380,6 +1646,17 @@ def bulk_clean_prompts(payload: PromptBulkPayload) -> dict[str, int]:
                 db.execute("UPDATE prompts SET text = ? WHERE id = ?", (clean_text, item["id"]))
                 changed += 1
     return {"cleaned": cleaned, "changed": changed}
+
+
+@app.post("/api/prompts/bulk-delete")
+def bulk_delete_prompts(payload: PromptBulkPayload) -> dict[str, int]:
+    prompt_ids = list(dict.fromkeys(payload.prompt_ids))[:500]
+    if not prompt_ids:
+        raise HTTPException(status_code=400, detail="Select at least one prompt")
+    placeholders = ",".join("?" for _ in prompt_ids)
+    with connect() as db:
+        cursor = db.execute(f"DELETE FROM prompts WHERE id IN ({placeholders})", prompt_ids)
+    return {"removed": cursor.rowcount}
 
 
 @app.delete("/api/prompts/{prompt_id}")
@@ -2006,7 +2283,7 @@ def artwork_certificate(artwork_id: int) -> FileResponse:
 
     certificate_id = f"BC-{artwork_id:05d}-{uuid.uuid5(uuid.NAMESPACE_URL, artwork['filename']).hex[:8].upper()}"
     safe_title = re.sub(r"[^A-Za-z0-9_-]+", "-", artwork["title"]).strip("-") or "artwork"
-    certificate_dir = BASE_DIR / "data" / "certificates"
+    certificate_dir = DATA_DIR / "certificates"
     certificate_dir.mkdir(parents=True, exist_ok=True)
     certificate_path = certificate_dir / f"{safe_title}-certificate-of-authenticity.pdf"
     page_width, page_height = landscape(letter)
@@ -2119,7 +2396,7 @@ def artwork_sale_receipt(artwork_id: int) -> FileResponse:
         raise HTTPException(status_code=400, detail="Record this artwork as sold before creating a receipt")
 
     safe_title = re.sub(r"[^A-Za-z0-9_-]+", "-", artwork["title"]).strip("-") or "artwork"
-    receipt_dir = BASE_DIR / "data" / "receipts"
+    receipt_dir = DATA_DIR / "receipts"
     receipt_dir.mkdir(parents=True, exist_ok=True)
     receipt_path = receipt_dir / f"{safe_title}-sale-receipt.pdf"
     receipt_number = f"BC-SALE-{artwork_id:05d}-{artwork['sold_date'].replace('-', '')}"
@@ -2261,7 +2538,7 @@ def artwork_gallery_label(artwork_id: int) -> FileResponse:
         raise HTTPException(status_code=400, detail="Add dimensions and medium before creating a gallery label")
 
     safe_title = re.sub(r"[^A-Za-z0-9_-]+", "-", artwork["title"]).strip("-") or "artwork"
-    label_dir = BASE_DIR / "data" / "gallery-labels"
+    label_dir = DATA_DIR / "gallery-labels"
     label_dir.mkdir(parents=True, exist_ok=True)
     label_path = label_dir / f"{safe_title}-gallery-label.pdf"
     document = canvas.Canvas(str(label_path), pagesize=letter)
@@ -2670,7 +2947,7 @@ def export_artwork_for_print(artwork_id: int, payload: PrintExportPayload) -> Fi
             prepared = prepared.resize((required_width, required_height), Image.Resampling.LANCZOS)
         if prepared.mode not in ("RGB", "RGBA"):
             prepared = prepared.convert("RGBA" if "transparency" in source.info else "RGB")
-        export_dir = BASE_DIR / "data" / "print_exports"
+        export_dir = DATA_DIR / "print_exports"
         export_dir.mkdir(parents=True, exist_ok=True)
         safe_title = re.sub(r"[^A-Za-z0-9_-]+", "-", artwork["title"]).strip("-") or "artwork"
         export_path = export_dir / f"{safe_title}-{required_width}x{required_height}-300dpi.png"
@@ -2835,7 +3112,7 @@ def download_seller_package(artwork_id: int) -> FileResponse:
     )[0]
     kit = artwork_content_kit(artwork_id)
     safe_title = re.sub(r"[^A-Za-z0-9_-]+", "-", artwork["title"]).strip("-") or "artwork"
-    package_dir = BASE_DIR / "data" / "seller_packages"
+    package_dir = DATA_DIR / "seller_packages"
     package_dir.mkdir(parents=True, exist_ok=True)
     package_path = package_dir / f"{safe_title}-seller-package.zip"
 
@@ -2885,8 +3162,8 @@ def create_artwork(payload: ArtworkPayload) -> dict:
     if len(image_bytes) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Image must be smaller than 10 MB")
     listing_url = payload.listing_url.strip()
-    if listing_url and not re.match(r"https://(?:www\.)?etsy\.com/", listing_url, re.IGNORECASE):
-        raise HTTPException(status_code=400, detail="The Etsy listing link needs to begin with https://www.etsy.com/")
+    if listing_url and not re.match(r"https://[^\s/]+(?:/|$)", listing_url, re.IGNORECASE):
+        raise HTTPException(status_code=400, detail="The shop or product link needs to begin with https://")
     extension = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif"}[match.group(1)]
     filename = f"{uuid.uuid4().hex}{extension}"
     (UPLOAD_DIR / filename).write_bytes(image_bytes)
@@ -2910,8 +3187,8 @@ def update_artwork(artwork_id: int, payload: ArtworkDetailsPayload) -> dict:
     if not title:
         raise HTTPException(status_code=400, detail="Artwork title is required")
     listing_url = payload.listing_url.strip()
-    if listing_url and not re.match(r"https://(?:www\.)?etsy\.com/", listing_url, re.IGNORECASE):
-        raise HTTPException(status_code=400, detail="The Etsy listing link needs to begin with https://www.etsy.com/")
+    if listing_url and not re.match(r"https://[^\s/]+(?:/|$)", listing_url, re.IGNORECASE):
+        raise HTTPException(status_code=400, detail="The shop or product link needs to begin with https://")
     with connect() as db:
         cursor = db.execute(
             "UPDATE artworks SET title = ?, collection = ?, tags = ?, notes = ?, dimensions = ?, medium = ?, price = ?, sale_status = ?, gallery_visible = ?, listing_url = ? WHERE id = ?",

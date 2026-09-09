@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inquire · Black Canvas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/inquire.css?v=1">
+</head>
+<body>
+  <header><a href="/gallery"><span>BC</span><strong>BLACK CANVAS</strong></a><a href="/gallery" class="return">← Return to gallery</a></header>
+  <main>
+    <section class="intro"><p class="kicker">COLLECT · COMMISSION · CONNECT</p><h1>Let’s begin<br>with a conversation.</h1><p>Ask about an available artwork, a future release, or a custom commission. Your message goes directly to Jeffrey’s studio.</p><div class="selected-work" id="selectedWork" hidden><span>ABOUT THIS ARTWORK</span><strong id="selectedWorkTitle"></strong><small id="selectedWorkCollection"></small></div></section>
+    <section class="form-card"><form id="inquiryForm"><label>I’m reaching out about<select id="inquiryType"><option>Artwork inquiry</option><option>Commission request</option><option>Collection or exhibition</option><option>Press or collaboration</option><option>Something else</option></select></label><label>Your name<input id="inquiryName" autocomplete="name" required placeholder="Your name"></label><label>Email address<input id="inquiryEmail" type="email" autocomplete="email" required placeholder="you@example.com"></label><label>Budget range <small>optional</small><input id="inquiryBudget" placeholder="Example: Under $500, $1,000–$2,000"></label><label>Tell me what you have in mind<textarea id="inquiryMessage" required rows="6" placeholder="I’m interested in…"></textarea></label><button id="sendInquiry" type="submit">Send inquiry →</button><p class="form-note">You’ll receive a personal reply by email. Your information stays with Black Canvas and is never posted publicly.</p></form><div class="success" id="inquirySuccess" hidden><span>✓</span><h2>Thank you.</h2><p>Your message is now with Jeffrey’s studio. You’ll receive a reply by email.</p><a href="/gallery">Return to the gallery</a></div></section>
+  </main>
+  <script src="/static/inquire.js?v=2"></script>
+</body>
+</html>

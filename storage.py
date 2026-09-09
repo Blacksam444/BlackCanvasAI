@@ -1,10 +1,11 @@
 import json
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any
 
 BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = BASE_DIR / "data"
+DATA_DIR = Path(os.environ.get("BLACKCANVAS_DATA_DIR", str(BASE_DIR / "data"))).expanduser().resolve()
 UPLOAD_DIR = DATA_DIR / "uploads"
 DB_PATH = DATA_DIR / "blackcanvas.db"
 
@@ -105,6 +106,18 @@ def initialize() -> None:
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY(conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
             );
+            CREATE TABLE IF NOT EXISTS inquiries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                artwork_id INTEGER,
+                inquiry_type TEXT NOT NULL DEFAULT 'Artwork inquiry',
+                name TEXT NOT NULL,
+                email TEXT NOT NULL,
+                message TEXT NOT NULL,
+                budget TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'New',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(artwork_id) REFERENCES artworks(id)
+            );
         """)
         prompt_columns = {row[1] for row in db.execute("PRAGMA table_info(prompts)")}
         if "source" not in prompt_columns:
@@ -171,5 +184,6 @@ def backup_data() -> dict[str, Any]:
         "conversations": rows("SELECT id, title, created_at, updated_at FROM conversations ORDER BY id"),
         "chat_messages": rows("SELECT id, conversation_id, role, text, metadata, created_at FROM chat_messages ORDER BY id"),
         "expenses": rows("SELECT id, description, category, amount, expense_date, notes, created_at FROM expenses ORDER BY id"),
+        "inquiries": rows("SELECT id, artwork_id, inquiry_type, name, email, message, budget, status, created_at FROM inquiries ORDER BY id"),
         "studio_settings": rows("SELECT key, value FROM studio_settings ORDER BY key"),
     }

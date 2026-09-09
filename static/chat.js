@@ -189,6 +189,7 @@ async function openConversation(id, title) {
       if (saved.metadata?.actions?.length) addAgentActions(message, "Open workspace", saved.metadata.actions);
       if (saved.metadata?.generated_prompt) {
         addPromptSaveButton(message, saved.metadata);
+        addMidjourneyButton(message, saved.metadata);
         addPromptRefiner(message, saved.metadata);
       }
     }
@@ -199,6 +200,12 @@ async function openConversation(id, title) {
 function addPromptSaveButton(message, data) {
   const button = document.createElement("button");
   button.className = "save-prompt";
+  if (data.prompt_saved) {
+    button.disabled = true;
+    button.textContent = data.prompt_save_status === "already_saved" ? "✓ Already in Prompt Library" : "✓ Saved to Prompt Library automatically";
+    message.querySelector(".copy-message").parentElement.appendChild(button);
+    return;
+  }
   button.textContent = "＋ Save to Prompt Library";
   button.onclick = async () => {
     button.disabled = true;
@@ -228,6 +235,33 @@ function addPromptSaveButton(message, data) {
       button.disabled = false;
       button.textContent = "＋ Save to Prompt Library";
       notify("Could not save the prompt just now.");
+    }
+  };
+  message.querySelector(".copy-message").parentElement.appendChild(button);
+}
+
+function cleanPromptForMidjourney(prompt) {
+  return String(prompt || "")
+    .replace(/^\s*\/?imagine\s+prompt\s*:\s*/i, "")
+    .replace(/\s+--(?:ar|raw|v|version|style|stylize|chaos|seed|no)(?:\s+[^\s]+)?/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function addMidjourneyButton(message, data) {
+  const prompt = cleanPromptForMidjourney(data.generated_prompt);
+  if (!prompt) return;
+  const button = document.createElement("button");
+  button.className = "midjourney-handoff";
+  button.textContent = "✦ Copy & open Midjourney";
+  button.title = "Copies this clean prompt, then opens Midjourney in a new tab";
+  button.onclick = async () => {
+    const midjourneyWindow = window.open("https://www.midjourney.com/imagine", "_blank", "noopener,noreferrer");
+    try {
+      await navigator.clipboard.writeText(prompt);
+      notify(midjourneyWindow ? "Prompt copied. Paste it into Midjourney and generate." : "Prompt copied. Open Midjourney and paste it to generate.");
+    } catch {
+      notify("Midjourney opened, but please use the Copy button and paste the prompt there.");
     }
   };
   message.querySelector(".copy-message").parentElement.appendChild(button);
@@ -306,6 +340,7 @@ async function send(text) {
     if (data.actions?.length) addAgentActions(answer, "Open workspace", data.actions);
     if (data.generated_prompt) {
       addPromptSaveButton(answer, data);
+      addMidjourneyButton(answer, data);
       addPromptRefiner(answer, data);
     }
   } catch {
