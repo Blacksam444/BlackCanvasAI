@@ -63,7 +63,8 @@ async def protect_public_gallery(request: Request, call_next):
         if path == "/":
             return RedirectResponse("/gallery", status_code=307)
         public_route = (
-            path in {"/gallery", "/inquire", "/api/gallery-settings", "/api/health", "/favicon.ico"}
+            path in {"/gallery", "/inquire", "/api/health", "/favicon.ico"}
+            or (path == "/api/gallery-settings" and request.method == "GET")
             or path.startswith("/static/")
             or path.startswith("/api/gallery-artworks")
             or path.startswith("/api/inquiry-artwork/")
@@ -445,6 +446,7 @@ class GallerySettingsPayload(BaseModel):
     artist_name: str = "Jeffrey McKay"
     intro: str = "Black Canvas is a living archive of color, story, texture, and Black imagination."
     shop_url: str = ""
+    etsy_url: str = ""
     pinterest_url: str = ""
     instagram_url: str = ""
     contact_email: str = ""
@@ -911,7 +913,7 @@ async def install_gallery_release_package(request: Request, package: UploadFile 
 @app.put("/api/gallery-settings")
 def update_gallery_settings(payload: GallerySettingsPayload) -> dict[str, str]:
     settings = {key: value.strip() for key, value in payload.model_dump().items()}
-    for key in ("shop_url", "pinterest_url", "instagram_url"):
+    for key in ("shop_url", "etsy_url", "pinterest_url", "instagram_url"):
         if settings[key] and not re.match(r"https?://", settings[key], re.IGNORECASE):
             raise HTTPException(status_code=400, detail="Links need to begin with https://")
     if settings["contact_email"] and not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", settings["contact_email"]):

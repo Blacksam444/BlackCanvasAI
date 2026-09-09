@@ -223,12 +223,13 @@ function applyGallerySettings(settings) {
   document.getElementById('galleryIntro').textContent = settings.intro || 'A living archive of color, story, texture, and Black imagination.';
   setExternalLink(document.getElementById('shopNav'), settings.shop_url);
   setExternalLink(document.getElementById('shopLink'), settings.shop_url);
+  setExternalLink(document.getElementById('etsyLink'), settings.etsy_url);
   setExternalLink(document.getElementById('pinterestLink'), settings.pinterest_url);
   setExternalLink(document.getElementById('instagramLink'), settings.instagram_url);
   const contactLink = document.getElementById('contactLink');
   contactLink.href = settings.contact_email ? `mailto:${settings.contact_email}` : '#collection';
   contactLink.hidden = !settings.contact_email;
-  document.getElementById('galleryLinkNote').hidden = Boolean(settings.shop_url || settings.pinterest_url || settings.instagram_url || settings.contact_email);
+  document.getElementById('galleryLinkNote').hidden = Boolean(settings.shop_url || settings.etsy_url || settings.pinterest_url || settings.instagram_url || settings.contact_email);
 }
 fetch('/api/gallery-settings').then((response) => response.ok ? response.json() : null).then((settings) => { if (settings) applyGallerySettings(settings); });
 
@@ -239,6 +240,7 @@ if (new URLSearchParams(window.location.search).get('edit') === '1') {
     document.getElementById('settingArtistName').value = gallerySettings.artist_name || '';
     document.getElementById('settingIntro').value = gallerySettings.intro || '';
     document.getElementById('settingShopUrl').value = gallerySettings.shop_url || '';
+    document.getElementById('settingEtsyUrl').value = gallerySettings.etsy_url || '';
     document.getElementById('settingPinterestUrl').value = gallerySettings.pinterest_url || '';
     document.getElementById('settingInstagramUrl').value = gallerySettings.instagram_url || '';
     document.getElementById('settingContactEmail').value = gallerySettings.contact_email || '';
@@ -250,6 +252,7 @@ if (new URLSearchParams(window.location.search).get('edit') === '1') {
       artist_name: document.getElementById('settingArtistName').value,
       intro: document.getElementById('settingIntro').value,
       shop_url: document.getElementById('settingShopUrl').value,
+      etsy_url: document.getElementById('settingEtsyUrl').value,
       pinterest_url: document.getElementById('settingPinterestUrl').value,
       instagram_url: document.getElementById('settingInstagramUrl').value,
       contact_email: document.getElementById('settingContactEmail').value,
