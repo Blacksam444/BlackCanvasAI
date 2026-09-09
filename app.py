@@ -11,7 +11,7 @@ import uuid
 import zipfile
 from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import Request as UrlRequest, urlopen
 from urllib.parse import quote, urlencode
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
@@ -307,7 +307,7 @@ def live_agent_reply(message: str, conversation_id: int | None = None) -> dict[s
         ),
         "max_output_tokens": 900,
     }
-    request = Request(
+    request = UrlRequest(
         "https://api.openai.com/v1/responses",
         data=json.dumps(request_body).encode("utf-8"),
         headers={
@@ -2888,7 +2888,7 @@ def analyze_artwork_pixels(artwork: dict, image_path: Path) -> dict:
     request_body = artwork_visual_request_body(
         artwork, prepared_image_data_url(image_path), style, existing_titles
     )
-    request = Request(
+    request = UrlRequest(
         "https://api.openai.com/v1/responses",
         data=json.dumps(request_body).encode("utf-8"),
         headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
