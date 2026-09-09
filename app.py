@@ -70,6 +70,7 @@ async def protect_public_gallery(request: Request, call_next):
             or path.startswith("/api/inquiry-artwork/")
             or (path == "/api/inquiries" and request.method == "POST")
             or (path == "/api/gallery-release-package" and request.method == "POST")
+            or (path == "/api/gallery-release-settings" and request.method == "PUT")
         )
         if not public_route:
             return JSONResponse(status_code=404, content={"detail": "Not found"})
@@ -925,6 +926,18 @@ def update_gallery_settings(payload: GallerySettingsPayload) -> dict[str, str]:
             (json.dumps(settings),),
         )
     return settings
+
+
+@app.put("/api/gallery-release-settings")
+def update_public_gallery_settings(request: Request, payload: GallerySettingsPayload) -> dict[str, str]:
+    """Update public-facing links without re-uploading the artwork package."""
+    if not PUBLIC_GALLERY_ONLY:
+        raise HTTPException(status_code=404, detail="Not found")
+    release_token = os.environ.get("BLACKCANVAS_RELEASE_TOKEN", "").strip()
+    provided_token = request.headers.get("x-blackcanvas-release-token", "")
+    if not release_token or not secrets.compare_digest(provided_token, release_token):
+        raise HTTPException(status_code=403, detail="Release authorization is required")
+    return update_gallery_settings(payload)
 
 
 @app.get("/connections")
