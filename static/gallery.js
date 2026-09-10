@@ -34,6 +34,8 @@ const requestedCollection = new URLSearchParams(window.location.search).get('col
 let selected = Object.prototype.hasOwnProperty.call(collectionExhibitions, requestedCollection) ? requestedCollection : 'all';
 let gallerySettings = {};
 let dialogIndex = 0;
+const PAGE_SIZE = 12;
+let shownArtworkCount = PAGE_SIZE;
 
 const escapeHtml = (value = '') => String(value).replace(/[&<>'\"]/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));
 const frameClass = (collection = '') => `frame-${collection.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'black-canvas'}`;
@@ -80,16 +82,24 @@ function publicArtworkStatus(item) {
 
 function render() {
   const items = visibleArtwork();
-  count.textContent = `${items.length} ${items.length === 1 ? 'work' : 'works'} on view`;
-  grid.innerHTML = items.map((item, index) => {
+  const displayedItems = items.slice(0, shownArtworkCount);
+  count.textContent = displayedItems.length === items.length
+    ? `${items.length} ${items.length === 1 ? 'work' : 'works'} on view`
+    : `${displayedItems.length} of ${items.length} works on view`;
+  grid.innerHTML = displayedItems.map((item, index) => {
     const extra = [item.medium, item.dimensions].filter(Boolean).join(' · ') || item.collection;
     const status = publicArtworkStatus(item);
+    const responsiveImage = `${item.url}?width=480 480w, ${item.url}?width=800 800w, ${item.url}?width=1200 1200w`;
     return `<button class="art-card ${frameClass(item.collection)} position-${index % 7}" type="button" data-artwork-id="${item.id}">
-      <span class="frame-shell"><span class="art-image"><img src="${item.url}" alt="${escapeHtml(item.title || 'Black Canvas artwork')}" loading="lazy"></span></span>
+      <span class="frame-shell"><span class="art-image"><img src="${item.url}?width=800" srcset="${responsiveImage}" sizes="(max-width: 720px) 90vw, (max-width: 960px) 45vw, 32vw" alt="${escapeHtml(item.title || 'Black Canvas artwork')}" loading="lazy"></span></span>
       <span class="art-copy"><span class="work-number">${String(index + 1).padStart(2, '0')}</span><span class="placard-body"><small>${escapeHtml(item.collection || 'Black Canvas')}</small><strong>${escapeHtml(item.title || 'Untitled work')}</strong><em>${escapeHtml(extra)}</em><span class="placard-status">${status}</span></span></span>
     </button>`;
   }).join('');
   emptyState.hidden = items.length !== 0;
+  const loadMore = document.getElementById('loadMoreArt');
+  const remaining = items.length - displayedItems.length;
+  loadMore.hidden = remaining <= 0;
+  loadMore.textContent = `Show ${Math.min(PAGE_SIZE, remaining)} more ${remaining === 1 ? 'work' : 'artworks'}`;
 }
 
 function dailySpotlight(items) {
@@ -105,7 +115,7 @@ function setFeatured(item) {
   if (!item) return;
   featuredArtwork.disabled = false;
   featuredArtwork.dataset.artworkId = item.id;
-  document.getElementById('featuredImage').src = item.url;
+  document.getElementById('featuredImage').src = `${item.url}?width=1200`;
   document.getElementById('featuredImage').alt = item.title || 'Featured Black Canvas artwork';
   document.getElementById('featuredTitle').textContent = item.title || 'Untitled work';
   document.getElementById('featuredMeta').textContent = [item.collection, item.medium, item.dimensions].filter(Boolean).join(' · ');
@@ -115,7 +125,7 @@ function showArtwork(id) {
   const item = artwork.find((artworkItem) => artworkItem.id === Number(id));
   if (!item) return;
   dialogIndex = artwork.indexOf(item);
-  document.getElementById('dialogImage').src = item.url;
+  document.getElementById('dialogImage').src = `${item.url}?width=1600`;
   document.getElementById('dialogImage').alt = item.title || 'Black Canvas artwork';
   document.getElementById('dialogCollection').textContent = item.collection || 'Black Canvas';
   document.getElementById('dialogTitle').textContent = item.title || 'Untitled work';
@@ -172,6 +182,7 @@ document.addEventListener('keydown', (event) => {
 document.querySelectorAll('[data-filter]').forEach((button) => {
   button.addEventListener('click', () => {
     selected = button.dataset.filter;
+    shownArtworkCount = PAGE_SIZE;
     document.querySelectorAll('[data-filter]').forEach((item) => item.classList.toggle('active', item === button));
     const url = new URL(window.location.href);
     if (collectionExhibitions[selected]) url.searchParams.set('collection', selected);
@@ -181,6 +192,11 @@ document.querySelectorAll('[data-filter]').forEach((button) => {
     setFeatured(dailySpotlight(visibleArtwork()));
     render();
   });
+});
+
+document.getElementById('loadMoreArt').addEventListener('click', () => {
+  shownArtworkCount += PAGE_SIZE;
+  render();
 });
 
 fetch('/api/gallery-artworks').then((response) => response.ok ? response.json() : []).then((items) => {

@@ -9,7 +9,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Manrope:wght@600;700;800&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/gallery.css?v=6">
+  <link rel="icon" href="/static/black-canvas-favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/gallery.css?v=7">
 </head>
 <body>
   <header class="site-header">
@@ -71,6 +72,7 @@
         <button class="surprise-filter" id="surpriseFilter" type="button">✦ Pick one for me</button>
       </div>
       <div class="art-grid" id="artGrid" aria-live="polite"></div>
+      <div class="gallery-more"><button id="loadMoreArt" type="button" hidden>Show more artwork</button></div>
       <div class="empty-state" id="emptyState" hidden>
         <p>Your selected artwork will appear here.</p>
         <a id="emptyStudioLink" href="/image-studio">Open Image Studio</a>
@@ -135,6 +137,6 @@
       <div class="editor-actions"><button class="cancel" value="cancel">Cancel</button><button class="save-settings" id="saveGallerySettings" value="default">Save changes</button></div>
     </form>
   </dialog>
-  <script src="/static/gallery.js?v=9"></script>
+  <script src="/static/gallery.js?v=10"></script>
 </body>
 </html>

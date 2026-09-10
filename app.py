@@ -1929,8 +1929,8 @@ def list_gallery_artworks() -> list[dict]:
 
 
 @app.get("/api/gallery-artworks/{artwork_id}/image")
-def gallery_artwork_image(artwork_id: int) -> Response:
-    """Serve a screen-quality gallery preview, keeping the original upload private."""
+def gallery_artwork_image(artwork_id: int, width: int = 1200) -> Response:
+    """Serve a right-sized gallery preview, keeping the original upload private."""
     matches = rows("SELECT filename FROM artworks WHERE id = ? AND gallery_visible = 1", (artwork_id,))
     if not matches:
         raise HTTPException(status_code=404, detail="Artwork not found")
@@ -1940,14 +1940,15 @@ def gallery_artwork_image(artwork_id: int) -> Response:
     try:
         with Image.open(image_path) as source:
             preview = ImageOps.exif_transpose(source).convert("RGB")
-            preview.thumbnail((1600, 1600), Image.Resampling.LANCZOS)
+            preview_width = min(max(int(width), 320), 1600)
+            preview.thumbnail((preview_width, preview_width), Image.Resampling.LANCZOS)
             image_bytes = io.BytesIO()
             preview.save(image_bytes, format="JPEG", quality=86, optimize=True)
     except (OSError, ValueError) as error:
         raise HTTPException(status_code=400, detail="Artwork preview could not be prepared") from error
     return Response(
         content=image_bytes.getvalue(), media_type="image/jpeg",
-        headers={"Cache-Control": "public, max-age=86400"},
+        headers={"Cache-Control": "public, max-age=86400", "Vary": "Accept"},
     )
 
 
