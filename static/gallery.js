@@ -36,6 +36,11 @@ let gallerySettings = {};
 let dialogIndex = 0;
 const PAGE_SIZE = 12;
 let shownArtworkCount = PAGE_SIZE;
+const savedArtworkStorageKey = 'blackCanvasSavedArtworkIds';
+let savedArtworkIds = new Set();
+try {
+  savedArtworkIds = new Set(JSON.parse(window.localStorage.getItem(savedArtworkStorageKey) || '[]').map(Number));
+} catch { savedArtworkIds = new Set(); }
 
 const escapeHtml = (value = '') => String(value).replace(/[&<>'\"]/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));
 const frameClass = (collection = '') => `frame-${collection.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'black-canvas'}`;
@@ -67,10 +72,26 @@ function applyExhibition() {
 }
 
 function visibleArtwork() {
+  if (selected === 'favorites') return artwork.filter((item) => savedArtworkIds.has(Number(item.id)));
   if (selected === 'available') return artwork.filter((item) => ['Ready to list', 'Listed'].includes(item.sale_status));
   if (selected === 'sold') return artwork.filter((item) => item.sale_status === 'Sold');
   if (selected === 'archive') return artwork.filter((item) => !['Ready to list', 'Listed'].includes(item.sale_status));
   return artwork.filter((item) => selected === 'all' || item.collection === selected);
+}
+
+function saveFavoriteIds() {
+  window.localStorage.setItem(savedArtworkStorageKey, JSON.stringify([...savedArtworkIds]));
+  document.getElementById('savedWorksFilter').textContent = savedArtworkIds.size
+    ? `Saved works (${savedArtworkIds.size})`
+    : 'Saved works';
+}
+
+function toggleSavedArtwork(artworkId) {
+  const id = Number(artworkId);
+  if (savedArtworkIds.has(id)) savedArtworkIds.delete(id);
+  else savedArtworkIds.add(id);
+  saveFavoriteIds();
+  render();
 }
 
 function publicArtworkStatus(item) {
@@ -90,10 +111,14 @@ function render() {
     const extra = [item.medium, item.dimensions].filter(Boolean).join(' · ') || item.collection;
     const status = publicArtworkStatus(item);
     const responsiveImage = `${item.url}?width=480 480w, ${item.url}?width=800 800w, ${item.url}?width=1200 1200w`;
-    return `<button class="art-card ${frameClass(item.collection)} position-${index % 7}" type="button" data-artwork-id="${item.id}">
+    const saved = savedArtworkIds.has(Number(item.id));
+    return `<article class="art-card ${frameClass(item.collection)} position-${index % 7}">
+      <button class="art-open" type="button" data-artwork-id="${item.id}" aria-label="Open ${escapeHtml(item.title || 'artwork')}">
       <span class="frame-shell"><span class="art-image"><img src="${item.url}?width=800" srcset="${responsiveImage}" sizes="(max-width: 720px) 90vw, (max-width: 960px) 45vw, 32vw" alt="${escapeHtml(item.title || 'Black Canvas artwork')}" loading="lazy"></span></span>
       <span class="art-copy"><span class="work-number">${String(index + 1).padStart(2, '0')}</span><span class="placard-body"><small>${escapeHtml(item.collection || 'Black Canvas')}</small><strong>${escapeHtml(item.title || 'Untitled work')}</strong><em>${escapeHtml(extra)}</em><span class="placard-status">${status}</span></span></span>
-    </button>`;
+      </button>
+      <button class="save-favorite ${saved ? 'saved' : ''}" type="button" data-save-artwork-id="${item.id}" aria-label="${saved ? 'Remove' : 'Save'} ${escapeHtml(item.title || 'artwork')}">${saved ? '♥' : '♡'}</button>
+    </article>`;
   }).join('');
   emptyState.hidden = items.length !== 0;
   const loadMore = document.getElementById('loadMoreArt');
@@ -163,8 +188,23 @@ function openSurpriseArtwork() {
 }
 
 grid.addEventListener('click', (event) => {
+  const saveButton = event.target.closest('[data-save-artwork-id]');
+  if (saveButton) {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleSavedArtwork(saveButton.dataset.saveArtworkId);
+    return;
+  }
   const card = event.target.closest('[data-artwork-id]');
   if (card) showArtwork(card.dataset.artworkId);
+});
+grid.addEventListener('keydown', (event) => {
+  const saveButton = event.target.closest('[data-save-artwork-id]');
+  if (saveButton && (event.key === 'Enter' || event.key === ' ')) {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleSavedArtwork(saveButton.dataset.saveArtworkId);
+  }
 });
 featuredArtwork.addEventListener('click', () => showArtwork(featuredArtwork.dataset.artworkId));
 document.getElementById('closeDialog').addEventListener('click', () => dialog.close());
@@ -201,6 +241,7 @@ document.getElementById('loadMoreArt').addEventListener('click', () => {
 
 fetch('/api/gallery-artworks').then((response) => response.ok ? response.json() : []).then((items) => {
   artwork = items;
+  saveFavoriteIds();
   applyExhibition();
   document.querySelectorAll('[data-filter]').forEach((button) => button.classList.toggle('active', button.dataset.filter === selected));
   setFeatured(dailySpotlight(visibleArtwork()));
