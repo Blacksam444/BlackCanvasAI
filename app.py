@@ -33,6 +33,8 @@ BASE_DIR = Path(__file__).resolve().parent
 OPENAI_ENV_FILE = BASE_DIR / ".env"
 OPENAI_MODEL = "gpt-5.6-luna"
 OPENAI_MONTHLY_CALL_LIMIT = 250
+OPENAI_LUNA_INPUT_PER_MILLION = 0.20
+OPENAI_LUNA_OUTPUT_PER_MILLION = 1.20
 PUBLIC_GALLERY_ONLY = os.environ.get("BLACKCANVAS_PUBLIC_GALLERY_ONLY", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
@@ -124,14 +126,30 @@ def openai_call_count() -> tuple[str, int]:
     return current_month, int(usage.get("calls", 0))
 
 
-def record_openai_call() -> None:
+def response_usage(result: dict | None) -> tuple[int, int]:
+    usage = (result or {}).get("usage") or {}
+    return int(usage.get("input_tokens") or 0), int(usage.get("output_tokens") or 0)
+
+
+def record_openai_call(activity_type: str = "Live Agent request", result: dict | None = None) -> None:
+    """Count each request and retain a private, plain-language estimate for Jeffrey."""
     month, calls = openai_call_count()
     value = json.dumps({"month": month, "calls": calls + 1})
+    input_tokens, output_tokens = response_usage(result)
+    estimated_cost = (
+        (input_tokens * OPENAI_LUNA_INPUT_PER_MILLION)
+        + (output_tokens * OPENAI_LUNA_OUTPUT_PER_MILLION)
+    ) / 1_000_000
     with connect() as db:
         db.execute(
             "INSERT INTO studio_settings(key, value) VALUES ('openai_agent_usage', ?) "
             "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             (value,),
+        )
+        db.execute(
+            "INSERT INTO agent_activity(activity_type, model, input_tokens, output_tokens, estimated_cost) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (activity_type, OPENAI_MODEL, input_tokens, output_tokens, estimated_cost),
         )
 
 
@@ -327,7 +345,7 @@ def live_agent_reply(message: str, conversation_id: int | None = None) -> dict[s
     reply = openai_response_text(result)
     if not reply:
         raise HTTPException(status_code=502, detail="Live Agent returned an empty reply. Please try again.")
-    record_openai_call()
+    record_openai_call("Creative chat", result)
     return {"reply": reply, "live_agent": True, "actions": agent_actions_for_request(message)}
 
 
@@ -727,6 +745,11 @@ def chat() -> FileResponse:
     return FileResponse(BASE_DIR / "templates" / "chat.html")
 
 
+@app.get("/agent-activity")
+def agent_activity_page() -> FileResponse:
+    return FileResponse(BASE_DIR / "templates" / "agent-activity.html")
+
+
 @app.get("/prompts")
 def prompts() -> FileResponse:
     return FileResponse(BASE_DIR / "templates" / "prompts.html")
@@ -957,6 +980,29 @@ def openai_status() -> dict[str, object]:
         "model": OPENAI_MODEL,
         "calls_used": calls,
         "calls_limit": OPENAI_MONTHLY_CALL_LIMIT,
+    }
+
+
+@app.get("/api/agent-activity")
+def agent_activity() -> dict[str, object]:
+    """Private usage log. Estimates are helpful guidance; the Platform invoice remains authoritative."""
+    current_month, total_calls = openai_call_count()
+    with connect() as db:
+        activity = [dict(item) for item in db.execute(
+            "SELECT id, activity_type, model, input_tokens, output_tokens, estimated_cost, status, created_at "
+            "FROM agent_activity WHERE substr(created_at, 1, 7) = ? ORDER BY id DESC LIMIT 100",
+            (current_month,),
+        ).fetchall()]
+    estimated_cost = round(sum(float(item["estimated_cost"] or 0) for item in activity), 4)
+    return {
+        "month": current_month,
+        "model": OPENAI_MODEL,
+        "calls_used": total_calls,
+        "calls_limit": OPENAI_MONTHLY_CALL_LIMIT,
+        "logged_calls": len(activity),
+        "earlier_unlogged_calls": max(total_calls - len(activity), 0),
+        "estimated_cost": estimated_cost,
+        "activity": activity,
     }
 
 
@@ -2919,7 +2965,7 @@ def analyze_artwork_pixels(artwork: dict, image_path: Path) -> dict:
         raise HTTPException(status_code=502, detail="The visual analyst returned an unreadable result. Please try again.")
     analysis["generated_prompt"] = clean_copy_ready_prompt(str(analysis.get("generated_prompt") or ""))
     analysis["tags"] = [str(tag).strip() for tag in analysis.get("tags", []) if str(tag).strip()][:14]
-    record_openai_call()
+    record_openai_call("Artwork image analysis", result)
     return analysis
 
 
