@@ -126,16 +126,27 @@ function openBatchUploader(files) {
     const existingCount = artworks.filter((item) => item.collection === collection).length;
     const detail = collectionDetails[collection] || { tags: "original art, contemporary art, Black Canvas", notes: "An original work from the Black Canvas collection." };
     let saved = 0;
+    let duplicates = 0;
+    let failed = 0;
     for (let index = 0; index < usableFiles.length; index += 1) {
       const file = usableFiles[index];
       const payload = { title: batchTitle(collection, usedTitles, existingCount + index), collection, tags: `${detail.tags}, original art, contemporary Black art`, notes: detail.notes, dimensions: "", medium: "", price: 0, sale_status: "In progress", gallery_visible: showOnGallery, data_url: await toDataUrl(file) };
       const response = await fetch("/api/artworks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      if (response.ok) saved += 1;
+      if (response.ok) {
+        saved += 1;
+      } else if (response.status === 409) {
+        duplicates += 1;
+      } else {
+        failed += 1;
+      }
     }
     dialog.close();
     dialog.remove();
     await load();
-    notify(`${saved} artwork${saved === 1 ? "" : "s"} added with titles and tags.`);
+    const parts = [`${saved} artwork${saved === 1 ? "" : "s"} added with titles and tags.`];
+    if (duplicates) parts.push(`${duplicates} exact duplicate${duplicates === 1 ? " was" : "s were"} skipped.`);
+    if (failed) parts.push(`${failed} file${failed === 1 ? " could" : "s could"} not be added.`);
+    notify(parts.join(" "));
   };
   dialog.addEventListener("close", () => dialog.remove());
   dialog.showModal();
@@ -417,13 +428,52 @@ document.querySelector("#saveArtwork").onclick = async (event) => {
     data_url: await toDataUrl(pendingFile),
   };
   const response = await fetch("/api/artworks", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-  if (!response.ok) return notify("The artwork could not be saved.");
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({}));
+    return notify(result.detail || "The artwork could not be saved.");
+  }
   pendingFile = null;
   document.querySelector("#fileInput").value = "";
   document.querySelector("#artDialog").close();
   await load();
   notify("Artwork saved permanently.");
 };
+
+function duplicateArtworkCard(artwork) {
+  return `<button class="duplicate-artwork-card" type="button" data-artwork-id="${artwork.id}">
+    <img src="${artwork.url}" alt="${escapeHtml(artwork.title)}">
+    <span><strong>${escapeHtml(artwork.title)}</strong><small>${escapeHtml(artwork.collection)}</small></span>
+    <em>Open</em>
+  </button>`;
+}
+
+document.querySelector("#findDuplicateArtwork").onclick = async () => {
+  const dialog = document.querySelector("#duplicateArtworkDialog");
+  const results = document.querySelector("#duplicateArtworkResults");
+  results.innerHTML = `<p class="duplicates-loading">Checking your catalog for exact matching image files…</p>`;
+  dialog.showModal();
+  try {
+    const response = await fetch("/api/artworks/duplicates");
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.detail || "Could not check the catalog right now.");
+    if (!result.groups.length) {
+      results.innerHTML = `<div class="duplicates-empty"><strong>No exact duplicates found.</strong><span>Your catalog is clear. Future exact repeat uploads will be skipped automatically.</span></div>`;
+      return;
+    }
+    results.innerHTML = `<p class="duplicate-help">Found ${result.duplicate_groups} duplicate group${result.duplicate_groups === 1 ? "" : "s"}. These are the same uploaded image file—not just similar artwork.</p>${result.groups.map((group, index) => `<section class="duplicate-group"><h3>Duplicate group ${index + 1} <span>${group.length} copies</span></h3><div>${group.map(duplicateArtworkCard).join("")}</div></section>`).join("")}`;
+    results.querySelectorAll("[data-artwork-id]").forEach((button) => {
+      button.onclick = () => {
+        const artwork = artworks.find((item) => item.id === Number(button.dataset.artworkId));
+        if (!artwork) return notify("That artwork could not be found.");
+        dialog.close();
+        showDetail(artwork);
+      };
+    });
+  } catch (error) {
+    results.innerHTML = `<div class="duplicates-empty"><strong>Could not check for duplicates.</strong><span>${escapeHtml(error.message || "Please try again.")}</span></div>`;
+  }
+};
+document.querySelector("#closeDuplicateArtwork").onclick = () => document.querySelector("#duplicateArtworkDialog").close();
 
 document.querySelector("#editArtwork").onclick = openEditDialog;
 document.querySelector("#createArtworkPrompt").onclick = async () => {

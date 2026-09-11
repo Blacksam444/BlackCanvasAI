@@ -1,5 +1,6 @@
 import base64
 import csv
+import hashlib
 import io
 import json
 import os
@@ -1921,6 +1922,29 @@ def list_artworks() -> list[dict]:
     return items
 
 
+@app.get("/api/artworks/duplicates")
+def find_duplicate_artworks() -> dict:
+    """Find exact duplicate upload files without changing or deleting any artwork."""
+    items = rows("SELECT id, title, collection, filename, image_hash FROM artworks ORDER BY id DESC")
+    groups: dict[str, list[dict]] = {}
+    with connect() as db:
+        for item in items:
+            image_path = UPLOAD_DIR / item["filename"]
+            if not image_path.exists():
+                continue
+            image_hash = item["image_hash"] or hashlib.sha256(image_path.read_bytes()).hexdigest()
+            if not item["image_hash"]:
+                db.execute("UPDATE artworks SET image_hash = ? WHERE id = ?", (image_hash, item["id"]))
+            groups.setdefault(image_hash, []).append({
+                "id": item["id"],
+                "title": item["title"],
+                "collection": item["collection"],
+                "url": f"/uploads/{item['filename']}",
+            })
+    duplicates = [members for members in groups.values() if len(members) > 1]
+    return {"groups": duplicates, "duplicate_groups": len(duplicates), "duplicate_artworks": sum(len(group) for group in duplicates)}
+
+
 @app.post("/api/artworks/bulk-update")
 def bulk_update_artworks(payload: ArtworkBulkPayload) -> dict[str, int]:
     artwork_ids = list(dict.fromkeys(payload.artwork_ids))[:100]
@@ -3231,6 +3255,22 @@ def create_artwork(payload: ArtworkPayload) -> dict:
     image_bytes = base64.b64decode(match.group(2), validate=True)
     if len(image_bytes) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Image must be smaller than 10 MB")
+    image_hash = hashlib.sha256(image_bytes).hexdigest()
+    with connect() as db:
+        duplicate = db.execute("SELECT title FROM artworks WHERE image_hash = ? LIMIT 1", (image_hash,)).fetchone()
+        if not duplicate:
+            older_items = db.execute("SELECT id, title, filename FROM artworks WHERE image_hash = ''").fetchall()
+            for item in older_items:
+                older_path = UPLOAD_DIR / item["filename"]
+                if not older_path.exists():
+                    continue
+                older_hash = hashlib.sha256(older_path.read_bytes()).hexdigest()
+                db.execute("UPDATE artworks SET image_hash = ? WHERE id = ?", (older_hash, item["id"]))
+                if older_hash == image_hash:
+                    duplicate = item
+                    break
+    if duplicate:
+        raise HTTPException(status_code=409, detail=f"This exact image is already in your catalog as '{duplicate['title']}'. It was skipped.")
     listing_url = payload.listing_url.strip()
     if listing_url and not re.match(r"https://[^\s/]+(?:/|$)", listing_url, re.IGNORECASE):
         raise HTTPException(status_code=400, detail="The shop or product link needs to begin with https://")
@@ -3238,9 +3278,9 @@ def create_artwork(payload: ArtworkPayload) -> dict:
     filename = f"{uuid.uuid4().hex}{extension}"
     (UPLOAD_DIR / filename).write_bytes(image_bytes)
     artwork_id = execute(
-        "INSERT INTO artworks(title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, gallery_visible, listing_url, filename) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO artworks(title, collection, tags, notes, favorite, dimensions, medium, price, sale_status, gallery_visible, listing_url, filename, image_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (payload.title.strip(), payload.collection, payload.tags.strip(), payload.notes.strip(), int(payload.favorite),
-         payload.dimensions.strip(), payload.medium.strip(), max(payload.price, 0), payload.sale_status, int(payload.gallery_visible), listing_url, filename),
+         payload.dimensions.strip(), payload.medium.strip(), max(payload.price, 0), payload.sale_status, int(payload.gallery_visible), listing_url, filename, image_hash),
     )
     return {"id": artwork_id, "url": f"/uploads/{filename}"}
 

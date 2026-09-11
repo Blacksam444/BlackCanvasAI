@@ -67,6 +67,7 @@ def initialize() -> None:
                 gallery_visible INTEGER NOT NULL DEFAULT 0,
                 listing_url TEXT NOT NULL DEFAULT '',
                 filename TEXT NOT NULL,
+                image_hash TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
             CREATE TABLE IF NOT EXISTS style_updates (
@@ -166,6 +167,8 @@ def initialize() -> None:
             db.execute("UPDATE artworks SET gallery_visible = 1 WHERE sale_status IN ('Ready to list', 'Listed')")
         if "listing_url" not in artwork_columns:
             db.execute("ALTER TABLE artworks ADD COLUMN listing_url TEXT NOT NULL DEFAULT ''")
+        if "image_hash" not in artwork_columns:
+            db.execute("ALTER TABLE artworks ADD COLUMN image_hash TEXT NOT NULL DEFAULT ''")
         db.execute("UPDATE prompts SET source = 'chatgpt', reviewed = 0 WHERE category = 'ChatGPT Import' AND source = 'manual'")
         db.execute("UPDATE prompts SET source = 'drive', reviewed = 0 WHERE category = 'Imported' AND source = 'manual'")
         if db.execute("SELECT COUNT(*) FROM prompts").fetchone()[0] == 0:
