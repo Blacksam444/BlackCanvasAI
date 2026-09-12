@@ -28,7 +28,7 @@ from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 from spellchecker import SpellChecker
 
-from storage import DATA_DIR, UPLOAD_DIR, backup_data, connect, execute, initialize, rows
+from storage import DATA_DIR, UPLOAD_DIR, backup_data, connect, execute, initialize, rows; from gallery_memory import GALLERY_PREVIEW_LOCK
 
 BASE_DIR = Path(__file__).resolve().parent
 OPENAI_ENV_FILE = BASE_DIR / ".env"
@@ -2008,7 +2008,7 @@ def gallery_artwork_image(artwork_id: int, width: int = 1200) -> Response:
     if not image_path.exists():
         raise HTTPException(status_code=404, detail="Artwork image not found")
     try:
-        with Image.open(image_path) as source:
+        with GALLERY_PREVIEW_LOCK, Image.open(image_path) as source:
             preview = ImageOps.exif_transpose(source).convert("RGB")
             preview_width = min(max(int(width), 320), 1600)
             preview.thumbnail((preview_width, preview_width), Image.Resampling.LANCZOS)
@@ -2395,7 +2395,7 @@ def artwork_certificate(artwork_id: int) -> FileResponse:
     document.rect(31, 31, page_width - 62, page_height - 62, fill=0, stroke=1)
 
     image_box_x, image_box_y, image_box_w, image_box_h = 58, 105, 270, 360
-    with Image.open(image_path) as source:
+    with GALLERY_PREVIEW_LOCK, Image.open(image_path) as source:
         image = ImageOps.exif_transpose(source).convert("RGB")
         image.thumbnail((image_box_w, image_box_h), Image.Resampling.LANCZOS)
         image_buffer = io.BytesIO()
@@ -2515,7 +2515,7 @@ def artwork_sale_receipt(artwork_id: int) -> FileResponse:
 
     image_path = UPLOAD_DIR / artwork["filename"]
     if image_path.is_file():
-        with Image.open(image_path) as source:
+        with GALLERY_PREVIEW_LOCK, Image.open(image_path) as source:
             image = ImageOps.exif_transpose(source).convert("RGB")
             image.thumbnail((180, 210), Image.Resampling.LANCZOS)
             image_buffer = io.BytesIO()
@@ -2870,7 +2870,7 @@ def artwork_image_record(artwork_id: int) -> tuple[dict, Path]:
 
 def prepared_image_data_url(image_path: Path) -> str:
     """Create a cost-conscious image input while preserving enough detail for visual analysis."""
-    with Image.open(image_path) as source:
+    with GALLERY_PREVIEW_LOCK, Image.open(image_path) as source:
         image = ImageOps.exif_transpose(source).copy()
         if getattr(image, "is_animated", False):
             image.seek(0)
@@ -3024,7 +3024,7 @@ def export_artwork_for_print(artwork_id: int, payload: PrintExportPayload) -> Fi
     artwork, image_path = artwork_image_record(artwork_id)
     required_width = round(payload.width_inches * 300)
     required_height = round(payload.height_inches * 300)
-    with Image.open(image_path) as source:
+    with GALLERY_PREVIEW_LOCK, Image.open(image_path) as source:
         image = ImageOps.exif_transpose(source)
         width, height = image.size
         original_ratio = width / height
@@ -3230,7 +3230,7 @@ def download_seller_package(artwork_id: int) -> FileResponse:
         "3. Use the original image for archiving and the 300-DPI PNG for print preparation.\n"
         "4. Marketplace requirements vary; preview the final listing before publishing.\n"
     )
-    with Image.open(image_path) as source:
+    with GALLERY_PREVIEW_LOCK, Image.open(image_path) as source:
         prepared = ImageOps.exif_transpose(source).copy()
         if prepared.mode not in ("RGB", "RGBA"):
             prepared = prepared.convert("RGBA" if "transparency" in source.info else "RGB")
