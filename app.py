@@ -53,6 +53,8 @@ def is_likely_image_prompt(title: str, category: str, text: str) -> bool:
 
 
 initialize()
+GALLERY_PREVIEW_DIR = DATA_DIR / "gallery-previews"
+GALLERY_PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
 app = FastAPI(title="Black Canvas AI")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
@@ -1999,27 +2001,34 @@ def list_gallery_artworks() -> list[dict]:
 
 
 @app.get("/api/gallery-artworks/{artwork_id}/image")
-def gallery_artwork_image(artwork_id: int, width: int = 1200) -> Response:
-    """Serve a right-sized gallery preview, keeping the original upload private."""
+def gallery_artwork_image(artwork_id: int, width: int = 1200) -> FileResponse:
+    """Serve a cached web preview so visitor traffic never repeatedly opens print-size originals."""
     matches = rows("SELECT filename FROM artworks WHERE id = ? AND gallery_visible = 1", (artwork_id,))
     if not matches:
         raise HTTPException(status_code=404, detail="Artwork not found")
     image_path = UPLOAD_DIR / matches[0]["filename"]
     if not image_path.exists():
         raise HTTPException(status_code=404, detail="Artwork image not found")
+    preview_width = min(max(int(width), 320), 1600)
+    preview_path = GALLERY_PREVIEW_DIR / f"{artwork_id}-{preview_width}.jpg"
+    if preview_path.is_file():
+        return FileResponse(preview_path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400", "Vary": "Accept"})
     try:
-        with GALLERY_PREVIEW_LOCK, Image.open(image_path) as source:
-            preview = ImageOps.exif_transpose(source).convert("RGB")
-            preview_width = min(max(int(width), 320), 1600)
-            preview.thumbnail((preview_width, preview_width), Image.Resampling.LANCZOS)
-            image_bytes = io.BytesIO()
-            preview.save(image_bytes, format="JPEG", quality=86, optimize=True)
+        with GALLERY_PREVIEW_LOCK:
+            if not preview_path.is_file():
+                temporary_path = preview_path.with_suffix(".tmp.jpg")
+                with Image.open(image_path) as source:
+                    # JPEGs can be decoded near the requested display size instead of at print resolution.
+                    source.draft("RGB", (preview_width * 2, preview_width * 2))
+                    preview = ImageOps.exif_transpose(source)
+                    preview.thumbnail((preview_width, preview_width), Image.Resampling.LANCZOS)
+                    if preview.mode != "RGB":
+                        preview = preview.convert("RGB")
+                    preview.save(temporary_path, format="JPEG", quality=84, optimize=False)
+                os.replace(temporary_path, preview_path)
     except (OSError, ValueError) as error:
         raise HTTPException(status_code=400, detail="Artwork preview could not be prepared") from error
-    return Response(
-        content=image_bytes.getvalue(), media_type="image/jpeg",
-        headers={"Cache-Control": "public, max-age=86400", "Vary": "Accept"},
-    )
+    return FileResponse(preview_path, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400", "Vary": "Accept"})
 
 
 @app.get("/api/artworks/{artwork_id}/agent-brief")
