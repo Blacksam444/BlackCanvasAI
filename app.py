@@ -68,7 +68,7 @@ async def protect_public_gallery(request: Request, call_next):
         if path == "/":
             return RedirectResponse("/gallery", status_code=307)
         public_route = (
-            path in {"/gallery", "/inquire", "/api/health", "/favicon.ico"}
+            path in {"/gallery", "/artist", "/inquire", "/api/health", "/favicon.ico"}
             or (path == "/api/gallery-settings" and request.method == "GET")
             or path.startswith("/static/")
             or path.startswith("/api/gallery-artworks")
@@ -773,6 +773,15 @@ def gallery() -> FileResponse:
     """A public-facing gallery preview, kept separate from the studio tools."""
     return FileResponse(
         BASE_DIR / "templates" / "gallery.html",
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
+
+
+@app.get("/artist")
+def artist() -> FileResponse:
+    """Public artist page, separate from the working studio."""
+    return FileResponse(
+        BASE_DIR / "templates" / "artist.html",
         headers={"Cache-Control": "no-store, max-age=0"},
     )
 

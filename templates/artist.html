@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#171411">
+  <meta name="description" content="Meet the artist behind Black Canvas.">
+  <title>Artist · Black Canvas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Manrope:wght@600;700;800&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
+  <link rel="icon" href="/static/black-canvas-favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/artist.css?v=1">
+</head>
+<body>
+  <header class="site-header">
+    <a class="wordmark" href="/gallery" aria-label="Black Canvas gallery home"><span>BC</span><strong>BLACK CANVAS</strong></a>
+    <nav aria-label="Gallery navigation"><a href="/gallery">Gallery</a><a href="/artist" aria-current="page">Artist</a><a href="/inquire">Inquire</a></nav>
+    <a class="return-link" href="/gallery">Return to gallery <span>↗</span></a>
+  </header>
+  <main>
+    <section class="artist-hero">
+      <p class="kicker">THE ARTIST BEHIND BLACK CANVAS</p>
+      <h1 id="artistName">Jeffrey McKay</h1>
+      <p class="artist-role">Contemporary artist · visual world-builder · collector of symbols</p>
+      <div class="monogram" aria-hidden="true">BC<br><span>444</span></div>
+    </section>
+    <section class="artist-story">
+      <div class="index">01 / PRACTICE</div>
+      <div>
+        <h2>Building worlds where memory, imagination, and everyday life meet.</h2>
+      </div>
+      <div class="body-copy">
+        <p>Black Canvas is an evolving visual practice rooted in Black imagination, emotional presence, street rhythm, and the beauty of becoming. Each work begins with a feeling, a symbol, or a piece of lived texture—then grows into a world of its own.</p>
+        <p>The work moves between regal portraiture, imagined futures, quiet reflection, collage, raw marks, and layered urban energy. The goal is not decoration. It is to make images that stay with you.</p>
+      </div>
+    </section>
+    <section class="collections">
+      <div class="section-title"><p class="kicker">THREE VISUAL LANGUAGES</p><h2>The Black Canvas world</h2></div>
+      <div class="collection-grid">
+        <article><span>01</span><h3>AfroNova</h3><p>Future mythology, ancestral memory, celestial power, and Black identity seen through a regal lens.</p><a href="/gallery?collection=AfroNova#collection">View AfroNova →</a></article>
+        <article><span>02</span><h3>Quiet Nova</h3><p>Interior light, stillness, tenderness, and space for emotion to breathe.</p><a href="/gallery?collection=Quiet%20Nova#collection">View Quiet Nova →</a></article>
+        <article><span>03</span><h3>GraffitiX</h3><p>Raw frequency, symbols, scratches, color collisions, and the pulse of the street.</p><a href="/gallery?collection=GraffitiX#collection">View GraffitiX →</a></article>
+      </div>
+    </section>
+    <section class="artist-cta">
+      <p class="kicker">COLLECT · COLLABORATE · CONNECT</p>
+      <h2>Interested in a work<br>or a commission?</h2>
+      <p>For availability, commissions, collaborations, or simply to start a conversation, reach out to the studio.</p>
+      <div><a class="button primary" href="/gallery#collection">Explore the gallery <span>↓</span></a><a class="button secondary" href="/inquire">Inquire with the artist <span>↗</span></a></div>
+    </section>
+  </main>
+  <footer><span>© <span id="year"></span> Black Canvas</span><span>Contemporary art by <b id="footerArtist">Jeffrey McKay</b></span><a href="/gallery">Gallery home ↑</a></footer>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    fetch('/api/gallery-settings').then((response) => response.ok ? response.json() : null).then((settings) => {
+      if (!settings) return;
+      const name = settings.artist_name || 'Jeffrey McKay';
+      document.getElementById('artistName').textContent = name;
+      document.getElementById('footerArtist').textContent = name;
+    });
+  </script>
+</body>
+</html>
