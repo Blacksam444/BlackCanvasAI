@@ -12,7 +12,10 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
+from typing import Literal
+
+from think_tank import MATERIALS, SURFACES, build_ideas
 
 from storage import UPLOAD_DIR, backup_data, connect, execute, initialize, rows
 
@@ -187,6 +190,25 @@ def dashboard_file() -> FileResponse:
 
 class ChatMessage(BaseModel):
     message: str
+
+
+class ThinkTankPayload(BaseModel):
+    materials: list[Literal["acrylic", "charcoal", "pastel", "collage", "ink"]] = Field(min_length=1, max_length=5)
+    surface: Literal["canvas", "paper", "panel"] = "canvas"
+    direction: str = Field(min_length=3, max_length=600)
+    collection: Literal["AfroNova", "Quiet Nova", "GraffitiX"] = "AfroNova"
+    variation: int = Field(default=0, ge=0, le=10000)
+
+    @field_validator("direction", mode="before")
+    @classmethod
+    def trim_direction(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("materials")
+    @classmethod
+    def unique_materials(cls, value):
+        # Keep the physical working order regardless of checkbox selection order.
+        return [name for name in ("acrylic", "collage", "ink", "charcoal", "pastel") if name in value]
 
 
 class PromptPayload(BaseModel):
@@ -434,6 +456,27 @@ def prompts() -> FileResponse:
 @app.get("/image-studio")
 def image_studio() -> FileResponse:
     return FileResponse(BASE_DIR / "templates" / "image-studio.html")
+
+
+@app.get("/think-tank")
+def think_tank() -> FileResponse:
+    return FileResponse(BASE_DIR / "templates" / "think-tank.html")
+
+
+@app.get("/api/think-tank/options")
+def think_tank_options() -> dict:
+    return {"materials": {name: item["label"] for name, item in MATERIALS.items()}, "surfaces": SURFACES}
+
+
+@app.post("/api/think-tank/generate")
+def generate_think_tank_ideas(payload: ThinkTankPayload) -> dict:
+    return {
+        "engine": "local",
+        "ideas": build_ideas(
+            payload.materials, payload.surface, payload.direction, payload.collection,
+            payload.variation, list_styles().get(payload.collection, {}), create_image_prompt,
+        ),
+    }
 
 
 @app.get("/style-bible")
