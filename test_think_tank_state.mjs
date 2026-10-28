@@ -118,3 +118,14 @@ test("refined briefs and unfinished refinement edits survive workspace restorati
   value.ideas[0].refineDraft.studio_notes = "x".repeat(1201);
   assert.equal(restoreWorkspace(JSON.stringify(value), options), null);
 });
+
+test("user direction, custom-only materials, and preferences restore without collection defaults", () => {
+  const own = { materials: [], other_materials: "Watercolor", surface: "paper", collection: "My own direction",
+    direction: "An abstract seascape", palette: "teal and rust", mood: "playful", style_direction: "Loose washes", avoid: "faces" };
+  const value = { version: 1, form: own, brief: own, variation: 0, ideas: ["A", "C", "E"].map((composition) => ({
+    ...idea(composition), category: "My own direction", materials: ["Watercolor"], brief: own,
+  })) };
+  assert.deepEqual(restoreWorkspace(JSON.stringify(value), options), value);
+  value.form = { ...own, avoid: "x".repeat(1201) };
+  assert.equal(restoreWorkspace(JSON.stringify(value), options), null);
+});

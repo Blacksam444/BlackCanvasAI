@@ -9,14 +9,7 @@ UPLOAD_DIR = DATA_DIR / "uploads"
 DB_PATH = DATA_DIR / "blackcanvas.db"
 MIDJOURNEY_RULES_PATH = BASE_DIR / "midjourney_rules.json"
 
-DEFAULT_PROMPTS = [
-    ("Cosmic Royalty Portrait", "AfroNova", "Create a bold portrait where cosmic elegance meets street-art energy. Feature a regal Black subject, luminous celestial textures, deep violet and gold tones, and gallery-quality detail.", 1),
-    ("Soft Morning Reflection", "Quiet Nova", "A contemplative Black figure in soft window light, surrounded by calm neutral tones, subtle texture, and generous negative space. The mood is intimate, grounded, and quietly powerful.", 0),
-    ("Neon City Expression", "GraffitiX", "An explosive urban portrait blending layered graffiti marks, neon color, expressive typography, torn-paper texture, and the energy of a midnight city wall.", 1),
-    ("Studio Process Reel", "Content", "Write a 30-second TikTok concept showing an artwork move from blank canvas to final reveal. Include a strong opening hook, three visual beats, on-screen text, and a natural call to action.", 0),
-    ("Artwork Pricing Check", "Business", "Help me price an original artwork. Consider dimensions, materials, hours worked, experience, uniqueness, packaging, platform fees, and a healthy profit margin.", 0),
-    ("Collection Story Builder", "AfroNova", "Develop a concise story for a cohesive art collection exploring Black identity, imagined futures, ancestry, and self-defined power.", 0),
-]
+DEFAULT_PROMPTS = []
 
 
 def connect() -> sqlite3.Connection:

@@ -12,10 +12,10 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Literal
 
-from think_tank import COMPOSITIONS, MATERIALS, SURFACES, build_ideas
+from think_tank import COMPOSITIONS, MATERIALS, SURFACES, USER_DIRECTION, build_ideas
 
 from storage import UPLOAD_DIR, backup_data, connect, execute, initialize, rows
 
@@ -193,16 +193,19 @@ class ChatMessage(BaseModel):
 
 
 class ThinkTankPayload(BaseModel):
-    materials: list[Literal["acrylic", "charcoal", "pastel", "collage", "ink"]] = Field(min_length=1, max_length=5)
+    materials: list[Literal["acrylic", "charcoal", "pastel", "collage", "ink"]] = Field(default_factory=list, max_length=5)
     surface: Literal["canvas", "paper", "panel"] = "canvas"
     direction: str = Field(min_length=3, max_length=600)
-    collection: Literal["AfroNova", "Quiet Nova", "GraffitiX"] = "AfroNova"
+    collection: Literal["My own direction", "AfroNova", "Quiet Nova", "GraffitiX"] = USER_DIRECTION
     variation: int = Field(default=0, ge=0, le=10000)
     palette: str = Field(default="", max_length=2600)
     mood: str = Field(default="", max_length=2600)
     studio_notes: str = Field(default="", max_length=1200)
+    style_direction: str = Field(default="", max_length=600)
+    avoid: str = Field(default="", max_length=1200)
+    other_materials: str = Field(default="", max_length=240)
 
-    @field_validator("direction", "palette", "mood", "studio_notes", mode="before")
+    @field_validator("direction", "palette", "mood", "studio_notes", "style_direction", "avoid", "other_materials", mode="before")
     @classmethod
     def trim_direction(cls, value):
         return value.strip() if isinstance(value, str) else value
@@ -212,6 +215,12 @@ class ThinkTankPayload(BaseModel):
     def unique_materials(cls, value):
         # Keep the physical working order regardless of checkbox selection order.
         return [name for name in ("acrylic", "collage", "ink", "charcoal", "pastel") if name in value]
+
+    @model_validator(mode="after")
+    def require_material(self):
+        if not self.materials and not self.other_materials:
+            raise ValueError("Choose a material or describe your own materials")
+        return self
 
 
 class ThinkTankRefinePayload(ThinkTankPayload):
@@ -309,44 +318,43 @@ def clean_image_idea(message: str) -> str:
     idea = re.sub(r"\b(a)\s+(african)\b", r"an \2", idea, flags=re.IGNORECASE)
     simple_style = re.sub(r"[^a-z]", "", idea.lower())
     if simple_style in ("afronova", "afronovastyle"):
-        idea = "a regal Black visionary in the AfroNova style"
+        idea = "an artwork in the AfroNova style"
     elif simple_style in ("quietnova", "quietnovastyle"):
-        idea = "a contemplative Black figure in the Quiet Nova style"
+        idea = "an artwork in the Quiet Nova style"
     elif simple_style in ("graffitix", "graffitixstyle"):
-        idea = "an expressive Black urban creator in the GraffitiX style"
+        idea = "an artwork in the GraffitiX style"
     return idea or message.strip()
 
 
 def prompt_collection(idea: str) -> tuple[str, str, str, str]:
     lowered = idea.lower()
-    if "afro nova" in lowered or "afronova" in lowered:
+
+    def selected(*aliases: str) -> bool:
+        return any(lowered.strip() == alias or re.search(
+            rf"(?<!not )\bin\s+(?:the\s+)?{re.escape(alias)}\s+style\b", lowered
+        ) for alias in aliases)
+
+    if selected("afro nova", "afronova"):
         return ("AfroNova", "deep violet, midnight blue, luminous gold, and rich earth tones",
                 "Afrofuturist elegance, celestial symbolism, intricate textile detail, and regal visual language",
                 "powerful, visionary, dignified")
-    if "quiet nova" in lowered:
+    if selected("quiet nova"):
         return ("Quiet Nova", "warm earth tones, soft cream, muted blue, and restrained gold",
                 "subtle tactile texture, generous negative space, and softly rendered details",
                 "intimate, grounded, contemplative")
-    if "graffitix" in lowered or "graffiti x" in lowered:
+    if selected("graffitix", "graffiti x"):
         return ("GraffitiX", "electric magenta, cyan, black, and flashes of gold",
                 "layered spray-paint marks, torn-paper textures, expressive urban energy, and a restrained symbolic vocabulary of hand-drawn 444 numerals, crowns, skulls, X-eyes, crude diamonds, primitive pyramids, cryptic writing, crossed-out phrases, ledger marks, and loose scribbles; organize the composition around one main subject, one hero symbol, one or two supporting symbols, then secondary background writing",
                 "bold, rebellious, kinetic")
-    if any(word in lowered for word in ("graffiti", "street", "urban", "neon", "city", "hip-hop")):
-        return ("GraffitiX", "electric magenta, cyan, black, and flashes of gold",
-                "layered spray-paint marks, torn-paper textures, expressive urban energy, and a restrained symbolic vocabulary of hand-drawn 444 numerals, crowns, skulls, X-eyes, crude diamonds, primitive pyramids, cryptic writing, crossed-out phrases, ledger marks, and loose scribbles; organize the composition around one main subject, one hero symbol, one or two supporting symbols, then secondary background writing",
-                "bold, rebellious, kinetic")
-    if any(word in lowered for word in ("quiet", "calm", "peaceful", "soft", "gentle", "reflective", "morning")):
-        return ("Quiet Nova", "warm earth tones, soft cream, muted blue, and restrained gold",
-                "subtle tactile texture, generous negative space, and softly rendered details",
-                "intimate, grounded, contemplative")
-    return ("AfroNova", "deep violet, midnight blue, luminous gold, and rich earth tones",
-            "Afrofuturist elegance, celestial symbolism, intricate textile detail, and regal visual language",
-            "powerful, visionary, dignified")
+    return (USER_DIRECTION, "", "", "")
 
 
-def create_image_prompt(message: str) -> tuple[str, str]:
+def create_image_prompt(message: str, *, collection_override: str | None = None) -> tuple[str, str]:
     idea = clean_image_idea(message)
-    collection, palette, style, mood = prompt_collection(idea)
+    explicit_own = re.search(r"(?:^|[.;])\s*collection\s*:\s*My own direction\b", idea, re.IGNORECASE)
+    collection, palette, style, mood = prompt_collection(USER_DIRECTION if explicit_own else (collection_override or idea))
+    if collection == USER_DIRECTION:
+        return collection, f"{strip_midjourney_parameters(idea)} {midjourney_v82_suffix(idea)}"
     lowered = idea.lower()
     subject = re.split(r"\s+in\s+the\s+(?:AfroNova|Quiet Nova|GraffitiX)\s+style", idea, maxsplit=1, flags=re.IGNORECASE)[0]
     requested_mood = re.search(r"with\s+(?:an?\s+)?(.+?)\s+mood", idea, flags=re.IGNORECASE)
@@ -363,6 +371,7 @@ def create_image_prompt(message: str) -> tuple[str, str]:
     requested_media = re.search(r"(?:^|[.;])\s*physical media\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     requested_background = re.search(r"(?:^|[.;])\s*background marks\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     requested_lighting = re.search(r"(?:^|[.;])\s*lighting\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
+    requested_approach = re.search(r"(?:^|[.;])\s*visual approach\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     midjourney_suffix = midjourney_v82_suffix(idea)
     if "photorealistic" in lowered or "photograph" in lowered:
         medium = "cinematic photorealistic portrait photography"
@@ -374,6 +383,8 @@ def create_image_prompt(message: str) -> tuple[str, str]:
         medium = "bold contemporary graphic poster art"
     else:
         medium = "museum-quality fine-art digital painting with painterly realism"
+    if requested_approach:
+        medium = requested_approach.group(1).strip()
     safety = " age-appropriate styling and a dignified, authentic expression," if any(
         word in subject.lower() for word in ("child", "boy", "girl", "kid", "baby")
     ) else ""
@@ -486,6 +497,7 @@ def generate_think_tank_ideas(payload: ThinkTankPayload) -> dict:
             payload.materials, payload.surface, payload.direction, payload.collection,
             payload.variation, list_styles().get(payload.collection, {}), create_image_prompt,
             palette_override=payload.palette, mood_override=payload.mood, studio_notes=payload.studio_notes,
+            style_direction=payload.style_direction, user_avoid=payload.avoid, other_materials=payload.other_materials,
         ),
     }
 
@@ -496,6 +508,7 @@ def refine_think_tank_idea(payload: ThinkTankRefinePayload) -> dict:
         payload.materials, payload.surface, payload.direction, payload.collection,
         payload.variation, list_styles().get(payload.collection, {}), create_image_prompt,
         palette_override=payload.palette, mood_override=payload.mood, studio_notes=payload.studio_notes,
+        style_direction=payload.style_direction, user_avoid=payload.avoid, other_materials=payload.other_materials,
         composition_index=payload.composition_index,
     )
     return {"engine": "local", "idea": ideas[0]}

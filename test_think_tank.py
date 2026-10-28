@@ -9,7 +9,7 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 
 from app import (
-    PromptPayload, ThinkTankPayload, ThinkTankRefinePayload, create_prompt, generate_think_tank_ideas,
+    PromptPayload, ThinkTankPayload, ThinkTankRefinePayload, create_prompt, create_image_prompt, generate_think_tank_ideas,
     list_prompts, refine_think_tank_idea, think_tank, think_tank_options,
 )
 from storage import backup_data, initialize
@@ -81,6 +81,68 @@ class ThinkTankTests(unittest.TestCase):
                 self.payload(**change)
         self.assertEqual(self.payload(direction="  A portrait  ").direction, "A portrait")
 
+    def test_default_direction_does_not_inherit_owner_styles_or_subjects(self):
+        payload = ThinkTankPayload(materials=["charcoal"], surface="paper", direction="A misty pine forest")
+        owner_style = {"colors": ["royal purple"], "mood": ["regal"], "ingredients": ["Black cosmic royalty"]}
+        with patch("app.list_styles", return_value={"AfroNova": owner_style, "My own direction": owner_style}):
+            ideas = generate_think_tank_ideas(payload)["ideas"]
+        for idea in ideas:
+            self.assertEqual(idea["category"], "My own direction")
+            self.assertEqual(idea["palette"], "")
+            self.assertEqual(idea["mood"], "")
+            self.assertEqual(idea["style_ingredients"], "")
+            self.assertIn("A misty pine forest", idea["reference_prompt"])
+            self.assertIn("Charcoal on heavy mixed-media paper", idea["reference_prompt"])
+            for unwanted in ("royal purple", "Black cosmic royalty", "portrait", "acrylic", "full-body"):
+                self.assertNotIn(unwanted, idea["reference_prompt"])
+
+    def test_user_preferences_and_custom_only_materials_survive_refine_and_remix(self):
+        payload = ThinkTankPayload(
+            direction="Abstract tidal shapes", other_materials="Watercolor and salt", surface="paper",
+            style_direction="Loose transparent washes", palette="teal and rust", mood="playful",
+            avoid="faces, crowns, and neon",
+        )
+        with patch("app.list_styles", return_value={}):
+            idea = generate_think_tank_ideas(payload)["ideas"][0]
+            refined = refine_think_tank_idea(ThinkTankRefinePayload(**idea["brief"], composition_index=idea["composition_index"]))["idea"]
+            remixes = generate_think_tank_ideas(ThinkTankPayload(**refined["brief"], variation=1))["ideas"]
+        for item in [idea, refined, *remixes]:
+            self.assertEqual(item["materials"], ["Watercolor and salt"])
+            self.assertEqual(item["palette"], "teal and rust")
+            self.assertEqual(item["mood"], "playful")
+            self.assertEqual(item["avoid"], "faces, crowns, and neon")
+            self.assertIn("Loose transparent washes", item["reference_prompt"])
+            self.assertIn("Avoid: faces, crowns, and neon", item["text"])
+            self.assertEqual(item["brief"]["other_materials"], "Watercolor and salt")
+
+    def test_chat_does_not_map_user_subjects_to_owner_collections(self):
+        for subject in ("a calm alpine lake", "a neon city map", "abstract urban shapes"):
+            collection, prompt = create_image_prompt(f"Create an image prompt for {subject}")
+            self.assertEqual(collection, "My own direction")
+            self.assertIn(subject, prompt)
+            self.assertNotIn("GraffitiX", prompt)
+            self.assertNotIn("AfroNova", prompt)
+        collection, prompt = create_image_prompt("A book titled AfroNova. Collection: My own direction.")
+        self.assertEqual(collection, "My own direction")
+        self.assertNotIn("expressive eyes", prompt)
+        for subject in ("a book titled AfroNova", "a landscape, not in the GraffitiX style"):
+            collection, _ = create_image_prompt(f"Create an image prompt for {subject}")
+            self.assertEqual(collection, "My own direction")
+
+    def test_material_or_preference_validation_rejects_empty_or_oversized_values(self):
+        for changes in ({"materials": [], "other_materials": "  "}, {"other_materials": "x" * 241},
+                        {"avoid": "x" * 1201}, {"style_direction": "x" * 601}):
+            with self.subTest(changes=changes), self.assertRaises(ValidationError):
+                self.payload(**changes)
+
+    def test_explicit_user_medium_overrides_the_selected_preset_medium(self):
+        collection, prompt = create_image_prompt(
+            "Create an image prompt for a portrait in the Quiet Nova style. Visual approach: watercolor on paper."
+        )
+        self.assertEqual(collection, "Quiet Nova")
+        self.assertIn("watercolor on paper", prompt)
+        self.assertNotIn("fine-art digital painting", prompt)
+
     def test_refinement_preserves_selected_composition_materials_surface_and_collection(self):
         payload = ThinkTankRefinePayload(**self.payload().model_dump(), composition_index=4)
         with patch("app.list_styles", return_value={}):
@@ -133,6 +195,7 @@ class ThinkTankTests(unittest.TestCase):
             with patch("storage.DATA_DIR", data), patch("storage.UPLOAD_DIR", data / "uploads"), \
                     patch("storage.connect", test_connection):
                 initialize()
+                self.assertEqual(list_prompts(), [])
                 payload = PromptPayload(title=idea["title"], category=idea["category"], text=idea["text"])
                 created = create_prompt(payload)
                 saved = next(item for item in list_prompts() if item["id"] == created["id"])

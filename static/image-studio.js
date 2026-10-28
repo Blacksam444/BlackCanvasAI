@@ -37,13 +37,26 @@ async function load() {
   const response = await fetch("/api/artworks");
   if (!response.ok) throw new Error();
   artworks = await response.json();
+  const filters = document.querySelector("#artFilters");
+  filters.querySelectorAll("[data-collection]").forEach((button) => button.remove());
+  const collections = [...new Set(artworks.map((artwork) => artwork.collection))].sort();
+  if (!["All", "Favorites", ...collections.map((collection) => `collection:${collection}`)].includes(filter)) filter = "All";
+  collections.forEach((collection) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.filter = `collection:${collection}`;
+    button.dataset.collection = "true";
+    button.textContent = ["All", "Favorites"].includes(collection) ? `Collection: ${collection}` : collection;
+    filters.appendChild(button);
+  });
+  filters.querySelectorAll("button").forEach((button) => button.classList.toggle("active", button.dataset.filter === filter));
   render();
 }
 
 function render() {
   grid.innerHTML = "";
   const shown = artworks.filter((artwork) => (
-    filter === "All" || (filter === "Favorites" ? artwork.favorite : artwork.collection === filter)
+    filter === "All" || (filter === "Favorites" ? artwork.favorite : artwork.collection === filter.slice("collection:".length))
   ) && `${artwork.title} ${artwork.collection} ${artwork.tags} ${artwork.notes}`.toLowerCase().includes(query));
   shown.forEach((artwork) => {
     const card = document.createElement("article");
@@ -162,14 +175,14 @@ document.querySelector("#saveArtworkDetails").onclick = async (event) => {
 };
 
 document.querySelector("#artSearch").oninput = (event) => { query = event.target.value.toLowerCase().trim(); render(); };
-document.querySelectorAll("#artFilters button").forEach((button) => {
-  button.onclick = () => {
-    document.querySelectorAll("#artFilters button").forEach((item) => item.classList.remove("active"));
-    button.classList.add("active");
-    filter = button.dataset.filter;
-    render();
-  };
-});
+document.querySelector("#artFilters").onclick = (event) => {
+  const button = event.target.closest("button[data-filter]");
+  if (!button) return;
+  document.querySelectorAll("#artFilters button").forEach((item) => item.classList.remove("active"));
+  button.classList.add("active");
+  filter = button.dataset.filter;
+  render();
+};
 document.querySelector("#detailClose").onclick = () => document.querySelector("#detailDialog").close();
 document.querySelector("#removeArtwork").onclick = async () => {
   if (!selectedId) return;

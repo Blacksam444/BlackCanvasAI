@@ -7,7 +7,7 @@ const showToast = (message) => {
 
 const hour = new Date().getHours();
 const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-document.querySelector("#greeting").textContent = `${greeting}, Jeffrey.`;
+document.querySelector("#greeting").textContent = `${greeting}.`;
 
 document.querySelectorAll("[data-view]").forEach((button) => {
   button.addEventListener("click", () => {

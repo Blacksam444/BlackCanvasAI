@@ -1,4 +1,4 @@
-import { WORKSPACE_KEY, restoreWorkspace, selectSingleRemix, arrangeRemixGroups } from "./think-tank-state.js?v=3";
+import { WORKSPACE_KEY, restoreWorkspace, selectSingleRemix, arrangeRemixGroups } from "./think-tank-state.js?v=4";
 
 const $ = (selector) => document.querySelector(selector);
 let generatedBrief = null;
@@ -36,6 +36,8 @@ function formBrief() {
   return {
     materials: [...document.querySelectorAll('input[name="material"]:checked')].map((input) => input.value),
     surface: $("#surface").value, direction: $("#direction").value, collection: $("#collection").value,
+    other_materials: $("#otherMaterials").value, style_direction: $("#styleDirection").value,
+    palette: $("#palette").value, mood: $("#mood").value, avoid: $("#avoid").value,
   };
 }
 
@@ -67,13 +69,15 @@ function createIdeaCard(idea, index) {
   const brief = idea.brief || generatedBrief;
   const refinement = idea.refineDraft || {
     direction: brief.direction, palette: idea.palette, mood: idea.mood, studio_notes: brief.studio_notes || "",
+    style_direction: brief.style_direction || "", avoid: brief.avoid || "",
   };
   const card = document.createElement("article");
   card.className = "idea-card";
   card.innerHTML = `<span class="idea-number">IDEA 0${index + 1} · ${escapeHtml(idea.category)}</span>
     <h3>${escapeHtml(idea.title)}</h3><p>${escapeHtml(idea.composition)}</p>
     <h4>Materials &amp; surface</h4><p>${escapeHtml(idea.materials.join(" · "))}<br>${escapeHtml(idea.surface)}</p>
-    <h4>Palette &amp; mood</h4><p>${escapeHtml(idea.palette)}<br>${escapeHtml(idea.mood)}</p>
+    <h4>Palette &amp; mood</h4><p>${escapeHtml(idea.palette || "Not specified")}<br>${escapeHtml(idea.mood || "Not specified")}</p>
+    ${brief.style_direction ? `<h4>Your style direction</h4><p>${escapeHtml(brief.style_direction)}</p>` : ""}
     ${idea.style_ingredients ? `<h4>Style Bible ingredients</h4><p>${escapeHtml(idea.style_ingredients)}</p>` : ""}
     ${idea.always ? `<h4>Always include</h4><p>${escapeHtml(idea.always)}</p>` : ""}
     ${idea.avoid ? `<h4>Avoid</h4><p>${escapeHtml(idea.avoid)}</p>` : ""}
@@ -86,6 +90,8 @@ function createIdeaCard(idea, index) {
         <label for="refineDirection${index}">Creative direction</label><textarea id="refineDirection${index}" name="direction" rows="3" minlength="3" maxlength="600" required>${escapeHtml(refinement.direction)}</textarea>
         <label for="refineMood${index}">Mood</label><input id="refineMood${index}" name="mood" maxlength="2600" value="${escapeHtml(refinement.mood)}" placeholder="For example: warm, hopeful, reflective">
         <label for="refinePalette${index}">Palette</label><input id="refinePalette${index}" name="palette" maxlength="2600" value="${escapeHtml(refinement.palette)}" placeholder="For example: indigo, copper, soft cream">
+        <label for="refineStyle${index}">Your style / influences</label><input id="refineStyle${index}" name="style_direction" maxlength="600" value="${escapeHtml(refinement.style_direction)}" placeholder="Describe the visual approach you prefer">
+        <label for="refineAvoid${index}">Things to avoid</label><textarea id="refineAvoid${index}" name="avoid" rows="2" maxlength="1200">${escapeHtml(refinement.avoid)}</textarea>
         <label for="refineNotes${index}">Studio notes</label><textarea id="refineNotes${index}" name="studio_notes" rows="3" maxlength="1200" placeholder="Your scale, texture, symbols, or finishing notes">${escapeHtml(refinement.studio_notes)}</textarea>
         <p class="tank-hint">Apply updates this card. Save the revision to add a new library entry.</p>
         <div class="refine-actions"><button class="tank-primary" type="submit">Apply refinement</button><button class="tank-secondary cancel-refine" type="button">Cancel edits</button></div>
@@ -94,7 +100,7 @@ function createIdeaCard(idea, index) {
     </details>
     <div class="idea-actions"><button class="tank-primary save-idea" type="button">${idea.saved ? "Saved ✓" : "Save to Prompt Library"}</button><button class="tank-secondary remix-idea" type="button">↻ Remix this idea</button><a href="/prompts" ${idea.saved ? "" : "hidden"}>View library ↗</a></div>`;
   const form = card.querySelector(".refine-form");
-  const readRefinement = () => Object.fromEntries(["direction", "mood", "palette", "studio_notes"]
+  const readRefinement = () => Object.fromEntries(["direction", "mood", "palette", "studio_notes", "style_direction", "avoid"]
     .map((name) => [name, form.elements.namedItem(name).value]));
   form.addEventListener("input", () => {
     idea.refineDraft = readRefinement();
@@ -258,8 +264,8 @@ $("#tankForm").onsubmit = (event) => {
   event.preventDefault();
   const brief = formBrief();
   brief.direction = brief.direction.trim();
-  if (!brief.materials.length) {
-    showStatus("Choose at least one material.");
+  if (!brief.materials.length && !brief.other_materials.trim()) {
+    showStatus("Choose at least one material or describe your own materials.");
     $("#materialOptions input").focus();
     return;
   }
@@ -292,7 +298,7 @@ async function loadOptions() {
   try {
     options = await request("/api/think-tank/options");
     $("#materialOptions").innerHTML = Object.entries(options.materials).map(([value, label]) =>
-      `<label class="material-choice"><input type="checkbox" name="material" value="${escapeHtml(value)}" ${value === "acrylic" ? "checked" : ""}>${escapeHtml(label)}</label>`).join("");
+      `<label class="material-choice"><input type="checkbox" name="material" value="${escapeHtml(value)}">${escapeHtml(label)}</label>`).join("");
     $("#surface").innerHTML = Object.entries(options.surfaces).map(([value, label]) =>
       `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`).join("");
     let restored;
@@ -306,6 +312,8 @@ async function loadOptions() {
       $("#surface").value = restored.form.surface;
       $("#direction").value = restored.form.direction;
       $("#collection").value = restored.form.collection;
+      for (const [id, key] of [["otherMaterials", "other_materials"], ["styleDirection", "style_direction"],
+        ["palette", "palette"], ["mood", "mood"], ["avoid", "avoid"]]) $("#" + id).value = restored.form[key] || "";
       if (ideas.some((idea) => idea.saved)) {
         try {
           const library = await request("/api/prompts");

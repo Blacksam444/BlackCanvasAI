@@ -14,7 +14,10 @@ const grid = document.querySelector("#promptGrid");
 const empty = document.querySelector("#empty");
 const toast = document.querySelector("#toast");
 const dialog = document.querySelector("#promptDialog");
-const canonicalCategories = ["AfroNova", "Quiet Nova", "GraffitiX", "Content", "Business", "Unsorted"];
+const canonicalCategories = ["My own direction", "AfroNova", "Quiet Nova", "GraffitiX", "Content", "Business", "Unsorted"];
+
+document.querySelector('#filters button[data-filter="All"]')
+  .insertAdjacentHTML("afterend", '<button data-filter="My own direction">My own direction</button>');
 document.querySelector("#sortPrompts").insertAdjacentHTML("beforeend", '<option value="test-age">Oldest tests first</option>');
 document.querySelector('#filters button[data-filter="Untested copies"]')
   .insertAdjacentHTML("afterend", '<button data-filter="Retest recommended">Retest recommended</button>');

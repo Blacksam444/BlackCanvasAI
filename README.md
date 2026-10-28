@@ -19,6 +19,17 @@ plans using the existing local prompt engine and saved Style Bible rules. Remix
 keeps the generated brief and rotates through six composition variations. This
 version does not call an external AI service or require an API key.
 
+The default is **My own direction**. Users can describe any subject, visual
+approach, colors, mood, things to avoid, and additional materials. No collection,
+palette, subject identity, or mood is assigned when these are left unspecified.
+AfroNova, Quiet Nova, and GraffitiX are optional presets. Think Tank reference
+prompts use the chosen materials/surface and the user's brief, including for
+landscapes, still life, and abstract work. Chat also defaults to user direction;
+describing a calm or urban scene does not silently select a collection.
+
+New prompt libraries start empty. Existing library content is preserved. Artwork
+collections can be named freely and Image Studio filters reflect saved artwork.
+
 **Save to Prompt Library** stores the complete plan and optional image reference
 prompt through the existing prompt API. Saved ideas use the same library, search,
 editing, duplicate protection, and backups as other prompts. **Remix this idea**

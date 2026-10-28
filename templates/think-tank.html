@@ -5,7 +5,7 @@
   <meta name="theme-color" content="#09090b"><title>Art Think Tank · Black Canvas AI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/think-tank.css?v=3">
+  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/think-tank.css?v=4">
 </head>
 <body>
 <div class="app-shell">
@@ -20,7 +20,7 @@
       <a class="nav-item" href="/prompts"><span>▤</span>Prompt Library</a>
       <a class="nav-item" href="/style-bible"><span>◇</span>Style Bible</a>
     </nav>
-    <div class="sidebar-footer"><a class="nav-item" href="/connections"><span>⚙</span>Connections</a><div class="profile"><div class="avatar">J</div><div><strong>Jeffrey</strong><span>Creator workspace</span></div></div></div>
+    <div class="sidebar-footer"><a class="nav-item" href="/connections"><span>⚙</span>Connections</a><div class="profile"><div class="avatar">○</div><div><strong>Your studio</strong><span>Creator workspace</span></div></div></div>
   </aside>
   <main class="main-content">
     <header class="topbar"><button class="menu-button" id="menuButton" aria-label="Open menu" aria-expanded="false">☰</button><a class="tank-library" href="/prompts">Open Prompt Library ↗</a></header>
@@ -29,8 +29,8 @@
       <div class="hero"><p class="eyebrow">FROM A SPARK TO THE STUDIO</p><h1>Art Think Tank</h1><p>Start with what’s on your worktable. Find your next physical artwork.</p></div>
       <ol class="tank-progress" aria-label="Creative process"><li>01 · Physical Art</li><li>02 · Materials</li><li>03 · Direction</li><li>04 · Three ideas</li></ol>
       <form id="tankForm" class="tank-form">
-        <fieldset><legend><span>01</span> Your materials</legend><p class="tank-hint">Choose what you want to work with.</p><div class="material-options" id="materialOptions"></div><label class="tank-label" for="surface">Working surface</label><select id="surface" name="surface" required></select></fieldset>
-        <fieldset><legend><span>02</span> Your direction</legend><label class="tank-label" for="direction">What do you want to explore?</label><textarea id="direction" name="direction" rows="4" minlength="3" maxlength="600" required placeholder="A Black woman surrounded by ancestral symbols, with a feeling of quiet strength"></textarea><label class="tank-label" for="collection">Collection / visual voice</label><select id="collection" name="collection"><option>AfroNova</option><option>Quiet Nova</option><option>GraffitiX</option></select><p class="tank-hint">Uses your saved <a href="/style-bible">Style Bible</a> palette and rules.</p></fieldset>
+        <fieldset><legend><span>01</span> Your materials</legend><p class="tank-hint">Choose what you want to work with, or add your own.</p><div class="material-options" id="materialOptions"></div><label class="tank-label" for="otherMaterials">Other materials (optional)</label><input id="otherMaterials" name="other_materials" maxlength="240" placeholder="Describe any other materials you use"><label class="tank-label" for="surface">Working surface</label><select id="surface" name="surface" required></select></fieldset>
+        <fieldset><legend><span>02</span> Your direction</legend><label class="tank-label" for="direction">What do you want to explore?</label><textarea id="direction" name="direction" rows="4" minlength="3" maxlength="600" required placeholder="Describe any subject, scene, or abstract idea you enjoy"></textarea><label class="tank-label" for="collection">Optional collection preset</label><select id="collection" name="collection"><option>My own direction</option><option>AfroNova</option><option>Quiet Nova</option><option>GraffitiX</option></select><p class="tank-hint">Start with your own preferences. Collection presets from the <a href="/style-bible">Style Bible</a> are optional.</p><label class="tank-label" for="styleDirection">Your style / influences (optional)</label><input id="styleDirection" name="style_direction" maxlength="600" placeholder="Describe the visual approach you like"><label class="tank-label" for="palette">Colors you like (optional)</label><input id="palette" name="palette" maxlength="2600" placeholder="Any colors or combinations you prefer"><label class="tank-label" for="mood">Mood / feeling (optional)</label><input id="mood" name="mood" maxlength="2600" placeholder="How would you like the artwork to feel?"><label class="tank-label" for="avoid">Things to avoid (optional)</label><textarea id="avoid" name="avoid" rows="2" maxlength="1200" placeholder="Subjects, colors, or visual qualities you don’t want"></textarea></fieldset>
         <div class="tank-form-footer"><p>Built with the studio’s local prompt engine.</p><button class="tank-primary" id="generateIdeas" type="submit" disabled>Create 3 ideas <span aria-hidden="true">↗</span></button></div>
       </form>
       <p id="tankStatus" role="status" aria-live="polite">Loading materials…</p>
@@ -44,6 +44,6 @@
   </main>
 </div>
 <div class="toast" id="toast" role="status"></div>
-<script type="module" src="/static/think-tank.js?v=3"></script>
+<script type="module" src="/static/think-tank.js?v=4"></script>
 </body>
 </html>

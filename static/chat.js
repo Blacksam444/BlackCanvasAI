@@ -30,7 +30,7 @@ function addMessage(role, text, save = true, promptData = null) {
   welcome.hidden = true;
   const element = document.createElement("article");
   element.className = `message ${role}`;
-  element.innerHTML = `<div class="message-avatar">${role === "user" ? "J" : "✦"}</div><div><div class="message-name">${role === "user" ? "You" : "Black Canvas AI"}</div><div class="message-body">${markdown(text)}</div><button class="copy-message">Copy</button></div>`;
+  element.innerHTML = `<div class="message-avatar">${role === "user" ? "○" : "✦"}</div><div><div class="message-name">${role === "user" ? "You" : "Black Canvas AI"}</div><div class="message-body">${markdown(text)}</div><button class="copy-message">Copy</button></div>`;
   element.querySelector(".copy-message").onclick = async () => {
     await navigator.clipboard.writeText(text);
     notify("Message copied.");
@@ -165,11 +165,18 @@ document.querySelector("#promptBuilder").onsubmit = (event) => {
   const imageStyle = document.querySelector("#builderStyle").value;
   const aspectRatio = document.querySelector("#builderAspectRatio").value;
   if (!subject) return document.querySelector("#builderSubject").focus();
-  const colorDirection = colors === "Collection colors" ? "the collection color palette" : colors;
+  const colorDirection = colors === "Collection colors" ? "the collection color palette" : colors.trim();
   const graffitiDirection = collection === "GraffitiX"
     ? ` Pose: ${document.querySelector("#builderPose").value}; Camera: ${document.querySelector("#builderCamera").value}; Wardrobe: ${document.querySelector("#builderWardrobe").value}; Hero symbol: ${document.querySelector("#builderHero").value}; Supporting symbols: ${document.querySelector("#builderSupporting").value}; Physical media: ${document.querySelector("#builderMedia").value}; Background marks: ${document.querySelector("#builderBackground").value}; Lighting: ${document.querySelector("#builderLighting").value}.`
     : "";
-  send(`Create an image prompt for ${subject} in the ${collection} style, with a ${mood} mood, using ${colorDirection}, as a ${imageStyle}. Aspect ratio: ${aspectRatio}.${graffitiDirection}`);
+  const own = collection === "My own direction";
+  const parts = [`Create an image prompt for ${subject}${own ? "" : ` in the ${collection} style`}`];
+  if (mood.trim()) parts.push(`Mood: ${mood.trim()}`);
+  if (colorDirection) parts.push(`Colors: ${colorDirection}`);
+  if (imageStyle.trim()) parts.push(`Medium / visual approach: ${imageStyle.trim()}`);
+  // Preserve the established collection builder syntax when a preset is explicitly selected.
+  send(own ? `${parts.join(". ")}. Aspect ratio: ${aspectRatio}. Collection: My own direction.`
+    : `Create an image prompt for ${subject} in the ${collection} style${mood ? `, with a ${mood} mood` : ""}${colorDirection ? `, using ${colorDirection}, as a ${imageStyle || "user-directed artwork"}` : ""}.${imageStyle.trim() ? ` Visual approach: ${imageStyle.trim()}.` : ""} Aspect ratio: ${aspectRatio}.${graffitiDirection}`);
 };
 JSON.parse(localStorage.getItem(KEY) || "[]").forEach((message) => addMessage(message.role, message.text, false, message.promptData));
 const openingQuestion = new URLSearchParams(window.location.search).get("q");
