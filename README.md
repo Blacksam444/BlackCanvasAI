@@ -25,6 +25,12 @@ editing, duplicate protection, and backups as other prompts. **Remix this idea**
 replaces only its card and keeps the other two ideas, including their save status.
 The batch remix changes all three compositions, even after individual remixes.
 
+**Develop this idea** lets you edit a card's direction, palette, mood, and studio
+notes while keeping its composition, materials, surface, and collection. Apply
+updates only that card; Save adds the revised plan as a new library entry, leaving
+earlier saves intact. Individual and batch remixes keep each card's refinements.
+Unfinished refinement edits are also remembered in the browser workspace.
+
 Your unfinished direction and current ideas are restored when you return in the
 same browser on the same device and address. This browser draft is not a Prompt
 Library save or a cross-device backup. Save ideas you want to keep in the library.

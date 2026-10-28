@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { restoreWorkspace, selectSingleRemix, arrangeBatchRemix } from "./static/think-tank-state.js";
+import { restoreWorkspace, selectSingleRemix, arrangeRemixGroups } from "./static/think-tank-state.js";
 
 const options = { materials: { acrylic: "Acrylic paint", collage: "Paper collage" }, surfaces: { canvas: "Primed canvas", paper: "Heavy paper" } };
 const brief = { materials: ["acrylic"], surface: "canvas", direction: "A quiet portrait", collection: "Quiet Nova" };
@@ -82,9 +82,39 @@ test("batch remix changes every card even after arbitrary individual remixes", (
     if (new Set([a, b, c]).size !== 3) continue;
     const current = [a, b, c].map((value) => idea(String(value)));
     for (let variation = 0; variation < 6; variation += 1) {
-      const remixed = arrangeBatchRemix(candidates(variation), current);
+      const group = candidates(variation);
+      const remixed = arrangeRemixGroups([group, group, group], current);
       remixed.forEach((item, index) => assert.notEqual(item.composition, current[index].composition));
       assert.equal(new Set(remixed.map((item) => item.composition)).size, 3);
     }
   }
+});
+
+test("batch remixes retain each card's own direction and refinement", () => {
+  const current = [idea("0"), idea("1"), idea("4")];
+  const groups = current.map((item, index) => candidates((Number(item.composition) + 1) % 6)
+    .map((candidate) => ({ ...candidate, brief: { ...brief, direction: `Individual direction ${index}`, studio_notes: `Notes ${index}` } })));
+  const result = arrangeRemixGroups(groups, current);
+  assert.ok(result);
+  result.forEach((item, index) => {
+    assert.equal(item.brief.direction, `Individual direction ${index}`);
+    assert.equal(item.brief.studio_notes, `Notes ${index}`);
+    assert.notEqual(item.composition, current[index].composition);
+  });
+  assert.equal(new Set(result.map((item) => item.composition)).size, 3);
+});
+
+test("impossible remixes leave the caller able to keep its current cards", () => {
+  const current = [idea("A"), idea("B"), idea("C")];
+  assert.equal(arrangeRemixGroups([[idea("A")], [idea("B")], [idea("C")]], current), null);
+});
+
+test("refined briefs and unfinished refinement edits survive workspace restoration", () => {
+  const value = workspace();
+  value.ideas[0].brief = { ...brief, direction: "A hopeful portrait", palette: "Copper and indigo", mood: "Hopeful", studio_notes: "Leave the lower edge raw." };
+  value.ideas[0].composition_index = 0;
+  value.ideas[0].refineDraft = { direction: "An unfinished revision", palette: "Copper", mood: "", studio_notes: "A work in progress" };
+  assert.deepEqual(restoreWorkspace(JSON.stringify(value), options), value);
+  value.ideas[0].refineDraft.studio_notes = "x".repeat(1201);
+  assert.equal(restoreWorkspace(JSON.stringify(value), options), null);
 });

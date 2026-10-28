@@ -15,7 +15,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field, field_validator
 from typing import Literal
 
-from think_tank import MATERIALS, SURFACES, build_ideas
+from think_tank import COMPOSITIONS, MATERIALS, SURFACES, build_ideas
 
 from storage import UPLOAD_DIR, backup_data, connect, execute, initialize, rows
 
@@ -198,8 +198,11 @@ class ThinkTankPayload(BaseModel):
     direction: str = Field(min_length=3, max_length=600)
     collection: Literal["AfroNova", "Quiet Nova", "GraffitiX"] = "AfroNova"
     variation: int = Field(default=0, ge=0, le=10000)
+    palette: str = Field(default="", max_length=2600)
+    mood: str = Field(default="", max_length=2600)
+    studio_notes: str = Field(default="", max_length=1200)
 
-    @field_validator("direction", mode="before")
+    @field_validator("direction", "palette", "mood", "studio_notes", mode="before")
     @classmethod
     def trim_direction(cls, value):
         return value.strip() if isinstance(value, str) else value
@@ -209,6 +212,10 @@ class ThinkTankPayload(BaseModel):
     def unique_materials(cls, value):
         # Keep the physical working order regardless of checkbox selection order.
         return [name for name in ("acrylic", "collage", "ink", "charcoal", "pastel") if name in value]
+
+
+class ThinkTankRefinePayload(ThinkTankPayload):
+    composition_index: int = Field(ge=0, lt=len(COMPOSITIONS))
 
 
 class PromptPayload(BaseModel):
@@ -465,7 +472,10 @@ def think_tank() -> FileResponse:
 
 @app.get("/api/think-tank/options")
 def think_tank_options() -> dict:
-    return {"materials": {name: item["label"] for name, item in MATERIALS.items()}, "surfaces": SURFACES}
+    return {
+        "materials": {name: item["label"] for name, item in MATERIALS.items()}, "surfaces": SURFACES,
+        "compositions": [composition for _, composition in COMPOSITIONS],
+    }
 
 
 @app.post("/api/think-tank/generate")
@@ -475,8 +485,20 @@ def generate_think_tank_ideas(payload: ThinkTankPayload) -> dict:
         "ideas": build_ideas(
             payload.materials, payload.surface, payload.direction, payload.collection,
             payload.variation, list_styles().get(payload.collection, {}), create_image_prompt,
+            palette_override=payload.palette, mood_override=payload.mood, studio_notes=payload.studio_notes,
         ),
     }
+
+
+@app.post("/api/think-tank/refine")
+def refine_think_tank_idea(payload: ThinkTankRefinePayload) -> dict:
+    ideas = build_ideas(
+        payload.materials, payload.surface, payload.direction, payload.collection,
+        payload.variation, list_styles().get(payload.collection, {}), create_image_prompt,
+        palette_override=payload.palette, mood_override=payload.mood, studio_notes=payload.studio_notes,
+        composition_index=payload.composition_index,
+    )
+    return {"engine": "local", "idea": ideas[0]}
 
 
 @app.get("/style-bible")

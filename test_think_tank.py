@@ -9,8 +9,8 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 
 from app import (
-    PromptPayload, ThinkTankPayload, create_prompt, generate_think_tank_ideas,
-    list_prompts, think_tank, think_tank_options,
+    PromptPayload, ThinkTankPayload, ThinkTankRefinePayload, create_prompt, generate_think_tank_ideas,
+    list_prompts, refine_think_tank_idea, think_tank, think_tank_options,
 )
 from storage import backup_data, initialize
 
@@ -81,6 +81,42 @@ class ThinkTankTests(unittest.TestCase):
                 self.payload(**change)
         self.assertEqual(self.payload(direction="  A portrait  ").direction, "A portrait")
 
+    def test_refinement_preserves_selected_composition_materials_surface_and_collection(self):
+        payload = ThinkTankRefinePayload(**self.payload().model_dump(), composition_index=4)
+        with patch("app.list_styles", return_value={}):
+            result = refine_think_tank_idea(payload)
+        self.assertEqual(result["engine"], "local")
+        idea = result["idea"]
+        self.assertEqual(idea["composition_index"], 4)
+        self.assertEqual(idea["composition"], think_tank_options()["compositions"][4])
+        self.assertEqual(idea["category"], payload.collection)
+        self.assertEqual(idea["brief"]["materials"], payload.materials)
+        self.assertEqual(idea["brief"]["surface"], payload.surface)
+
+    def test_refined_palette_mood_notes_and_direction_reach_the_plan_and_remixes(self):
+        updates = {"palette": "copper and indigo", "mood": "warm and hopeful", "studio_notes": "Leave the lower edge raw.",
+                   "direction": "A hopeful ancestral portrait"}
+        payload = ThinkTankRefinePayload(**self.payload(**updates).model_dump(), composition_index=2)
+        with patch("app.list_styles", return_value={"Quiet Nova": {"dos": ["Keep dignity"], "donts": ["Neon"]}}):
+            idea = refine_think_tank_idea(payload)["idea"]
+            remixed = generate_think_tank_ideas(ThinkTankPayload(**idea["brief"], variation=1))["ideas"]
+        for item in [idea, *remixed]:
+            self.assertEqual(item["palette"], updates["palette"])
+            self.assertEqual(item["mood"], updates["mood"])
+            self.assertIn(updates["direction"], item["text"])
+            self.assertIn(updates["studio_notes"], item["text"])
+            self.assertIn(updates["palette"], item["reference_prompt"])
+            self.assertIn(updates["mood"], item["reference_prompt"])
+            self.assertIn("Always include: Keep dignity", item["text"])
+            self.assertIn("Avoid: Neon", item["text"])
+
+    def test_refinement_rejects_unsupported_compositions_and_oversized_notes(self):
+        for change in ({"composition_index": -1}, {"composition_index": 6}, {"studio_notes": "x" * 1201},
+                       {"palette": "x" * 2601}, {"mood": "x" * 2601}):
+            values = {**self.payload().model_dump(), "composition_index": 0, **change}
+            with self.subTest(change=change), self.assertRaises(ValidationError):
+                ThinkTankRefinePayload(**values)
+
     def test_save_uses_existing_library_backup_and_duplicate_protection(self):
         idea = self.generate()["ideas"][0]
         with tempfile.TemporaryDirectory() as temp:
@@ -105,6 +141,16 @@ class ThinkTankTests(unittest.TestCase):
                 with self.assertRaises(HTTPException) as error:
                     create_prompt(payload)
                 self.assertEqual(error.exception.status_code, 409)
+                with patch("app.list_styles", return_value={}):
+                    refined = refine_think_tank_idea(ThinkTankRefinePayload(
+                        **self.payload(direction="A revised ancestral portrait", studio_notes="Keep the edges rough.").model_dump(),
+                        composition_index=idea["composition_index"],
+                    ))["idea"]
+                revision = create_prompt(PromptPayload(title=refined["title"], category=refined["category"], text=refined["text"]))
+                self.assertNotEqual(revision["id"], created["id"])
+                library = {item["id"]: item for item in list_prompts()}
+                self.assertEqual(library[created["id"]]["text"], idea["text"])
+                self.assertIn("Keep the edges rough.", library[revision["id"]]["text"])
 
     def test_page_and_navigation_are_available(self):
         self.assertTrue(Path(think_tank().path).is_file())

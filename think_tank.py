@@ -34,18 +34,22 @@ def style_list(style: dict, key: str) -> str:
     return ", ".join(value.strip()[:200] for value in values[:12] if isinstance(value, str) and value.strip())
 
 
-def build_ideas(materials, surface, direction, collection, variation, saved_style, prompt_factory):
-    """Return three unsaved plans; variation rotates all three compositions."""
+def build_ideas(materials, surface, direction, collection, variation, saved_style, prompt_factory,
+                palette_override="", mood_override="", studio_notes="", composition_index=None):
+    """Return three plans, or refine one while retaining its composition."""
     palette, mood = DEFAULT_STYLES[collection]
-    palette = style_list(saved_style, "colors") or palette
-    mood = style_list(saved_style, "mood") or mood
+    palette = palette_override or style_list(saved_style, "colors") or palette
+    mood = mood_override or style_list(saved_style, "mood") or mood
     ingredients = style_list(saved_style, "ingredients")
     always = style_list(saved_style, "dos")
     avoid = style_list(saved_style, "donts")
     labels = [MATERIALS[name]["label"] for name in materials]
     ideas = []
-    for index in range(3):
-        name, composition = COMPOSITIONS[(variation + index * 2) % len(COMPOSITIONS)]
+    indices = [composition_index] if composition_index is not None else [
+        (variation + index * 2) % len(COMPOSITIONS) for index in range(3)
+    ]
+    for index, selected_composition in enumerate(indices):
+        name, composition = COMPOSITIONS[selected_composition]
         # Rotate the focal treatment as well as the composition for each remix.
         treatment = ("a bold silhouette", "broken tonal planes", "a continuous contour")[(variation + index) % 3]
         steps = [
@@ -72,12 +76,18 @@ def build_ideas(materials, surface, direction, collection, variation, saved_styl
             notes.append(f"Always include: {always}")
         if avoid:
             notes.append(f"Avoid: {avoid}")
-        notes.extend(["", "STUDIO PLAN", *[f"{n}. {step}" for n, step in enumerate(steps, 1)],
-                      "", "OPTIONAL IMAGE REFERENCE PROMPT", reference_prompt])
+        notes.extend(["", "STUDIO PLAN", *[f"{n}. {step}" for n, step in enumerate(steps, 1)]])
+        if studio_notes:
+            notes.extend(["", "STUDIO NOTES", studio_notes])
+        notes.extend(["", "OPTIONAL IMAGE REFERENCE PROMPT", reference_prompt])
         ideas.append({
             "title": title, "category": collection, "composition": composition, "palette": palette,
             "mood": mood, "materials": labels, "surface": SURFACES[surface], "steps": steps,
             "style_ingredients": ingredients, "always": always, "avoid": avoid,
             "reference_prompt": reference_prompt, "text": "\n".join(notes),
+            "composition_index": selected_composition,
+            "brief": {"materials": list(materials), "surface": surface, "direction": direction,
+                      "collection": collection, "palette": palette_override, "mood": mood_override,
+                      "studio_notes": studio_notes},
         })
     return ideas

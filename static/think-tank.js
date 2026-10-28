@@ -1,4 +1,4 @@
-import { WORKSPACE_KEY, restoreWorkspace, selectSingleRemix, arrangeBatchRemix } from "./think-tank-state.js?v=2";
+import { WORKSPACE_KEY, restoreWorkspace, selectSingleRemix, arrangeRemixGroups } from "./think-tank-state.js?v=3";
 
 const $ = (selector) => document.querySelector(selector);
 let generatedBrief = null;
@@ -58,10 +58,16 @@ function setBusy(value) {
   document.querySelectorAll(".idea-card").forEach((card, index) => {
     card.querySelector(".save-idea").disabled = busy || ideas[index].saved;
     card.querySelector(".remix-idea").disabled = busy;
+    card.querySelectorAll(".refine-form input, .refine-form textarea, .refine-form button")
+      .forEach((control) => { control.disabled = busy; });
   });
 }
 
 function createIdeaCard(idea, index) {
+  const brief = idea.brief || generatedBrief;
+  const refinement = idea.refineDraft || {
+    direction: brief.direction, palette: idea.palette, mood: idea.mood, studio_notes: brief.studio_notes || "",
+  };
   const card = document.createElement("article");
   card.className = "idea-card";
   card.innerHTML = `<span class="idea-number">IDEA 0${index + 1} · ${escapeHtml(idea.category)}</span>
@@ -72,8 +78,39 @@ function createIdeaCard(idea, index) {
     ${idea.always ? `<h4>Always include</h4><p>${escapeHtml(idea.always)}</p>` : ""}
     ${idea.avoid ? `<h4>Avoid</h4><p>${escapeHtml(idea.avoid)}</p>` : ""}
     <h4>Try it on the worktable</h4><ol>${idea.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol>
+    ${brief.studio_notes ? `<h4>Studio notes</h4><p class="studio-notes">${escapeHtml(brief.studio_notes)}</p>` : ""}
     <details><summary>Optional image reference prompt</summary><p>${escapeHtml(idea.reference_prompt)}</p></details>
+    <details class="idea-refine" ${idea.refineDraft ? "open" : ""}><summary>Develop this idea</summary>
+      <p>Keep this composition, materials, surface, and collection. Shape the direction below.</p>
+      <form class="refine-form">
+        <label for="refineDirection${index}">Creative direction</label><textarea id="refineDirection${index}" name="direction" rows="3" minlength="3" maxlength="600" required>${escapeHtml(refinement.direction)}</textarea>
+        <label for="refineMood${index}">Mood</label><input id="refineMood${index}" name="mood" maxlength="2600" value="${escapeHtml(refinement.mood)}" placeholder="For example: warm, hopeful, reflective">
+        <label for="refinePalette${index}">Palette</label><input id="refinePalette${index}" name="palette" maxlength="2600" value="${escapeHtml(refinement.palette)}" placeholder="For example: indigo, copper, soft cream">
+        <label for="refineNotes${index}">Studio notes</label><textarea id="refineNotes${index}" name="studio_notes" rows="3" maxlength="1200" placeholder="Your scale, texture, symbols, or finishing notes">${escapeHtml(refinement.studio_notes)}</textarea>
+        <p class="tank-hint">Apply updates this card. Save the revision to add a new library entry.</p>
+        <div class="refine-actions"><button class="tank-primary" type="submit">Apply refinement</button><button class="tank-secondary cancel-refine" type="button">Cancel edits</button></div>
+        <p class="refine-status" role="status" aria-live="polite"></p>
+      </form>
+    </details>
     <div class="idea-actions"><button class="tank-primary save-idea" type="button">${idea.saved ? "Saved ✓" : "Save to Prompt Library"}</button><button class="tank-secondary remix-idea" type="button">↻ Remix this idea</button><a href="/prompts" ${idea.saved ? "" : "hidden"}>View library ↗</a></div>`;
+  const form = card.querySelector(".refine-form");
+  const readRefinement = () => Object.fromEntries(["direction", "mood", "palette", "studio_notes"]
+    .map((name) => [name, form.elements.namedItem(name).value]));
+  form.addEventListener("input", () => {
+    idea.refineDraft = readRefinement();
+    rememberWorkspace();
+  });
+  form.onsubmit = (event) => {
+    event.preventDefault();
+    refineOne(index, readRefinement());
+  };
+  form.querySelector(".cancel-refine").onclick = () => {
+    delete idea.refineDraft;
+    const replacement = createIdeaCard(idea, index);
+    card.replaceWith(replacement);
+    rememberWorkspace();
+    replacement.querySelector(".idea-refine summary").focus({ preventScroll: true });
+  };
   const save = card.querySelector(".save-idea");
   save.disabled = idea.saved || busy;
   save.onclick = async () => {
@@ -114,23 +151,81 @@ function renderIdeas() {
   $("#results").hidden = false;
 }
 
-const newIdea = (idea, nextVariation) => ({ ...idea, variation: nextVariation, saved: false, savedId: null });
+const newIdea = (idea, nextVariation, previous = null) => ({
+  ...idea, variation: nextVariation, saved: false, savedId: null,
+  ...(previous?.refineDraft ? { refineDraft: previous.refineDraft } : {}),
+});
 
-async function generate(brief, nextVariation, remix = false) {
+async function generate(brief, nextVariation) {
   if (busy) return;
   setBusy(true);
   showStatus("Shaping three directions for your worktable…");
   try {
     const result = await request("/api/think-tank/generate", { ...brief, variation: nextVariation });
-    const nextIdeas = remix ? arrangeBatchRemix(result.ideas, ideas) : result.ideas;
     generatedBrief = brief;
     variation = nextVariation;
-    ideas = nextIdeas.map((idea) => newIdea(idea, nextVariation));
+    ideas = result.ideas.map((idea) => newIdea(idea, nextVariation));
     renderIdeas();
     rememberWorkspace();
     $("#resultsTitle").focus();
     showStatus("Three ideas ready. Save a starting point or remix an individual idea.");
   } catch (error) {
+    showStatus(error.message);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function remixAll() {
+  if (busy || !generatedBrief) return;
+  setBusy(true);
+  showStatus("Remixing three ideas with their individual directions and refinements…");
+  try {
+    const nextVariations = ideas.map((idea) => (idea.variation + 1) % 6);
+    const results = await Promise.all(ideas.map((idea, index) => request("/api/think-tank/generate", {
+      ...(idea.brief || generatedBrief), variation: nextVariations[index],
+    })));
+    const selected = arrangeRemixGroups(results.map((result) => result.ideas), ideas);
+    if (!selected) throw new Error("Could not find three distinct remixes. Your ideas are still here; please try again.");
+    ideas = selected.map((idea, index) => newIdea(idea, nextVariations[index], ideas[index]));
+    variation = (variation + 1) % 6;
+    renderIdeas();
+    rememberWorkspace();
+    $("#resultsTitle").focus();
+    showStatus("Three remixes ready. Each keeps its own creative direction, palette, mood, and notes.");
+  } catch (error) {
+    showStatus(error.message);
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function refineOne(index, refinement) {
+  if (busy || !generatedBrief) return;
+  const idea = ideas[index];
+  const card = $("#ideaGrid").children[index];
+  const status = card.querySelector(".refine-status");
+  if (refinement.direction.trim().length < 3) {
+    status.textContent = "Add a creative direction of at least three characters.";
+    card.querySelector('[name="direction"]').focus();
+    return;
+  }
+  setBusy(true);
+  status.textContent = "Applying your refinement…";
+  try {
+    const result = await request("/api/think-tank/refine", {
+      ...(idea.brief || generatedBrief), ...refinement, variation: idea.variation,
+      composition_index: idea.composition_index ?? options.compositions.indexOf(idea.composition),
+    });
+    ideas[index] = newIdea(result.idea, idea.variation);
+    const replacement = createIdeaCard(ideas[index], index);
+    card.replaceWith(replacement);
+    rememberWorkspace();
+    showStatus(`Idea ${index + 1} refined. Save the revision when you’re ready.`);
+    replacement.querySelector("h3").tabIndex = -1;
+    replacement.querySelector("h3").focus({ preventScroll: true });
+  } catch (error) {
+    status.textContent = error.message;
     showStatus(error.message);
   } finally {
     setBusy(false);
@@ -143,10 +238,10 @@ async function remixOne(index) {
   setBusy(true);
   showStatus(`Remixing idea ${index + 1}. Your other ideas will stay in place…`);
   try {
-    const result = await request("/api/think-tank/generate", { ...generatedBrief, variation: nextVariation });
+    const result = await request("/api/think-tank/generate", { ...(ideas[index].brief || generatedBrief), variation: nextVariation });
     const candidate = selectSingleRemix(result.ideas, ideas, index);
     if (!candidate) throw new Error("Could not find a distinct remix. Your ideas are still here; please try again.");
-    ideas[index] = newIdea(candidate, nextVariation);
+    ideas[index] = newIdea(candidate, nextVariation, ideas[index]);
     const replacement = createIdeaCard(ideas[index], index);
     $("#ideaGrid").children[index].replaceWith(replacement);
     rememberWorkspace();
@@ -177,9 +272,7 @@ $("#tankForm").onsubmit = (event) => {
 };
 $("#tankForm").addEventListener("input", rememberWorkspace);
 $("#tankForm").addEventListener("change", rememberWorkspace);
-$("#remixIdeas").onclick = () => {
-  if (generatedBrief) generate(generatedBrief, (variation + 1) % 6, true);
-};
+$("#remixIdeas").onclick = remixAll;
 $("#menuButton").onclick = () => {
   const open = $("#sidebar").classList.toggle("open");
   $("#menuButton").setAttribute("aria-expanded", String(open));
