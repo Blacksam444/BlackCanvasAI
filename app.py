@@ -18,6 +18,7 @@ from typing import Literal
 from think_tank import COMPOSITIONS, MATERIALS, SURFACES, USER_DIRECTION, build_ideas
 
 from storage import UPLOAD_DIR, backup_data, connect, execute, initialize, rows
+from projects import router as project_router, restore_projects, validate_project_backups
 
 BASE_DIR = Path(__file__).resolve().parent
 MIDJOURNEY_RULES_PATH = BASE_DIR / "midjourney_rules.json"
@@ -180,6 +181,7 @@ def format_prompt_pack(prompts: list[dict]) -> str:
     return "\n\n".join(sections) + "\n"
 initialize()
 app = FastAPI(title="Black Canvas AI")
+app.include_router(project_router)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
@@ -1370,7 +1372,7 @@ def backup_to_google_drive() -> dict:
         fields="id,name,webViewLink",
     ).execute()
     manifest = backup_data()
-    manifest.update({"backup_format": 6, "created_at": created_at.isoformat(), "artwork_file_count": 0})
+    manifest.update({"backup_format": 7, "created_at": created_at.isoformat(), "artwork_file_count": 0})
     uploaded_images = 0
     mime_types = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif"}
     for artwork in manifest.get("artworks", []):
@@ -1406,6 +1408,7 @@ def backup_to_google_drive() -> dict:
         "url": folder.get("webViewLink", ""),
         "artwork_files": uploaded_images,
         "prompts": len(manifest.get("prompts", [])),
+        "projects": len(manifest.get("projects", [])),
     }
 
 
@@ -1465,6 +1468,7 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
         manifest = json.loads(service.files().get_media(fileId=manifest_file["id"]).execute())
     except (ValueError, json.JSONDecodeError) as error:
         raise HTTPException(status_code=400, detail="The backup manifest is invalid") from error
+    project_backups = validate_project_backups(manifest)
 
     snapshot_root = UPLOAD_DIR.parent / "restore-snapshots"
     snapshot_dir = snapshot_root / datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S-%f_UTC")
@@ -1519,12 +1523,14 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
                 ),
             )
             restored_artworks += 1
+        restored_project_count = restore_projects(db, project_backups, manifest, repair_midjourney_syntax)
     restored_rules = restore_midjourney_rules_from_manifest(manifest)
     return {
         "status": "restored",
         "prompts": restored_prompts,
         "artworks": restored_artworks,
         "images": restored_images,
+        "projects": restored_project_count,
         "midjourney_rules": int(restored_rules),
         "safety_snapshot": snapshot_dir.name,
     }

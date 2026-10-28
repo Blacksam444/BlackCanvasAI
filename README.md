@@ -48,11 +48,31 @@ Library save or a cross-device backup. Save ideas you want to keep in the librar
 Creating a new set replaces the current three ideas. Browser storage restrictions
 are reported on the page; generation and library saving still work without it.
 
+## Projects
+
+Choose **Start project** on a Think Tank idea, or **Open as project** when viewing
+a saved Prompt Library item. The idea is saved in the existing library first;
+the project links to it instead of keeping a second prompt store. Repeating the
+action opens the same project. Think Tank studio steps, materials, surface, and
+notes become editable project fields; other prompts start with a blank checklist.
+
+Use Projects to edit the plan, add or remove steps, track checklist progress, and
+mark the project as planned, in progress, paused, or completed. **Save project**
+stores progress on the app server for other connected devices. Unsaved drafts are
+remembered in the current browser when storage is available. Revision checks
+prevent a stale device from silently overwriting newer saves; older drafts can
+be reviewed explicitly before replacement. Source ideas in Trash do not remove
+the project or its checklist.
+
+Backup format 7 includes projects. Google Drive restore remaps source prompt IDs
+and adds missing projects without overwriting existing project progress. Older
+backups with no projects remain supported.
+
 ## Verify changes
 
 ```powershell
 python -m unittest discover -v
-python -m py_compile app.py storage.py think_tank.py
+python -m py_compile app.py storage.py think_tank.py projects.py
 node --test test_think_tank_state.mjs
 ```
 

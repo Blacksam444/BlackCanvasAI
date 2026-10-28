@@ -60,6 +60,7 @@ function setBusy(value) {
   document.querySelectorAll(".idea-card").forEach((card, index) => {
     card.querySelector(".save-idea").disabled = busy || ideas[index].saved;
     card.querySelector(".remix-idea").disabled = busy;
+    card.querySelector(".start-project").disabled = busy;
     card.querySelectorAll(".refine-form input, .refine-form textarea, .refine-form button")
       .forEach((control) => { control.disabled = busy; });
   });
@@ -98,7 +99,7 @@ function createIdeaCard(idea, index) {
         <p class="refine-status" role="status" aria-live="polite"></p>
       </form>
     </details>
-    <div class="idea-actions"><button class="tank-primary save-idea" type="button">${idea.saved ? "Saved ✓" : "Save to Prompt Library"}</button><button class="tank-secondary remix-idea" type="button">↻ Remix this idea</button><a href="/prompts" ${idea.saved ? "" : "hidden"}>View library ↗</a></div>`;
+    <div class="idea-actions"><button class="tank-primary save-idea" type="button">${idea.saved ? "Saved ✓" : "Save to Prompt Library"}</button><button class="tank-secondary start-project" type="button">${idea.projectId ? "Open project →" : "Start project →"}</button><button class="tank-secondary remix-idea" type="button">↻ Remix this idea</button><a href="/prompts" ${idea.saved ? "" : "hidden"}>View library ↗</a></div>`;
   const form = card.querySelector(".refine-form");
   const readRefinement = () => Object.fromEntries(["direction", "mood", "palette", "studio_notes", "style_direction", "avoid"]
     .map((name) => [name, form.elements.namedItem(name).value]));
@@ -124,22 +125,13 @@ function createIdeaCard(idea, index) {
     setBusy(true);
     save.textContent = "Saving…";
     try {
-      const result = await request("/api/prompts", { title: idea.title, category: idea.category, text: idea.text, favorite: false });
-      idea.saved = true;
-      idea.savedId = result.id;
-      save.textContent = "Saved ✓";
+      const result = await ensureIdeaSaved(idea);
+      save.textContent = result.existing ? "Already saved ✓" : "Saved ✓";
       card.querySelector(".idea-actions a").hidden = false;
       showStatus("Idea and studio plan saved to your Prompt Library.");
     } catch (error) {
-      if (error.status === 409) {
-        idea.saved = true;
-        save.textContent = "Already saved ✓";
-        card.querySelector(".idea-actions a").hidden = false;
-        showStatus("This idea is already in your Prompt Library.");
-      } else {
-        save.textContent = "Retry save";
-        showStatus(error.message);
-      }
+      save.textContent = "Retry save";
+      showStatus(error.message);
     } finally {
       rememberWorkspace();
       setBusy(false);
@@ -147,7 +139,61 @@ function createIdeaCard(idea, index) {
   };
   card.querySelector(".remix-idea").disabled = busy;
   card.querySelector(".remix-idea").onclick = () => remixOne(index);
+  const start = card.querySelector(".start-project");
+  start.disabled = busy;
+  start.onclick = async () => {
+    if (busy) return;
+    if (idea.projectId) { location.href = `/projects?project=${encodeURIComponent(idea.projectId)}`; return; }
+    if (idea.refineDraft) { showStatus("Apply or cancel the refinement edits before starting this project."); return; }
+    setBusy(true);
+    start.textContent = "Starting project…";
+    try {
+      const saved = await ensureIdeaSaved(idea);
+      save.textContent = "Saved ✓";
+      card.querySelector(".idea-actions a").hidden = false;
+      const result = await request("/api/projects", { prompt_id: saved.id, seed: {
+        materials: idea.materials, surface: idea.surface, notes: (idea.brief || generatedBrief).studio_notes || "",
+        checklist: idea.steps.map((text, step) => ({ id: `step_${Date.now().toString(36)}_${step}`, text, done: false })),
+      } });
+      idea.projectId = result.project.id;
+      rememberWorkspace();
+      location.href = `/projects?project=${encodeURIComponent(idea.projectId)}`;
+    } catch (error) {
+      showStatus(error.message);
+      start.textContent = "Retry starting project";
+      rememberWorkspace();
+    } finally { setBusy(false); }
+  };
   return card;
+}
+
+async function ensureIdeaSaved(idea) {
+  if (idea.savedId && idea.saved) {
+    const library = await request("/api/prompts");
+    const saved = library.find((prompt) => prompt.id === idea.savedId && prompt.title === idea.title && prompt.text === idea.text);
+    if (saved) {
+      if (saved.trashed) await request("/api/prompts/bulk-restore", { prompt_ids: [saved.id] });
+      return { id: saved.id, existing: true };
+    }
+    idea.saved = false;
+    idea.savedId = null;
+  }
+  try {
+    const result = await request("/api/prompts", { title: idea.title, category: idea.category, text: idea.text, favorite: false });
+    idea.saved = true;
+    idea.savedId = result.id;
+    idea.text = result.text;
+    return { id: result.id, existing: false };
+  } catch (error) {
+    if (error.status !== 409) throw error;
+    const library = await request("/api/prompts");
+    const saved = library.find((prompt) => prompt.title === idea.title && prompt.text === idea.text);
+    if (!saved) throw new Error("This idea already exists in the library. Open it there to start the project.");
+    if (saved.trashed) await request("/api/prompts/bulk-restore", { prompt_ids: [saved.id] });
+    idea.saved = true;
+    idea.savedId = saved.id;
+    return { id: saved.id, existing: true };
+  }
 }
 
 function renderIdeas() {

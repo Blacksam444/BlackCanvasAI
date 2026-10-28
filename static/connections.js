@@ -83,7 +83,7 @@ action.onclick = async () => {
       const response = await fetch("/api/google/backup", { method: "POST" });
       const result = await response.json();
       if (!response.ok) throw Error(result.detail || "Backup failed");
-      notify(`Complete backup saved: ${result.prompts} prompts and ${result.artwork_files} artwork file${result.artwork_files === 1 ? "" : "s"}.`);
+      notify(`Complete backup saved: ${result.prompts} prompts, ${result.projects || 0} projects, and ${result.artwork_files} artwork files.`);
       backupSummary.textContent = `Latest backup: just now · ${result.artwork_files} artwork file${result.artwork_files === 1 ? "" : "s"}`;
       action.textContent = "Backed up ✓";
       setTimeout(() => {
@@ -137,7 +137,7 @@ async function loadBackups() {
           const restored = await restoreResponse.json();
           if (!restoreResponse.ok) throw Error(restored.detail || "Restore failed");
           button.textContent = "Restored ✓";
-          notify(`Restore complete: ${restored.prompts} prompts, ${restored.artworks} catalog entries, and ${restored.images} image files added.`);
+          notify(`Restore complete: ${restored.prompts} prompts, ${restored.projects || 0} projects, ${restored.artworks} catalog entries, and ${restored.images} image files added.`);
         } catch (error) {
           button.disabled = false;
           button.textContent = "Try restore again";

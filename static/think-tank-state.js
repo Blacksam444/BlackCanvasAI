@@ -31,6 +31,7 @@ function validIdea(idea, options) {
     && (idea.savedId === null || (Number.isInteger(idea.savedId) && idea.savedId > 0))
     && (idea.brief === undefined || (validBrief(idea.brief, options) && idea.brief.collection === idea.category))
     && (idea.composition_index === undefined || variation(idea.composition_index))
+    && (idea.projectId === undefined || (typeof idea.projectId === "string" && /^[A-Za-z0-9_-]{1,80}$/.test(idea.projectId)))
     && (idea.refineDraft === undefined || (idea.refineDraft
       && text(idea.refineDraft.direction, 600) && text(idea.refineDraft.palette, 2600)
       && text(idea.refineDraft.mood, 2600) && text(idea.refineDraft.studio_notes, 1200)

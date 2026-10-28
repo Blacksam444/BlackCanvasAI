@@ -53,6 +53,19 @@ def initialize() -> None:
                 filename TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+            CREATE TABLE IF NOT EXISTS projects (
+                id TEXT PRIMARY KEY,
+                source_prompt_id INTEGER UNIQUE,
+                title TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'planned',
+                materials TEXT NOT NULL DEFAULT '[]',
+                surface TEXT NOT NULL DEFAULT '',
+                checklist TEXT NOT NULL DEFAULT '[]',
+                notes TEXT NOT NULL DEFAULT '',
+                revision INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
         """)
         prompt_columns = {row[1] for row in db.execute("PRAGMA table_info(prompts)")}
         if "source" not in prompt_columns:
@@ -77,7 +90,9 @@ def initialize() -> None:
             db.executemany("INSERT INTO prompts(title, category, text, favorite) VALUES (?, ?, ?, ?)", DEFAULT_PROMPTS)
 
 
-def rows(query: str, values: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+def rows(query: str, values: tuple[Any, ...] = (), *, connection=None) -> list[dict[str, Any]]:
+    if connection is not None:
+        return [dict(row) for row in connection.execute(query, values).fetchall()]
     with connect() as db:
         return [dict(row) for row in db.execute(query, values).fetchall()]
 
@@ -89,11 +104,16 @@ def execute(query: str, values: tuple[Any, ...] = ()) -> int:
 
 
 def backup_data() -> dict[str, Any]:
-    styles = rows("SELECT name, content FROM styles ORDER BY name")
-    return {
-        "version": 6,
-        "prompts": rows("SELECT id, title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result, version_test_notes, version_tested_at FROM prompts ORDER BY id"),
-        "styles": {item["name"]: json.loads(item["content"]) for item in styles},
-        "midjourney_rules": json.loads(MIDJOURNEY_RULES_PATH.read_text(encoding="utf-8")),
-        "artworks": rows("SELECT id, title, collection, tags, notes, favorite, filename, created_at FROM artworks ORDER BY id"),
-    }
+    with connect() as db:
+        # Keep linked projects and prompts in one point-in-time database snapshot.
+        db.execute("BEGIN")
+        styles = rows("SELECT name, content FROM styles ORDER BY name", connection=db)
+        return {
+            "version": 7,
+            "prompts": rows("SELECT id, title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result, version_test_notes, version_tested_at FROM prompts ORDER BY id", connection=db),
+            "styles": {item["name"]: json.loads(item["content"]) for item in styles},
+            "midjourney_rules": json.loads(MIDJOURNEY_RULES_PATH.read_text(encoding="utf-8")),
+            "artworks": rows("SELECT id, title, collection, tags, notes, favorite, filename, created_at FROM artworks ORDER BY id", connection=db),
+            "projects": [{**item, "materials": json.loads(item["materials"]), "checklist": json.loads(item["checklist"])}
+                         for item in rows("SELECT * FROM projects ORDER BY created_at, id", connection=db)],
+        }
