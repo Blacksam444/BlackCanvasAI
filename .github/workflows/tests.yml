@@ -46,3 +46,6 @@ jobs:
           for file in static/*.js; do
             node --check "$file"
           done
+
+      - name: Test Think Tank workspace and remix behavior
+        run: node --test test_think_tank_state.mjs

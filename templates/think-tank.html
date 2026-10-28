@@ -5,7 +5,7 @@
   <meta name="theme-color" content="#09090b"><title>Art Think Tank · Black Canvas AI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/think-tank.css?v=1">
+  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/think-tank.css?v=2">
 </head>
 <body>
 <div class="app-shell">
@@ -34,15 +34,16 @@
         <div class="tank-form-footer"><p>Built with the studio’s local prompt engine.</p><button class="tank-primary" id="generateIdeas" type="submit" disabled>Create 3 ideas <span aria-hidden="true">↗</span></button></div>
       </form>
       <p id="tankStatus" role="status" aria-live="polite">Loading materials…</p>
+      <p class="tank-hint" id="workspaceNote">Your workspace is remembered on this device. Save an idea to add it to your Prompt Library.</p>
       <section id="results" class="tank-results" hidden aria-labelledby="resultsTitle" aria-busy="false">
         <div class="tank-results-heading"><div><p class="eyebrow">TAKE ONE TO THE WORKTABLE</p><h2 id="resultsTitle" tabindex="-1">Three starting points</h2><p id="resultSummary"></p></div><button class="tank-secondary" id="remixIdeas" type="button">↻ Remix these ideas</button></div>
-        <p class="tank-hint" id="remixHint">Remix keeps these materials and direction, and changes the compositions.</p>
+        <p class="tank-hint" id="remixHint">Remix one idea to keep the other two, or remix all three. Both keep the materials and direction shown here.</p>
         <div class="idea-grid" id="ideaGrid"></div>
       </section>
     </section>
   </main>
 </div>
 <div class="toast" id="toast" role="status"></div>
-<script src="/static/think-tank.js?v=1"></script>
+<script type="module" src="/static/think-tank.js?v=2"></script>
 </body>
 </html>

@@ -21,14 +21,22 @@ version does not call an external AI service or require an API key.
 
 **Save to Prompt Library** stores the complete plan and optional image reference
 prompt through the existing prompt API. Saved ideas use the same library, search,
-editing, duplicate protection, and backups as other prompts. Ideas stay unsaved
-until you choose Save; remixing or leaving the page replaces unsaved results.
+editing, duplicate protection, and backups as other prompts. **Remix this idea**
+replaces only its card and keeps the other two ideas, including their save status.
+The batch remix changes all three compositions, even after individual remixes.
+
+Your unfinished direction and current ideas are restored when you return in the
+same browser on the same device and address. This browser draft is not a Prompt
+Library save or a cross-device backup. Save ideas you want to keep in the library.
+Creating a new set replaces the current three ideas. Browser storage restrictions
+are reported on the page; generation and library saving still work without it.
 
 ## Verify changes
 
 ```powershell
 python -m unittest discover -v
 python -m py_compile app.py storage.py think_tank.py
+node --test test_think_tank_state.mjs
 ```
 
 Pull requests and updates to `main` also run these Python checks plus JavaScript syntax validation automatically in GitHub Actions.
