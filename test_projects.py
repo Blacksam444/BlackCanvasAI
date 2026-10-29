@@ -18,6 +18,7 @@ from projects import (
     restore_project_artworks,
 )
 import storage
+from project_sheets import ProjectSheetPayload, create_project_sheet
 
 
 class ClosingConnection(sqlite3.Connection):
@@ -420,6 +421,111 @@ class ProjectTests(unittest.TestCase):
             self.assertEqual((repeated["projects"], repeated["project_photos"]), (0, 0))
             self.assertEqual(get_project(project["id"])["artworks"], [])
             self.assertEqual(len(list_artworks()), 2)
+
+    def test_project_sheet_exports_the_saved_plan_without_writing_any_records(self):
+        project = self.project()
+        before = storage.backup_data()
+        sheet = create_project_sheet(project["id"], ProjectSheetPayload(plan=self.payload(project)))
+        self.assertEqual(sheet["snapshot"], "Saved plan copy")
+        self.assertIn(project["title"], sheet["text"])
+        self.assertIn(project["surface"], sheet["text"])
+        self.assertIn("1. [ ]", sheet["text"])
+        self.assertIn("Test a small study first.", sheet["html"])
+        self.assertNotIn("SOURCE IDEA", sheet["text"])
+        self.assertEqual(storage.backup_data(), before)
+
+    def test_project_sheet_uses_current_edits_and_escapes_html_in_all_user_text(self):
+        project = self.project()
+        plan = self.payload(project, title='<script>alert("title")</script>', surface="A <wood> panel",
+            notes="My own unsaved notes", materials=["Paper & ink"],
+            checklist=[{"id": "my_step", "text": "Study <img src=x onerror=alert(1)>\nThen draw.", "done": True}])
+        sheet = create_project_sheet(project["id"], ProjectSheetPayload(plan=plan))
+        self.assertEqual(sheet["snapshot"], "Copy of current edits")
+        self.assertIn("&lt;script&gt;", sheet["html"])
+        self.assertNotIn("<script>", sheet["html"])
+        self.assertIn("Paper &amp; ink", sheet["html"])
+        self.assertIn("1. [x] Study <img", sheet["text"])
+        self.assertIn("1 of 1 steps checked", sheet["text"])
+        self.assertNotIn("/", sheet["filename"])
+        self.assertEqual(get_project(project["id"])["title"], project["title"])
+        self.assertEqual(get_project(project["id"])["revision"], 1)
+
+    def test_sheet_options_omit_notes_and_source_and_embed_only_chosen_images(self):
+        project = self.project()
+        first = self.photo(project["id"], "reference")
+        second = self.photo(project["id"], "finished")
+        storage.execute("UPDATE artworks SET notes = ? WHERE id = ?", ("Photo notes for this copy only", first["id"]))
+        payload = self.payload(project, notes="Plan notes for this copy only")
+        sheet = create_project_sheet(project["id"], ProjectSheetPayload(
+            plan=payload, include_notes=False, photo_ids=[first["id"]]))
+        for content in (sheet["html"], sheet["text"]):
+            self.assertNotIn("Photo notes for this copy only", content)
+            self.assertNotIn("Plan notes for this copy only", content)
+        self.assertEqual(sheet["html"].count('src="data:image/png;base64,'), 1)
+        self.assertNotIn('src="/uploads/', sheet["html"])
+        self.assertIn("Reference: My studio photo", sheet["text"])
+        self.assertNotIn("Finished piece:", sheet["text"])
+        full = create_project_sheet(project["id"], ProjectSheetPayload(
+            plan=payload, include_notes=True, include_source=True, photo_ids=[first["id"], second["id"]]))
+        self.assertIn("Photo notes for this copy only", full["html"])
+        self.assertIn("Plan notes for this copy only", full["text"])
+        self.assertIn(project["source_prompt"]["text"], full["text"])
+        self.assertEqual(full["html"].count('src="data:image/png;base64,'), 2)
+
+    def test_sheet_stale_device_warning_keeps_both_saved_work_and_device_plan_intact(self):
+        project = self.project()
+        update_project(project["id"], self.payload(project, notes="Newer work saved on my phone"))
+        sheet = create_project_sheet(project["id"], ProjectSheetPayload(plan=self.payload(project, notes="Older device plan")))
+        self.assertIn("Newer changes", sheet["warning"])
+        self.assertIn("Older device plan", sheet["text"])
+        self.assertNotIn("Newer work saved on my phone", sheet["text"])
+        self.assertEqual(get_project(project["id"])["notes"], "Newer work saved on my phone")
+        with self.assertRaises(HTTPException) as error:
+            create_project_sheet(project["id"], ProjectSheetPayload(plan=self.payload(project, revision=99)))
+        self.assertEqual(error.exception.status_code, 409)
+
+    def test_sheet_cannot_include_an_unlinked_or_unknown_photo_or_project(self):
+        project = self.project()
+        photo = self.photo()
+        for photo_id in (photo["id"], 999999):
+            with self.assertRaises(HTTPException) as error:
+                create_project_sheet(project["id"], ProjectSheetPayload(plan=self.payload(project), photo_ids=[photo_id]))
+            self.assertEqual(error.exception.status_code, 409)
+        with self.assertRaises(HTTPException) as error:
+            create_project_sheet("missing", ProjectSheetPayload(plan=self.payload(project)))
+        self.assertEqual(error.exception.status_code, 404)
+
+    def test_missing_source_and_missing_or_unsafe_image_files_have_clear_placeholders(self):
+        project = self.project()
+        photo = self.photo(project["id"])
+        record = storage.rows("SELECT filename FROM artworks WHERE id = ?", (photo["id"],))[0]
+        (storage.UPLOAD_DIR / record["filename"]).unlink()
+        storage.execute("DELETE FROM prompts WHERE id = ?", (project["source_prompt_id"],))
+        sheet = create_project_sheet(project["id"], ProjectSheetPayload(plan=self.payload(project), include_source=True, photo_ids=[photo["id"]]))
+        self.assertIn("Source idea unavailable.", sheet["text"])
+        self.assertIn("Image unavailable in this copy.", sheet["html"])
+        (self.directory / "outside.png").write_bytes(b"private file outside uploads")
+        storage.execute("UPDATE artworks SET filename = ? WHERE id = ?", ("../outside.png", photo["id"]))
+        sheet = create_project_sheet(project["id"], ProjectSheetPayload(plan=self.payload(project), photo_ids=[photo["id"]]))
+        self.assertNotIn('src="data:', sheet["html"])
+        self.assertNotIn("outside.png", sheet["text"])
+
+    def test_sheet_rejects_selected_images_over_the_combined_size_limit(self):
+        project = self.project()
+        first = self.photo(project["id"])
+        second = self.photo(project["id"])
+        record = storage.rows("SELECT filename FROM artworks WHERE id = ?", (first["id"],))[0]
+        one_image_size = (storage.UPLOAD_DIR / record["filename"]).stat().st_size
+        with patch("project_sheets.MAX_PHOTO_BYTES", one_image_size), self.assertRaises(HTTPException) as error:
+            create_project_sheet(project["id"], ProjectSheetPayload(plan=self.payload(project), photo_ids=[first["id"], second["id"]]))
+        self.assertEqual(error.exception.status_code, 413)
+        self.assertEqual(len(get_project(project["id"])["artworks"]), 2)
+
+    def test_sheet_validation_rejects_duplicate_excess_or_invalid_photo_selections(self):
+        project = self.project()
+        for selection in ([1, 1], list(range(1, 14)), [0], [-1]):
+            with self.subTest(selection=selection), self.assertRaises(ValidationError):
+                ProjectSheetPayload(plan=self.payload(project), photo_ids=selection)
 
 
 if __name__ == "__main__":

@@ -400,4 +400,100 @@ $("#refreshProjectPhotos").onclick = async () => {
   } catch (error) { $("#photoStatus").textContent = error.message; }
   finally { setPhotoBusy(false); }
 };
+
+let sheetCopy = null;
+let sheetRequest = 0;
+let sheetController = null;
+const sheetActions = () => document.querySelectorAll(".sheet-actions button");
+function clearSheet() {
+  sheetCopy = null;
+  sheetActions().forEach((button) => { button.disabled = true; });
+  $("#projectSheetPreview").hidden = true;
+  $("#projectSheetPreview").srcdoc = "";
+}
+
+$("#openProjectSheet").onclick = () => {
+  if (!current || busy) return;
+  if (!$("#projectForm").reportValidity()) {
+    $("#saveStatus").textContent = "Check the plan fields before making a project sheet.";
+    return;
+  }
+  $("#sheetOptions").reset();
+  $("#sheetOptions").querySelectorAll("input,button").forEach((control) => { control.disabled = false; });
+  $("#sheetPhotoChoices").replaceChildren(...photos.map((photo) => {
+    const label = document.createElement("label");
+    label.innerHTML = `<input type="checkbox" value="${photo.id}"><img alt=""><span>${escapeHtml(photo.title)}<small>${photoStages[photo.stage]}</small></span>`;
+    label.querySelector("img").src = photo.url;
+    return label;
+  }));
+  $("#sheetPhotoCount").textContent = `(${photos.length} available)`;
+  $("#sheetNoPhotos").hidden = photos.length > 0;
+  $("#sheetPhotoOptions").open = false;
+  $("#sheetDraftNotice").textContent = dirty ? "This copy uses your current edits on this device. Making a copy does not save those changes." : "This copy uses the plan shown on this device. Making a copy does not change the saved project.";
+  clearSheet();
+  $("#projectSheetDialog").showModal();
+  buildSheet();
+};
+
+async function buildSheet() {
+  const photoIds = [...document.querySelectorAll("#sheetPhotoChoices input:checked")].map((input) => Number(input.value));
+  clearSheet();
+  if (photoIds.length > 12) { $("#sheetStatus").textContent = "Choose up to 12 photos for one project sheet."; return; }
+  const requestId = ++sheetRequest;
+  sheetController = new AbortController();
+  const payload = { plan: readForm(), include_notes: $("#sheetNotes").checked, include_source: $("#sheetSource").checked, photo_ids: photoIds };
+  $("#sheetOptions").querySelectorAll("input,button").forEach((control) => { control.disabled = true; });
+  $("#sheetStatus").textContent = "Preparing your project sheet…";
+  try {
+    const response = await fetch(`/api/projects/${encodeURIComponent(current.id)}/sheet`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: sheetController.signal,
+    });
+    let result;
+    try { result = await response.json(); } catch { throw new Error("The studio could not prepare the sheet. Please try again."); }
+    if (!response.ok) throw new Error(typeof result.detail === "string" ? result.detail : "Check the plan fields and photo selections, then try again.");
+    if (requestId !== sheetRequest) return;
+    sheetCopy = result;
+    $("#projectSheetPreview").srcdoc = result.html;
+    $("#projectSheetPreview").hidden = false;
+    $("#sheetStatus").textContent = `${result.snapshot}. ${result.warning || "Your copy is ready. Making it does not save plan changes."}`;
+  } catch (error) {
+    if (requestId === sheetRequest && error.name !== "AbortError") $("#sheetStatus").textContent = error instanceof TypeError ? "Could not reach the studio. Your plan is still here; try making the preview again." : error.message;
+  } finally {
+    if (requestId === sheetRequest) {
+      sheetController = null;
+      $("#sheetOptions").querySelectorAll("input,button").forEach((control) => { control.disabled = false; });
+    }
+  }
+}
+
+$("#projectSheetPreview").onload = () => {
+  if (sheetCopy && $("#projectSheetPreview").srcdoc === sheetCopy.html) sheetActions().forEach((button) => { button.disabled = false; });
+};
+$("#sheetOptions").onsubmit = (event) => { event.preventDefault(); buildSheet(); };
+$("#sheetOptions").onchange = () => { clearSheet(); $("#sheetStatus").textContent = "Options changed. Make preview to update your copy."; };
+$("#closeProjectSheet").onclick = () => $("#projectSheetDialog").close();
+$("#projectSheetDialog").addEventListener("close", () => {
+  ++sheetRequest;
+  sheetController?.abort();
+  sheetController = null;
+  clearSheet();
+});
+$("#printProjectSheet").onclick = () => {
+  if (!sheetCopy) return;
+  try { $("#projectSheetPreview").contentWindow.focus(); $("#projectSheetPreview").contentWindow.print(); }
+  catch { $("#sheetStatus").textContent = "Printing is unavailable here. Download the HTML copy, then open it in your browser to print."; }
+};
+function downloadSheet(format) {
+  if (!sheetCopy) return;
+  const url = URL.createObjectURL(new Blob([sheetCopy[format === "html" ? "html" : "text"]], { type: format === "html" ? "text/html;charset=utf-8" : "text/plain;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${sheetCopy.filename}.${format}`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+$("#downloadProjectSheet").onclick = () => downloadSheet("html");
+$("#downloadProjectText").onclick = () => downloadSheet("txt");
 load();

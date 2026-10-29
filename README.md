@@ -78,6 +78,15 @@ keeps the catalog image. Removing an image from Image Studio removes all its
 project links too; the catalog asks for confirmation when the image is linked.
 JPEG, PNG, WebP, and GIF uploads up to 10 MB are supported.
 
+**Print / download plan** opens a project sheet made from the fields currently
+shown on your device, including unsaved edits. Choose whether to include notes,
+the full source idea, and up to 12 linked photos (20 MB combined). Preview the copy,
+print or save a PDF through your browser, or download HTML/text. HTML embeds the
+selected images and works offline; text keeps the plan and photo captions. Making
+a sheet does not save or replace project changes. If another device saved a newer
+plan, the sheet identifies that it uses your device's older fields. Refresh photos
+before reopening the sheet to include photos added from another device.
+
 Backup format 8 includes projects and photo links. Google Drive restore remaps
 source prompt IDs and artwork IDs and adds missing projects without overwriting
 existing project progress or photo links. Photo links restore for newly added
@@ -89,7 +98,7 @@ files; Google Drive folder backups include the actual images.
 
 ```powershell
 python -m unittest discover -v
-python -m py_compile app.py storage.py think_tank.py projects.py
+python -m py_compile app.py storage.py think_tank.py projects.py project_sheets.py
 node --test test_think_tank_state.mjs
 ```
 

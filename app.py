@@ -24,6 +24,7 @@ from projects import (
     router as project_router, restore_projects, validate_project_backups,
     PhotoStage, attach_artwork, restore_project_artworks, validate_project_artwork_backups,
 )
+from project_sheets import router as project_sheet_router
 
 BASE_DIR = Path(__file__).resolve().parent
 MIDJOURNEY_RULES_PATH = BASE_DIR / "midjourney_rules.json"
@@ -187,6 +188,7 @@ def format_prompt_pack(prompts: list[dict]) -> str:
 initialize()
 app = FastAPI(title="Black Canvas AI")
 app.include_router(project_router)
+app.include_router(project_sheet_router)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
