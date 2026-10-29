@@ -1,5 +1,5 @@
 let artworks = [];
-let filter = "All";
+let filter = new URLSearchParams(location.search).get("filter") === "favorites" ? "Favorites" : "All";
 let query = "";
 let pendingFile = null;
 let selectedId = null;

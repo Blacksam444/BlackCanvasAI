@@ -11,6 +11,23 @@ python -m uvicorn app:app --reload
 
 Open `http://127.0.0.1:8000`.
 
+## Home
+
+Home shows saved project, in-progress, completed, and creative kit counts. Resume
+one of the three most recently saved unfinished projects with its checklist
+progress and an available progress/finished photo. The project counts open the
+matching status filter; Creative kits opens the optional kit panel in Think Tank.
+Empty studios get starting links, and completed projects remain in Projects.
+
+Newest prompts and artwork are grouped by library and link directly to their
+saved records. The featured saved idea supports exact copying, with selection
+and manual-copy fallbacks when clipboard access is unavailable. Version-testing
+controls appear when there are migrated copies or outdated prompts to review.
+Refresh studio pulls in other-device saves without clearing an unfinished Chat
+question. Failed refreshes preserve the last loaded view and show its status;
+an initial connection failure keeps counts unknown until a successful retry.
+Dashboard data comes from one database read snapshot and does not save changes.
+
 ## Art Think Tank
 
 Open **Home → Art Think Tank → Physical Art**, select materials and a working

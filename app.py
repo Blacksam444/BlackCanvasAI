@@ -23,6 +23,7 @@ from storage import UPLOAD_DIR, backup_data, connect, execute, initialize, rows
 from projects import (
     router as project_router, restore_projects, validate_project_backups,
     PhotoStage, attach_artwork, restore_project_artworks, validate_project_artwork_backups,
+    project_overview,
 )
 from project_sheets import router as project_sheet_router
 from creative_kits import CreativePreferences, router as creative_kit_router, restore_kits, validate_kit_backups
@@ -614,7 +615,8 @@ def summarize_version_tests(items: list[dict]) -> dict[str, int]:
 @app.get("/api/dashboard")
 def dashboard_summary() -> dict:
     verification = midjourney_verification_status()
-    with connect() as db:
+    with closing(connect()) as db:
+        db.execute("BEGIN")
         prompt_count = db.execute("SELECT COUNT(*) FROM prompts WHERE trashed = 0").fetchone()[0]
         artwork_count = db.execute("SELECT COUNT(*) FROM artworks").fetchone()[0]
         favorite_count = db.execute(
@@ -633,6 +635,8 @@ def dashboard_summary() -> dict:
         artwork_rows = [dict(item) for item in db.execute(
             "SELECT id, title, collection, notes FROM artworks ORDER BY id DESC LIMIT 3"
         ).fetchall()]
+        projects = project_overview(db)
+        kit_count = db.execute("SELECT COUNT(*) FROM creative_kits").fetchone()[0]
         version_testing = summarize_version_tests([dict(item) for item in db.execute(
             "SELECT parent_prompt_id, version_test_result, version_tested_at FROM prompts WHERE trashed = 0 AND parent_prompt_id IS NOT NULL"
         ).fetchall()])
@@ -654,7 +658,11 @@ def dashboard_summary() -> dict:
     activity.sort(key=lambda item: item["id"], reverse=True)
     return {
         "counts": {"prompts": prompt_count, "artworks": artwork_count,
-                   "favorites": favorite_count, "to_review": review_count},
+                   "favorites": favorite_count, "to_review": review_count,
+                   "projects": projects["counts"]["total"], "creative_kits": kit_count},
+        "projects": projects,
+        "recent_prompts": prompt_rows,
+        "recent_artworks": artwork_rows,
         "version_testing": version_testing,
         "midjourney_rules": {
             "version": MIDJOURNEY_RULES["version"],

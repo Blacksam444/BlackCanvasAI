@@ -496,4 +496,6 @@ function downloadSheet(format) {
 }
 $("#downloadProjectSheet").onclick = () => downloadSheet("html");
 $("#downloadProjectText").onclick = () => downloadSheet("txt");
+const requestedStatus = new URLSearchParams(location.search).get("status");
+if (Object.hasOwn(statuses, requestedStatus)) $("#projectFilter").value = requestedStatus;
 load();

@@ -397,6 +397,10 @@ async function loadOptions() {
         rememberWorkspace();
       },
     });
+    if (location.hash === "#creativeKits") {
+      $("#creativeKits").open = true;
+      $("#creativeKits").scrollIntoView({ block: "start" });
+    }
   } catch {
     options = null;
     setBusy(false);

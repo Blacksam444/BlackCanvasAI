@@ -7,6 +7,7 @@ from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import PurePosixPath, PureWindowsPath
 from typing import Literal
+from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
@@ -168,6 +169,34 @@ def project_record(row) -> dict:
     done = sum(bool(step["done"]) for step in result["checklist"])
     result["progress"] = {"done": done, "total": total, "percent": round(done / total * 100) if total else 0}
     return result
+
+
+def project_overview(db) -> dict:
+    counts = {"planned": 0, "in_progress": 0, "paused": 0, "completed": 0}
+    for row in db.execute("SELECT status, COUNT(*) AS count FROM projects GROUP BY status"):
+        if row["status"] in counts:
+            counts[row["status"]] = row["count"]
+    counts["total"] = sum(counts.values())
+    counts["ongoing"] = counts["total"] - counts["completed"]
+    recent = []
+    for row in db.execute(
+        "SELECT * FROM projects WHERE status IN ('planned', 'in_progress', 'paused') "
+        "ORDER BY julianday(updated_at) DESC, id LIMIT 3"
+    ):
+        project = project_record(row)
+        cover = None
+        for photo in db.execute(
+            "SELECT a.filename, a.title, pa.stage FROM project_artworks pa JOIN artworks a ON a.id = pa.artwork_id "
+            "WHERE pa.project_id = ? AND pa.stage IN ('progress', 'finished') "
+            "ORDER BY julianday(pa.created_at) DESC, a.id DESC", (project["id"],),
+        ):
+            image_path = (storage.UPLOAD_DIR / photo["filename"]).resolve()
+            if image_path.is_relative_to(storage.UPLOAD_DIR.resolve()) and image_path.is_file():
+                cover = {"url": f"/uploads/{quote(photo['filename'], safe='')}", "title": photo["title"], "stage": photo["stage"]}
+                break
+        recent.append({key: project[key] for key in ("id", "title", "status", "materials", "surface", "progress", "updated_at")})
+        recent[-1]["cover"] = cover
+    return {"counts": counts, "recent": recent}
 
 
 def get_project(project_id: str) -> dict:
