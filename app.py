@@ -25,6 +25,7 @@ from projects import (
     PhotoStage, attach_artwork, restore_project_artworks, validate_project_artwork_backups,
 )
 from project_sheets import router as project_sheet_router
+from creative_kits import CreativePreferences, router as creative_kit_router, restore_kits, validate_kit_backups
 
 BASE_DIR = Path(__file__).resolve().parent
 MIDJOURNEY_RULES_PATH = BASE_DIR / "midjourney_rules.json"
@@ -189,6 +190,7 @@ initialize()
 app = FastAPI(title="Black Canvas AI")
 app.include_router(project_router)
 app.include_router(project_sheet_router)
+app.include_router(creative_kit_router)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
@@ -201,29 +203,15 @@ class ChatMessage(BaseModel):
     message: str
 
 
-class ThinkTankPayload(BaseModel):
-    materials: list[Literal["acrylic", "charcoal", "pastel", "collage", "ink"]] = Field(default_factory=list, max_length=5)
-    surface: Literal["canvas", "paper", "panel"] = "canvas"
+class ThinkTankPayload(CreativePreferences):
     direction: str = Field(min_length=3, max_length=600)
-    collection: Literal["My own direction", "AfroNova", "Quiet Nova", "GraffitiX"] = USER_DIRECTION
     variation: int = Field(default=0, ge=0, le=10000)
-    palette: str = Field(default="", max_length=2600)
-    mood: str = Field(default="", max_length=2600)
     studio_notes: str = Field(default="", max_length=1200)
-    style_direction: str = Field(default="", max_length=600)
-    avoid: str = Field(default="", max_length=1200)
-    other_materials: str = Field(default="", max_length=240)
 
-    @field_validator("direction", "palette", "mood", "studio_notes", "style_direction", "avoid", "other_materials", mode="before")
+    @field_validator("direction", "studio_notes", mode="before")
     @classmethod
     def trim_direction(cls, value):
         return value.strip() if isinstance(value, str) else value
-
-    @field_validator("materials")
-    @classmethod
-    def unique_materials(cls, value):
-        # Keep the physical working order regardless of checkbox selection order.
-        return [name for name in ("acrylic", "collage", "ink", "charcoal", "pastel") if name in value]
 
     @model_validator(mode="after")
     def require_material(self):
@@ -1409,7 +1397,7 @@ def backup_to_google_drive() -> dict:
         fields="id,name,webViewLink",
     ).execute()
     manifest = backup_data()
-    manifest.update({"backup_format": 8, "created_at": created_at.isoformat(), "artwork_file_count": 0})
+    manifest.update({"backup_format": 9, "created_at": created_at.isoformat(), "artwork_file_count": 0})
     uploaded_images = 0
     mime_types = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif"}
     for artwork in manifest.get("artworks", []):
@@ -1446,6 +1434,7 @@ def backup_to_google_drive() -> dict:
         "artwork_files": uploaded_images,
         "prompts": len(manifest.get("prompts", [])),
         "projects": len(manifest.get("projects", [])),
+        "creative_kits": len(manifest.get("creative_kits", [])),
     }
 
 
@@ -1507,6 +1496,7 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
         raise HTTPException(status_code=400, detail="The backup manifest is invalid") from error
     project_backups = validate_project_backups(manifest)
     project_photo_backups = validate_project_artwork_backups(manifest)
+    kit_backups = validate_kit_backups(manifest)
 
     snapshot_root = UPLOAD_DIR.parent / "restore-snapshots"
     snapshot_dir = snapshot_root / datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S-%f_UTC")
@@ -1565,6 +1555,7 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
         restored_project_count = restore_projects(db, project_backups, manifest, repair_midjourney_syntax)
         new_project_ids = {row["id"] for row in db.execute("SELECT id FROM projects")} - previous_project_ids
         restored_photo_links = restore_project_artworks(db, project_photo_backups, new_project_ids)
+        restored_kit_count = restore_kits(db, kit_backups)
     restored_rules = restore_midjourney_rules_from_manifest(manifest)
     return {
         "status": "restored",
@@ -1573,6 +1564,7 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
         "images": restored_images,
         "projects": restored_project_count,
         "project_photos": restored_photo_links,
+        "creative_kits": restored_kit_count,
         "midjourney_rules": int(restored_rules),
         "safety_snapshot": snapshot_dir.name,
     }

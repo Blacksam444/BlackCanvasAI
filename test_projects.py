@@ -19,6 +19,7 @@ from projects import (
 )
 import storage
 from project_sheets import ProjectSheetPayload, create_project_sheet
+from creative_kits import KitPayload, KitUpdatePayload, create_kit, list_kits, update_kit
 
 
 class ClosingConnection(sqlite3.Connection):
@@ -166,7 +167,7 @@ class ProjectTests(unittest.TestCase):
         project = update_project(project["id"], self.payload(project, status="paused", notes="Try a wider surface.",
             checklist=[{**step, "done": True} for step in project["checklist"]]))
         manifest = storage.backup_data()
-        self.assertEqual(manifest["version"], 8)
+        self.assertEqual(manifest["version"], 9)
         self.assertIsInstance(manifest["projects"][0]["checklist"], list)
         backups = validate_project_backups(json.loads(json.dumps(manifest)))
         with patch("storage.DB_PATH", self.directory / "restored.db"):
@@ -385,6 +386,7 @@ class ProjectTests(unittest.TestCase):
     def test_folder_restore_recovers_photo_files_and_links_without_live_drive_calls(self):
         project = self.project()
         self.photo(project["id"], "finished")
+        kit = create_kit(KitPayload(name="My restored kit", preferences={"palette": "Blue gray"}))["kit"]
         manifest = storage.backup_data()
         filename = manifest["artworks"][0]["filename"]
         image_bytes = (storage.UPLOAD_DIR / filename).read_bytes()
@@ -412,6 +414,9 @@ class ProjectTests(unittest.TestCase):
             self.photo()  # The old catalog ID also belongs to unrelated work.
             restored = restore_google_backup("local-fixture")
             self.assertEqual((restored["projects"], restored["project_photos"], restored["images"]), (1, 1, 1))
+            self.assertEqual(restored["creative_kits"], 1)
+            self.assertEqual(list_kits()[0]["id"], kit["id"])
+            update_kit(kit["id"], KitUpdatePayload(name=kit["name"], revision=kit["revision"], preferences={"palette": "My newer palette"}))
             photo = get_project(project["id"])["artworks"][0]
             self.assertEqual(photo["stage"], "finished")
             self.assertEqual((upload_path / filename).read_bytes(), image_bytes)
@@ -419,6 +424,8 @@ class ProjectTests(unittest.TestCase):
             unlink_project_artwork(project["id"], photo["id"])
             repeated = restore_google_backup("local-fixture")
             self.assertEqual((repeated["projects"], repeated["project_photos"]), (0, 0))
+            self.assertEqual(repeated["creative_kits"], 0)
+            self.assertEqual(list_kits()[0]["preferences"]["palette"], "My newer palette")
             self.assertEqual(get_project(project["id"])["artworks"], [])
             self.assertEqual(len(list_artworks()), 2)
 

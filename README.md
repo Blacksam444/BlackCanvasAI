@@ -48,6 +48,17 @@ Library save or a cross-device backup. Save ideas you want to keep in the librar
 Creating a new set replaces the current three ideas. Browser storage restrictions
 are reported on the page; generation and library saving still work without it.
 
+**Your saved creative kits** keeps reusable materials, surface, optional preset,
+style, colors, mood, and exclusions in the studio database. Name and save the
+preferences currently in the form, then review and apply a kit when you want to
+use it. Applying preserves your current subject and existing idea cards; Undo
+last apply restores the previous form preferences until you edit them manually.
+Kits never apply automatically or store your subject or generated idea text.
+They are available to connected devices using the same studio, including when
+browser draft storage is blocked. Refresh kits to see other-device changes.
+Update selected kit from form replaces its preferences explicitly; revision
+checks prevent stale updates/removals. Removing a kit keeps ideas and projects.
+
 ## Projects
 
 Choose **Start project** on a Think Tank idea, or **Open as project** when viewing
@@ -87,7 +98,8 @@ a sheet does not save or replace project changes. If another device saved a newe
 plan, the sheet identifies that it uses your device's older fields. Refresh photos
 before reopening the sheet to include photos added from another device.
 
-Backup format 8 includes projects and photo links. Google Drive restore remaps
+Backup format 9 includes creative kits, projects, and photo links. Kit restore
+adds missing kits and preserves existing kits by ID or name. Google Drive restore remaps
 source prompt IDs and artwork IDs and adds missing projects without overwriting
 existing project progress or photo links. Photo links restore for newly added
 projects; repeating an older restore preserves later unlinks. Older backups with
@@ -98,7 +110,7 @@ files; Google Drive folder backups include the actual images.
 
 ```powershell
 python -m unittest discover -v
-python -m py_compile app.py storage.py think_tank.py projects.py project_sheets.py
+python -m py_compile app.py storage.py think_tank.py projects.py project_sheets.py creative_kits.py
 node --test test_think_tank_state.mjs
 ```
 

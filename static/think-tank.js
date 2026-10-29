@@ -1,4 +1,5 @@
 import { WORKSPACE_KEY, restoreWorkspace, selectSingleRemix, arrangeRemixGroups } from "./think-tank-state.js?v=4";
+import { initCreativeKits } from "./creative-kits.js?v=1";
 
 const $ = (selector) => document.querySelector(selector);
 let generatedBrief = null;
@@ -6,6 +7,7 @@ let variation = 0;
 let ideas = [];
 let busy = false;
 let options = null;
+let kitsController = null;
 const escapeHtml = (text = "") => String(text).replace(/[&<>"']/g, (character) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;",
 }[character]));
@@ -54,6 +56,7 @@ function rememberWorkspace() {
 
 function setBusy(value) {
   busy = value;
+  kitsController?.setDisabled();
   $("#generateIdeas").disabled = busy || !options;
   $("#remixIdeas").disabled = busy || ideas.length !== 3;
   $("#results").setAttribute("aria-busy", String(busy));
@@ -383,6 +386,17 @@ async function loadOptions() {
       showStatus("Choose your materials, then give the piece a direction.");
     }
     setBusy(false);
+    kitsController = initCreativeKits({
+      getBrief: formBrief, canAct: () => !busy && Boolean(options), options,
+      applyPreferences(preferences) {
+        document.querySelectorAll('input[name="material"]').forEach((input) => { input.checked = preferences.materials.includes(input.value); });
+        $("#surface").value = preferences.surface;
+        $("#collection").value = preferences.collection;
+        for (const [id, key] of [["otherMaterials", "other_materials"], ["styleDirection", "style_direction"],
+          ["palette", "palette"], ["mood", "mood"], ["avoid", "avoid"]]) $("#" + id).value = preferences[key];
+        rememberWorkspace();
+      },
+    });
   } catch {
     options = null;
     setBusy(false);
