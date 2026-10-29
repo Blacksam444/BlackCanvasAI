@@ -241,7 +241,7 @@ class PromptRuleTests(unittest.TestCase):
             rules_path.write_text(json.dumps(original_rules), encoding="utf-8")
             with patch("storage.MIDJOURNEY_RULES_PATH", rules_path), patch("storage.rows", return_value=[]):
                 backup = backup_data()
-            self.assertEqual(backup["version"], 7)
+            self.assertEqual(backup["version"], 8)
             self.assertEqual(backup["midjourney_rules"]["version"], original_rules["version"])
             with patch("app.MIDJOURNEY_RULES_PATH", rules_path):
                 try:

@@ -3,6 +3,7 @@ let filter = "All";
 let query = "";
 let pendingFile = null;
 let selectedId = null;
+let openedLinkedArtwork = false;
 
 const grid = document.querySelector("#artGrid");
 const drop = document.querySelector("#dropZone");
@@ -51,6 +52,15 @@ async function load() {
   });
   filters.querySelectorAll("button").forEach((button) => button.classList.toggle("active", button.dataset.filter === filter));
   render();
+  if (!openedLinkedArtwork) {
+    openedLinkedArtwork = true;
+    const id = new URLSearchParams(location.search).get("artwork");
+    if (id) {
+      const artwork = artworks.find((item) => String(item.id) === id);
+      if (artwork) showDetail(artwork);
+      else notify("That image is no longer in Image Studio.");
+    }
+  }
 }
 
 function render() {
@@ -100,6 +110,16 @@ function showDetail(artwork) {
   document.querySelector("#detailTitle").textContent = artwork.title;
   document.querySelector("#detailNotes").textContent = artwork.notes || "No notes added yet.";
   document.querySelector("#detailTags").innerHTML = (artwork.tags || "").split(",").filter(Boolean).map((tag) => `<span>${escapeHtml(tag.trim())}</span>`).join("");
+  const stageLabels = { reference: "Reference", progress: "Work in progress", finished: "Finished piece" };
+  document.querySelector("#artworkProjects").replaceChildren(...(artwork.projects || []).map((project) => {
+    const link = document.createElement("a");
+    link.href = `/projects?project=${encodeURIComponent(project.project_id)}`;
+    link.textContent = `${stageLabels[project.stage]} · ${project.title} →`;
+    link.style.color = "#c7b7ff";
+    return link;
+  }));
+  document.querySelector("#artworkDeleteNote").hidden = !(artwork.projects || []).length;
+  document.querySelector("#detailImage").alt = artwork.title;
   document.querySelector("#detailDialog").showModal();
 }
 
@@ -186,7 +206,10 @@ document.querySelector("#artFilters").onclick = (event) => {
 document.querySelector("#detailClose").onclick = () => document.querySelector("#detailDialog").close();
 document.querySelector("#removeArtwork").onclick = async () => {
   if (!selectedId) return;
-  await fetch(`/api/artworks/${selectedId}`, { method: "DELETE" });
+  const artwork = artworks.find((item) => item.id === selectedId);
+  if (artwork?.projects?.length && !confirm("Remove this image from Image Studio and all its linked projects?")) return;
+  const response = await fetch(`/api/artworks/${selectedId}`, { method: "DELETE" });
+  if (!response.ok) return notify("The artwork could not be removed. Please try again.");
   document.querySelector("#detailDialog").close();
   await load();
   notify("Artwork removed from this catalog.");

@@ -1,4 +1,5 @@
 import base64
+import binascii
 import json
 import re
 import shutil
@@ -6,6 +7,7 @@ import sqlite3
 import uuid
 import zipfile
 from datetime import date, datetime, timedelta, timezone
+from contextlib import closing
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -18,7 +20,10 @@ from typing import Literal
 from think_tank import COMPOSITIONS, MATERIALS, SURFACES, USER_DIRECTION, build_ideas
 
 from storage import UPLOAD_DIR, backup_data, connect, execute, initialize, rows
-from projects import router as project_router, restore_projects, validate_project_backups
+from projects import (
+    router as project_router, restore_projects, validate_project_backups,
+    PhotoStage, attach_artwork, restore_project_artworks, validate_project_artwork_backups,
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 MIDJOURNEY_RULES_PATH = BASE_DIR / "midjourney_rules.json"
@@ -276,6 +281,8 @@ class ArtworkPayload(BaseModel):
     notes: str = ""
     favorite: bool = False
     data_url: str
+    project_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_-]{1,80}$")
+    project_stage: PhotoStage = "progress"
 
 
 class ArtworkDetailsPayload(BaseModel):
@@ -1146,26 +1153,53 @@ def save_style(name: str, payload: StylePayload) -> dict[str, str]:
 @app.get("/api/artworks")
 def list_artworks() -> list[dict]:
     items = rows("SELECT id, title, collection, tags, notes, favorite, filename, created_at FROM artworks ORDER BY id DESC")
+    links = rows("SELECT pa.artwork_id, pa.project_id, pa.stage, p.title FROM project_artworks pa "
+                 "JOIN projects p ON p.id = pa.project_id ORDER BY pa.created_at DESC")
+    by_artwork = {}
+    for link in links:
+        by_artwork.setdefault(link.pop("artwork_id"), []).append(link)
     for item in items:
         item["url"] = f"/uploads/{item['filename']}"
+        item["projects"] = by_artwork.get(item["id"], [])
     return items
 
 
 @app.post("/api/artworks")
 def create_artwork(payload: ArtworkPayload) -> dict:
+    title = payload.title.strip()
+    if not title or len(title) > 200:
+        raise HTTPException(status_code=400, detail="Use an artwork title between 1 and 200 characters")
+    if payload.project_id:
+        with closing(connect()) as db:
+            if not db.execute("SELECT 1 FROM projects WHERE id = ?", (payload.project_id,)).fetchone():
+                raise HTTPException(status_code=404, detail="Project not found")
     match = re.fullmatch(r"data:(image/(?:jpeg|png|webp|gif));base64,(.+)", payload.data_url, re.DOTALL)
     if not match:
         raise HTTPException(status_code=400, detail="Unsupported image format")
-    image_bytes = base64.b64decode(match.group(2), validate=True)
+    try:
+        image_bytes = base64.b64decode(match.group(2), validate=True)
+    except (ValueError, binascii.Error) as error:
+        raise HTTPException(status_code=400, detail="The image could not be read; please choose it again") from error
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="Choose an image file")
     if len(image_bytes) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Image must be smaller than 10 MB")
     extension = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif"}[match.group(1)]
     filename = f"{uuid.uuid4().hex}{extension}"
-    (UPLOAD_DIR / filename).write_bytes(image_bytes)
-    artwork_id = execute(
-        "INSERT INTO artworks(title, collection, tags, notes, favorite, filename) VALUES (?, ?, ?, ?, ?, ?)",
-        (payload.title.strip(), payload.collection, payload.tags.strip(), payload.notes.strip(), int(payload.favorite), filename),
-    )
+    image_path = UPLOAD_DIR / filename
+    try:
+        image_path.write_bytes(image_bytes)
+        with closing(connect()) as db, db:
+            cursor = db.execute(
+                "INSERT INTO artworks(title, collection, tags, notes, favorite, filename) VALUES (?, ?, ?, ?, ?, ?)",
+                (title, payload.collection, payload.tags.strip(), payload.notes.strip(), int(payload.favorite), filename),
+            )
+            artwork_id = cursor.lastrowid
+            if payload.project_id:
+                attach_artwork(db, payload.project_id, artwork_id, payload.project_stage)
+    except Exception:
+        image_path.unlink(missing_ok=True)
+        raise
     return {"id": artwork_id, "url": f"/uploads/{filename}"}
 
 
@@ -1193,10 +1227,11 @@ def update_artwork(artwork_id: int, payload: ArtworkDetailsPayload) -> dict:
 
 @app.delete("/api/artworks/{artwork_id}")
 def delete_artwork(artwork_id: int) -> dict[str, str]:
-    with connect() as db:
+    with closing(connect()) as db, db:
         item = db.execute("SELECT filename FROM artworks WHERE id = ?", (artwork_id,)).fetchone()
         if not item:
             raise HTTPException(status_code=404, detail="Artwork not found")
+        db.execute("DELETE FROM project_artworks WHERE artwork_id = ?", (artwork_id,))
         db.execute("DELETE FROM artworks WHERE id = ?", (artwork_id,))
     image_path = UPLOAD_DIR / item["filename"]
     if image_path.exists():
@@ -1372,7 +1407,7 @@ def backup_to_google_drive() -> dict:
         fields="id,name,webViewLink",
     ).execute()
     manifest = backup_data()
-    manifest.update({"backup_format": 7, "created_at": created_at.isoformat(), "artwork_file_count": 0})
+    manifest.update({"backup_format": 8, "created_at": created_at.isoformat(), "artwork_file_count": 0})
     uploaded_images = 0
     mime_types = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif"}
     for artwork in manifest.get("artworks", []):
@@ -1469,11 +1504,12 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
     except (ValueError, json.JSONDecodeError) as error:
         raise HTTPException(status_code=400, detail="The backup manifest is invalid") from error
     project_backups = validate_project_backups(manifest)
+    project_photo_backups = validate_project_artwork_backups(manifest)
 
     snapshot_root = UPLOAD_DIR.parent / "restore-snapshots"
     snapshot_dir = snapshot_root / datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S-%f_UTC")
     snapshot_dir.mkdir(parents=True, exist_ok=False)
-    with connect() as source_db, sqlite3.connect(snapshot_dir / "blackcanvas.db") as snapshot_db:
+    with closing(connect()) as source_db, closing(sqlite3.connect(snapshot_dir / "blackcanvas.db")) as snapshot_db:
         source_db.backup(snapshot_db)
     shutil.copy2(MIDJOURNEY_RULES_PATH, snapshot_dir / "midjourney_rules.json")
     if UPLOAD_DIR.exists():
@@ -1483,7 +1519,7 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
     restored_artworks = 0
     restored_images = 0
     remote_by_name = {item["name"]: item for item in children}
-    with connect() as db:
+    with closing(connect()) as db, db:
         for prompt in manifest.get("prompts", []):
             cursor = db.execute(
                 "INSERT OR IGNORE INTO prompts(title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result, version_test_notes, version_tested_at) "
@@ -1523,7 +1559,10 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
                 ),
             )
             restored_artworks += 1
+        previous_project_ids = {row["id"] for row in db.execute("SELECT id FROM projects")}
         restored_project_count = restore_projects(db, project_backups, manifest, repair_midjourney_syntax)
+        new_project_ids = {row["id"] for row in db.execute("SELECT id FROM projects")} - previous_project_ids
+        restored_photo_links = restore_project_artworks(db, project_photo_backups, new_project_ids)
     restored_rules = restore_midjourney_rules_from_manifest(manifest)
     return {
         "status": "restored",
@@ -1531,6 +1570,7 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
         "artworks": restored_artworks,
         "images": restored_images,
         "projects": restored_project_count,
+        "project_photos": restored_photo_links,
         "midjourney_rules": int(restored_rules),
         "safety_snapshot": snapshot_dir.name,
     }

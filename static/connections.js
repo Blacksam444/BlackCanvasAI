@@ -137,7 +137,7 @@ async function loadBackups() {
           const restored = await restoreResponse.json();
           if (!restoreResponse.ok) throw Error(restored.detail || "Restore failed");
           button.textContent = "Restored ✓";
-          notify(`Restore complete: ${restored.prompts} prompts, ${restored.projects || 0} projects, ${restored.artworks} catalog entries, and ${restored.images} image files added.`);
+          notify(`Restore complete: ${restored.prompts} prompts, ${restored.projects || 0} projects, ${restored.project_photos || 0} project photo links, ${restored.artworks} catalog entries, and ${restored.images} image files added.`);
         } catch (error) {
           button.disabled = false;
           button.textContent = "Try restore again";

@@ -5,7 +5,7 @@
   <meta name="theme-color" content="#09090b"><title>Projects · Black Canvas AI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/projects.css?v=1">
+  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/projects.css?v=2">
 </head>
 <body>
 <div class="app-shell">
@@ -47,10 +47,37 @@
           <p class="project-hint" id="draftNote">Save progress to make it available on your other connected devices.</p>
           <div class="project-actions"><button class="primary" type="submit" id="saveProject">Save project</button><button class="secondary" type="button" id="reloadProject">Reload saved version</button><button class="secondary" type="button" id="recoverDraft" hidden>Review older draft</button></div>
         </form>
+        <section class="project-photos" aria-labelledby="photosHeading">
+          <div class="checklist-heading"><div><p class="eyebrow">SEE YOUR PIECE TAKE SHAPE</p><h3 id="photosHeading">Project photos</h3></div><div class="photo-toolbar"><button type="button" class="secondary" id="refreshProjectPhotos">Refresh photos</button><button type="button" class="primary" id="addProjectPhoto">＋ Add photo</button></div></div>
+          <p class="project-hint">Keep references, experiments, and finished work together. Photos are saved in Image Studio and linked here.</p>
+          <label class="photo-filter">Show<select id="photoFilter"><option value="all">All project photos</option><option value="reference">References</option><option value="progress">Work in progress</option><option value="finished">Finished pieces</option></select></label>
+          <p id="photoStatus" role="status" aria-live="polite"></p>
+          <div class="project-photo-grid" id="projectPhotoGrid"></div>
+          <p class="project-hint" id="photoEmpty">Add your first photo, or choose one you already saved in Image Studio.</p>
+        </section>
       </section>
     </section>
   </main>
 </div>
-<script src="/static/projects.js?v=1"></script>
+<dialog id="projectPhotoDialog" class="project-photo-dialog">
+  <form id="projectPhotoForm">
+    <div class="photo-dialog-heading"><h2>Add a project photo</h2><button type="button" class="remove-step" id="closePhotoDialog" aria-label="Close photo dialog">×</button></div>
+    <label>Add from<select id="photoSource"><option value="upload">Upload a photo</option><option value="existing">Image Studio</option></select></label>
+    <div id="photoUploadFields">
+      <label>Choose image<input id="projectPhotoFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required></label>
+      <p class="project-hint">JPEG, PNG, WebP, or GIF, up to 10 MB.</p>
+      <label>Photo title<input id="projectPhotoTitle" maxlength="200" required placeholder="Give this moment a name"></label>
+      <label>Collection (optional)<input id="projectPhotoCollection" maxlength="200" placeholder="Name a collection, or leave blank"></label>
+      <label>Photo notes (optional)<textarea id="projectPhotoNotes" rows="3" maxlength="5000" placeholder="What changed, what worked, or what to try next"></textarea></label>
+    </div>
+    <div id="photoExistingFields" hidden><label>Search Image Studio<input id="photoSearch" type="search" placeholder="Title, collection, or notes"></label><label>Choose a saved image<select id="existingPhoto"></select></label><p class="project-hint" id="existingPhotoNote"></p></div>
+    <img id="projectPhotoPreview" alt="Selected photo preview" hidden>
+    <label>Use as<select id="projectPhotoStage"><option value="progress">Work in progress</option><option value="reference">Reference</option><option value="finished">Finished piece</option></select></label>
+    <p class="project-hint">Adding a photo saves it immediately. Save project separately to keep any plan edits.</p>
+    <p id="photoDialogStatus" role="status" aria-live="polite"></p>
+    <div class="project-actions"><button type="submit" class="primary" id="saveProjectPhoto">Add to project</button><button type="button" class="secondary" id="cancelPhotoDialog">Cancel</button></div>
+  </form>
+</dialog>
+<script src="/static/projects.js?v=2"></script>
 </body>
 </html>

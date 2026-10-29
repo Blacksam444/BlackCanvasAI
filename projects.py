@@ -5,6 +5,7 @@ import re
 import uuid
 from contextlib import closing
 from datetime import datetime, timezone
+from pathlib import PurePosixPath, PureWindowsPath
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException
@@ -15,6 +16,69 @@ import storage
 
 router = APIRouter()
 ProjectStatus = Literal["planned", "in_progress", "paused", "completed"]
+PhotoStage = Literal["reference", "progress", "finished"]
+
+
+class ProjectArtworkPayload(BaseModel):
+    artwork_id: int = Field(ge=1)
+    stage: PhotoStage = "progress"
+
+
+class ProjectArtworkBackup(BaseModel):
+    project_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,80}$")
+    filename: str = Field(min_length=1, max_length=255)
+    stage: PhotoStage
+    created_at: datetime
+
+    @field_validator("filename")
+    @classmethod
+    def safe_filename(cls, value):
+        if value in {".", ".."} or PurePosixPath(value).name != value or PureWindowsPath(value).name != value or ":" in value:
+            raise ValueError("Photo backups need a plain filename")
+        return value
+
+
+def project_artworks(db, project_id: str) -> list[dict]:
+    result = []
+    for row in db.execute(
+        "SELECT a.id, a.title, a.collection, a.notes, a.filename, pa.stage, pa.created_at "
+        "FROM project_artworks pa JOIN artworks a ON a.id = pa.artwork_id "
+        "WHERE pa.project_id = ? ORDER BY pa.created_at DESC, a.id DESC", (project_id,),
+    ):
+        item = dict(row)
+        item["url"] = f"/uploads/{item['filename']}"
+        result.append(item)
+    return result
+
+
+def attach_artwork(db, project_id: str, artwork_id: int, stage: PhotoStage) -> bool:
+    if not db.execute("SELECT 1 FROM projects WHERE id = ?", (project_id,)).fetchone():
+        raise HTTPException(status_code=404, detail="Project not found")
+    if not db.execute("SELECT 1 FROM artworks WHERE id = ?", (artwork_id,)).fetchone():
+        raise HTTPException(status_code=404, detail="Artwork not found")
+    cursor = db.execute(
+        "INSERT OR IGNORE INTO project_artworks(project_id, artwork_id, stage, created_at) VALUES (?, ?, ?, ?)",
+        (project_id, artwork_id, stage, datetime.now(timezone.utc).isoformat()),
+    )
+    return cursor.rowcount > 0
+
+
+@router.post("/api/projects/{project_id}/artworks")
+def link_project_artwork(project_id: str, payload: ProjectArtworkPayload) -> dict:
+    with closing(storage.connect()) as db, db:
+        created = attach_artwork(db, project_id, payload.artwork_id, payload.stage)
+        photos = project_artworks(db, project_id)
+    return {"created": created, "artworks": photos}
+
+
+@router.delete("/api/projects/{project_id}/artworks/{artwork_id}")
+def unlink_project_artwork(project_id: str, artwork_id: int) -> dict:
+    with closing(storage.connect()) as db, db:
+        if not db.execute("SELECT 1 FROM projects WHERE id = ?", (project_id,)).fetchone():
+            raise HTTPException(status_code=404, detail="Project not found")
+        db.execute("DELETE FROM project_artworks WHERE project_id = ? AND artwork_id = ?", (project_id, artwork_id))
+        photos = project_artworks(db, project_id)
+    return {"artworks": photos}
 
 
 class ProjectStep(BaseModel):
@@ -114,6 +178,7 @@ def get_project(project_id: str) -> dict:
         result = project_record(row)
         source = db.execute("SELECT id, title, category, text, trashed FROM prompts WHERE id = ?", (row["source_prompt_id"],)).fetchone()
         result["source_prompt"] = dict(source) if source else None
+        result["artworks"] = project_artworks(db, project_id)
     return result
 
 
@@ -193,6 +258,33 @@ def validate_project_backups(manifest: dict) -> list[ProjectBackupPayload]:
         return [ProjectBackupPayload.model_validate(value) for value in values]
     except ValidationError as error:
         raise HTTPException(status_code=400, detail="A project in this backup is invalid; no projects were restored") from error
+
+
+def validate_project_artwork_backups(manifest: dict) -> list[ProjectArtworkBackup]:
+    values = manifest.get("project_artworks", [])
+    if not isinstance(values, list):
+        raise HTTPException(status_code=400, detail="The backup project photo list is invalid")
+    try:
+        return [ProjectArtworkBackup.model_validate(value) for value in values]
+    except ValidationError as error:
+        raise HTTPException(status_code=400, detail="A project photo in this backup is invalid") from error
+
+
+def restore_project_artworks(db, photos: list[ProjectArtworkBackup], new_project_ids: set[str]) -> int:
+    """Only restore links for newly restored projects, retaining deliberate removals."""
+    restored = 0
+    for item in photos:
+        if item.project_id not in new_project_ids:
+            continue
+        artwork = db.execute("SELECT id FROM artworks WHERE filename = ? ORDER BY id LIMIT 1", (item.filename,)).fetchone()
+        if not artwork or not db.execute("SELECT 1 FROM projects WHERE id = ?", (item.project_id,)).fetchone():
+            continue
+        cursor = db.execute(
+            "INSERT OR IGNORE INTO project_artworks(project_id, artwork_id, stage, created_at) VALUES (?, ?, ?, ?)",
+            (item.project_id, artwork["id"], item.stage, item.created_at.isoformat()),
+        )
+        restored += max(cursor.rowcount, 0)
+    return restored
 
 
 def restore_projects(db, projects: list[ProjectBackupPayload], manifest: dict, normalize_text) -> int:

@@ -66,6 +66,13 @@ def initialize() -> None:
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS project_artworks (
+                project_id TEXT NOT NULL,
+                artwork_id INTEGER NOT NULL,
+                stage TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (project_id, artwork_id)
+            );
         """)
         prompt_columns = {row[1] for row in db.execute("PRAGMA table_info(prompts)")}
         if "source" not in prompt_columns:
@@ -109,11 +116,15 @@ def backup_data() -> dict[str, Any]:
         db.execute("BEGIN")
         styles = rows("SELECT name, content FROM styles ORDER BY name", connection=db)
         return {
-            "version": 7,
+            "version": 8,
             "prompts": rows("SELECT id, title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result, version_test_notes, version_tested_at FROM prompts ORDER BY id", connection=db),
             "styles": {item["name"]: json.loads(item["content"]) for item in styles},
             "midjourney_rules": json.loads(MIDJOURNEY_RULES_PATH.read_text(encoding="utf-8")),
             "artworks": rows("SELECT id, title, collection, tags, notes, favorite, filename, created_at FROM artworks ORDER BY id", connection=db),
             "projects": [{**item, "materials": json.loads(item["materials"]), "checklist": json.loads(item["checklist"])}
                          for item in rows("SELECT * FROM projects ORDER BY created_at, id", connection=db)],
+            "project_artworks": rows(
+                "SELECT pa.project_id, a.filename, pa.stage, pa.created_at FROM project_artworks pa "
+                "JOIN artworks a ON a.id = pa.artwork_id JOIN projects p ON p.id = pa.project_id "
+                "ORDER BY pa.created_at, pa.artwork_id", connection=db),
         }

@@ -64,9 +64,26 @@ prevent a stale device from silently overwriting newer saves; older drafts can
 be reviewed explicitly before replacement. Source ideas in Trash do not remove
 the project or its checklist.
 
-Backup format 7 includes projects. Google Drive restore remaps source prompt IDs
-and adds missing projects without overwriting existing project progress. Older
-backups with no projects remain supported.
+**Project photos** lets you upload images from your phone or computer, or link
+images already in Image Studio. Label each as a reference, work in progress, or a
+finished piece, then filter the project gallery by that label. Uploads are saved
+once in the existing artwork catalog and linked to the project; adding a finished
+photo leaves the project status up to you. Photo additions save immediately and
+keep unsaved plan edits in place. **Refresh photos** brings in photos added from
+another device without reloading your plan. Save project separately to keep plan edits.
+
+Open a project photo in Image Studio to edit its title, collection, and notes, or
+follow the link back to its project. **Unlink** removes only the project link and
+keeps the catalog image. Removing an image from Image Studio removes all its
+project links too; the catalog asks for confirmation when the image is linked.
+JPEG, PNG, WebP, and GIF uploads up to 10 MB are supported.
+
+Backup format 8 includes projects and photo links. Google Drive restore remaps
+source prompt IDs and artwork IDs and adds missing projects without overwriting
+existing project progress or photo links. Photo links restore for newly added
+projects; repeating an older restore preserves later unlinks. Older backups with
+no projects or photo links remain supported. The JSON manifest references image
+files; Google Drive folder backups include the actual images.
 
 ## Verify changes
 

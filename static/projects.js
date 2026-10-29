@@ -5,6 +5,11 @@ let current = null;
 let dirty = false;
 let busy = false;
 let staleDraft = null;
+let photos = [];
+let catalog = [];
+let photoBusy = false;
+let previewUrl = null;
+const photoStages = { reference: "Reference", progress: "Work in progress", finished: "Finished piece" };
 const escapeHtml = (value = "") => String(value).replace(/[&<>"']/g, (character) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;",
 }[character]));
@@ -108,6 +113,8 @@ async function loadProject(id, recover = true) {
   $("#sourceState").textContent = source?.trashed ? "The original idea is in Trash. Your project is still available." : (source?.category || "");
   $("#sourceLink").href = source ? `/prompts?prompt=${encodeURIComponent(source.id)}` : "/prompts";
   applyForm(project);
+  photos = project.artworks;
+  renderPhotos();
   $("#saveStatus").textContent = `Saved ${new Date(project.updated_at).toLocaleString()}.`;
   if (recover) {
     let draft;
@@ -219,4 +226,178 @@ $("#closeMenu").onclick = closeMenu;
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && $("#sidebar").classList.contains("open")) closeMenu(); });
 window.addEventListener("beforeunload", (event) => { if (dirty) { event.preventDefault(); event.returnValue = ""; } });
 window.addEventListener("resize", resizeSteps);
+
+function renderPhotos() {
+  const shown = photos.filter((photo) => $("#photoFilter").value === "all" || photo.stage === $("#photoFilter").value);
+  $("#projectPhotoGrid").replaceChildren(...shown.map((photo) => {
+    const card = document.createElement("article");
+    card.className = "project-photo-card";
+    card.innerHTML = `<a class="photo-image-link" href="/image-studio?artwork=${encodeURIComponent(photo.id)}"><img loading="lazy" alt="${escapeHtml(photo.title)}"></a><div class="photo-card-body"><span class="project-badge">${photoStages[photo.stage]}</span><h4>${escapeHtml(photo.title)}</h4><p>${escapeHtml(photo.notes || "")}</p><small>Added ${escapeHtml(new Date(photo.created_at).toLocaleDateString())}</small><div class="photo-card-actions"><a href="/image-studio?artwork=${encodeURIComponent(photo.id)}">View in Image Studio ↗</a><button type="button" class="secondary unlink-photo">Unlink</button></div></div>`;
+    card.querySelector("img").src = photo.url;
+    card.querySelector(".unlink-photo").setAttribute("aria-label", `Unlink ${photo.title} from this project`);
+    card.querySelector(".unlink-photo").disabled = photoBusy;
+    card.querySelector(".unlink-photo").onclick = async () => {
+      if (photoBusy) return;
+      setPhotoBusy(true);
+      try {
+        const result = await photoRequest(`/api/projects/${encodeURIComponent(current.id)}/artworks/${photo.id}`, "DELETE");
+        photos = result.artworks;
+        renderPhotos();
+        $("#photoStatus").textContent = "Photo unlinked. It is still saved in Image Studio.";
+      } catch (error) { $("#photoStatus").textContent = error.message; }
+      finally { setPhotoBusy(false); }
+    };
+    return card;
+  }));
+  $("#photoEmpty").hidden = shown.length > 0;
+  $("#photoEmpty").textContent = photos.length ? "No photos with this label. Try another filter or add a photo." : "Add your first photo, or choose one you already saved in Image Studio.";
+}
+
+function setPhotoBusy(value) {
+  photoBusy = value;
+  document.querySelectorAll("#addProjectPhoto,#refreshProjectPhotos,.unlink-photo").forEach((control) => { control.disabled = value; });
+}
+
+async function photoRequest(url, method = "GET", payload) {
+  let response;
+  try {
+    response = await fetch(url, { method, ...(payload === undefined ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }) });
+  } catch { throw new Error("Could not reach the studio. Your photo selection is still here; please try again."); }
+  let result;
+  try { result = await response.json(); } catch { throw new Error("The photo request could not finish. Please try again."); }
+  if (!response.ok) throw new Error(typeof result.detail === "string" ? result.detail : "The photo could not be saved. Check the details and try again.");
+  return result;
+}
+
+function releasePreview() {
+  if (previewUrl) URL.revokeObjectURL(previewUrl);
+  previewUrl = null;
+  $("#projectPhotoPreview").hidden = true;
+  $("#projectPhotoPreview").removeAttribute("src");
+}
+
+function previewExisting() {
+  releasePreview();
+  const photo = catalog.find((item) => String(item.id) === $("#existingPhoto").value);
+  if (photo) { $("#projectPhotoPreview").src = photo.url; $("#projectPhotoPreview").hidden = false; }
+}
+
+function filterCatalog() {
+  const query = $("#photoSearch").value.trim().toLowerCase();
+  const selected = $("#existingPhoto").value;
+  const shown = catalog.filter((photo) => !photos.some((linked) => linked.id === photo.id)
+    && `${photo.title} ${photo.collection} ${photo.notes}`.toLowerCase().includes(query));
+  $("#existingPhoto").replaceChildren(...shown.map((photo) => new Option(`${photo.title} · ${photo.collection}`, String(photo.id))));
+  if (shown.some((photo) => String(photo.id) === selected)) $("#existingPhoto").value = selected;
+  $("#existingPhotoNote").textContent = shown.length ? "Only images not already linked to this project are listed." : "No matching images available. Try another search or upload a photo.";
+  previewExisting();
+}
+
+async function changePhotoSource() {
+  releasePreview();
+  const upload = $("#photoSource").value === "upload";
+  $("#photoUploadFields").hidden = !upload;
+  $("#photoExistingFields").hidden = upload;
+  $("#photoUploadFields").querySelectorAll("input,textarea").forEach((input) => { input.disabled = !upload; });
+  $("#existingPhoto").required = !upload;
+  $("#photoDialogStatus").textContent = "";
+  if (upload) { previewFile(); return; }
+  $("#saveProjectPhoto").disabled = true;
+  $("#photoDialogStatus").textContent = "Loading Image Studio…";
+  try {
+    catalog = await photoRequest("/api/artworks");
+    if ($("#photoSource").value === "existing") {
+      filterCatalog();
+      $("#photoDialogStatus").textContent = "";
+    }
+  } catch (error) { $("#photoDialogStatus").textContent = error.message; }
+  finally { $("#saveProjectPhoto").disabled = false; }
+}
+
+function previewFile() {
+  releasePreview();
+  const file = $("#projectPhotoFile").files[0];
+  if (!file) return;
+  if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type) || file.size > 10 * 1024 * 1024 || !file.size) {
+    $("#photoDialogStatus").textContent = "Choose a JPEG, PNG, WebP, or GIF up to 10 MB.";
+    $("#projectPhotoFile").value = "";
+    return;
+  }
+  $("#photoDialogStatus").textContent = "";
+  if (!$("#projectPhotoTitle").value.trim()) $("#projectPhotoTitle").value = file.name.replace(/\.[^.]+$/, "").slice(0, 200);
+  previewUrl = URL.createObjectURL(file);
+  $("#projectPhotoPreview").src = previewUrl;
+  $("#projectPhotoPreview").hidden = false;
+}
+
+function closePhotoDialog() { if (!photoBusy) $("#projectPhotoDialog").close(); }
+$("#addProjectPhoto").onclick = () => {
+  $("#projectPhotoForm").reset();
+  $("#photoDialogStatus").textContent = "";
+  $("#projectPhotoDialog").showModal();
+  changePhotoSource();
+};
+$("#closePhotoDialog").onclick = closePhotoDialog;
+$("#cancelPhotoDialog").onclick = closePhotoDialog;
+$("#projectPhotoDialog").addEventListener("cancel", (event) => { if (photoBusy) event.preventDefault(); });
+$("#projectPhotoDialog").addEventListener("close", releasePreview);
+$("#projectPhotoFile").onchange = previewFile;
+$("#photoSource").onchange = changePhotoSource;
+$("#existingPhoto").onchange = previewExisting;
+$("#photoSearch").oninput = filterCatalog;
+$("#photoFilter").onchange = renderPhotos;
+$("#projectPhotoForm").onsubmit = async (event) => {
+  event.preventDefault();
+  if (photoBusy || !current) return;
+  const upload = $("#photoSource").value === "upload";
+  const file = $("#projectPhotoFile").files[0];
+  if (upload && (!file || !$("#projectPhotoTitle").value.trim())) return;
+  if (!upload && !$("#existingPhoto").value) return;
+  const payload = upload ? { title: $("#projectPhotoTitle").value.trim(), collection: $("#projectPhotoCollection").value.trim() || "Unsorted",
+    notes: $("#projectPhotoNotes").value, project_id: current.id, project_stage: $("#projectPhotoStage").value }
+    : { artwork_id: Number($("#existingPhoto").value), stage: $("#projectPhotoStage").value };
+  setPhotoBusy(true);
+  const controls = [...$("#projectPhotoForm").querySelectorAll("input,textarea,select,button")];
+  const disabled = controls.map((control) => control.disabled);
+  controls.forEach((control) => { control.disabled = true; });
+  $("#photoDialogStatus").textContent = "Saving photo…";
+  let saved = false;
+  try {
+    if (upload) {
+      payload.data_url = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error("Could not read the selected photo. Choose it again."));
+        reader.readAsDataURL(file);
+      });
+      const result = await photoRequest("/api/artworks", "POST", payload);
+      // Update only the gallery so unsaved plan fields remain in place.
+      photos = [{ id: result.id, title: payload.title, collection: payload.collection, notes: payload.notes,
+        url: result.url, stage: payload.project_stage, created_at: new Date().toISOString() }, ...photos];
+    } else {
+      const result = await photoRequest(`/api/projects/${encodeURIComponent(current.id)}/artworks`, "POST", payload);
+      photos = result.artworks;
+    }
+    saved = true;
+    $("#photoFilter").value = "all";
+    renderPhotos();
+    $("#photoStatus").textContent = "Photo saved and linked to this project. Your plan edits are still as you left them.";
+  } catch (error) { $("#photoDialogStatus").textContent = error.message; }
+  finally {
+    setPhotoBusy(false);
+    controls.forEach((control, index) => { control.disabled = disabled[index]; });
+    if (saved) $("#projectPhotoDialog").close();
+  }
+};
+$("#refreshProjectPhotos").onclick = async () => {
+  if (!current || photoBusy) return;
+  setPhotoBusy(true);
+  try {
+    const project = await request(`/api/projects/${encodeURIComponent(current.id)}`);
+    photos = project.artworks;
+    renderPhotos();
+    $("#photoStatus").textContent = "Photos refreshed. Your plan edits are still as you left them.";
+  } catch (error) { $("#photoStatus").textContent = error.message; }
+  finally { setPhotoBusy(false); }
+};
 load();
