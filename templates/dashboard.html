@@ -9,18 +9,20 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/styles.css">
-    <link rel="stylesheet" href="/static/dashboard-live.css?v=3">
+    <link rel="stylesheet" href="/static/dashboard-live.css?v=4">
 </head>
 <body>
     <div class="app-shell">
         <aside class="sidebar" id="sidebar">
+            <button class="home-close-menu" id="closeMenu" aria-label="Close menu">×</button>
             <div class="brand">
                 <div class="brand-mark">BC</div>
                 <div><strong>Black Canvas</strong><span>AI Studio</span></div>
             </div>
 
             <nav class="nav-list" aria-label="Main navigation">
-                <a class="nav-item active" href="/"><span>⌂</span>Home</a>
+                <a class="nav-item active" href="/" aria-current="page"><span>⌂</span>Home</a>
+                <a class="nav-item" href="/think-tank"><span>✺</span>Art Think Tank</a><a class="nav-item" href="/projects"><span>☷</span>Projects</a>
                 <a class="nav-item" href="/image-studio"><span>✦</span>Image Studio</a>
                 <a class="nav-item" href="/chat"><span>◌</span>Chat</a>
                 <a class="nav-item" href="/prompts"><span>▤</span>Prompt Library</a>
@@ -29,23 +31,39 @@
 
             <div class="sidebar-footer">
                 <a class="nav-item" href="/connections"><span>⚙</span>Connections</a>
-                <div class="profile"><div class="avatar">J</div><div><strong>Jeffrey</strong><span>Creator workspace</span></div></div>
+                <div class="profile"><div class="avatar">○</div><div><strong>Your studio</strong><span>Creator workspace</span></div></div>
             </div>
         </aside>
 
         <main class="main-content">
             <header class="topbar">
-                <button class="menu-button" id="menuButton" aria-label="Open menu">☰</button>
-                <div class="status"><i></i> Studio online</div>
+                <button class="menu-button" id="menuButton" aria-label="Open menu" aria-expanded="false">☰</button>
+                <div class="status" id="studioConnection" data-state="loading"><i></i><span>Connecting…</span></div>
                 <a class="new-project" href="/api/backup" download style="text-decoration:none">↓ Download backup</a>
             </header>
 
             <section class="dashboard">
                 <div class="hero">
                     <p class="eyebrow">YOUR CREATIVE COMMAND CENTER</p>
-                    <h1 id="greeting">Good morning, Jeffrey.</h1>
+                    <h1 id="greeting">Your creative workspace</h1>
                     <p>What are we bringing to life today?</p>
                 </div>
+
+                <section id="studioOverview" aria-label="Your studio overview" aria-busy="true">
+                    <div class="studio-refresh"><p id="dashboardStatus" role="status" aria-live="polite">Loading your studio…</p><button type="button" id="refreshStudio" disabled>Refresh studio</button></div>
+                    <div class="studio-counts">
+                        <a href="/projects"><strong id="projectCount">—</strong><span>Saved projects</span></a>
+                        <a href="/projects?status=in_progress"><strong id="activeProjectCount">—</strong><span>In progress</span></a>
+                        <a href="/projects?status=completed"><strong id="completedProjectCount">—</strong><span>Completed</span></a>
+                        <a href="/think-tank#creativeKits"><strong id="kitCount">—</strong><span>Creative kits</span></a>
+                    </div>
+                    <section class="resume-projects" aria-labelledby="resumeHeading">
+                        <div class="section-heading"><div><p class="eyebrow">BACK TO THE WORKTABLE</p><h2 id="resumeHeading">Pick up a project</h2></div><a href="/projects">All projects →</a></div>
+                        <p class="home-hint">Your three most recently saved unfinished projects.</p>
+                        <div id="resumeProjectGrid" class="resume-project-grid"></div>
+                        <div id="resumeEmpty" class="resume-empty" hidden><h3>Your next piece starts here</h3><p>Explore an idea, save it, and make a studio plan that suits you.</p><a href="/think-tank">Find a new idea →</a><a href="/prompts">Use a saved idea →</a></div>
+                    </section>
+                </section>
 
                 <form class="ask-box" id="askForm">
                     <div class="spark">✦</div>
@@ -56,9 +74,9 @@
                 <div class="section-heading"><div><p class="eyebrow">START HERE</p><h2>Quick actions</h2></div></div>
                 <div class="quick-grid">
                     <a class="quick-card purple" href="/image-studio"><span class="card-icon">✦</span><strong>Open Image Studio</strong><small>Catalog and organize your artwork</small><b>Open studio →</b></a>
-                    <a class="quick-card blue" href="/chat"><span class="card-icon">◌</span><strong>Start a conversation</strong><small>Plan, price, write, or brainstorm</small><b>New chat →</b></a>
+                    <a class="quick-card blue" href="/think-tank"><span class="card-icon">✺</span><strong>Art Think Tank</strong><small>Materials, direction, and three ideas for physical art</small><b>Find your next artwork →</b></a>
                     <a class="quick-card amber" href="/prompts"><span class="card-icon">▤</span><strong>Explore prompts</strong><small>Use your proven creative recipes</small><b>Browse library →</b></a>
-                    <a class="quick-card pink" href="/style-bible"><span class="card-icon">◇</span><strong>Choose a style</strong><small>Build with a consistent visual voice</small><b>View styles →</b></a>
+                    <a class="quick-card pink" href="/projects"><span class="card-icon">☷</span><strong>Continue a project</strong><small>Studio steps, notes, and saved progress</small><b>Open projects →</b></a>
                 </div>
 
                 <div class="content-grid">
@@ -66,17 +84,17 @@
                         <div class="panel-title"><div><p class="eyebrow">YOUR COLLECTION</p><h2>Library snapshot</h2></div></div>
                         <a href="/prompts"><strong id="promptCount">—</strong><span>Saved prompts</span><em id="reviewCount">Loading</em></a>
                         <a href="/image-studio"><strong id="artworkCount">—</strong><span>Cataloged artwork</span><em>Open studio</em></a>
-                        <a href="/prompts"><strong id="favoriteCount">—</strong><span>Favorites</span><em>View library</em></a>
+                        <div class="library-favorites"><strong id="favoriteCount">—</strong><span>Favorites across libraries</span><div><a href="/prompts?filter=Favorites">Prompts ↗</a><a href="/image-studio?filter=favorites">Artwork ↗</a></div></div>
                     </section>
 
                     <section class="panel prompt-panel">
-                        <div class="prompt-top"><span>✦</span><p class="eyebrow">PROMPT OF THE DAY</p></div>
+                        <div class="prompt-top"><span>✦</span><p class="eyebrow">A SAVED IDEA TO REVISIT</p></div>
                         <blockquote id="dailyPrompt">Loading a prompt from your library...</blockquote>
-                        <div><span class="tag" id="dailyCategory">Your library</span><button id="copyPrompt">Copy prompt</button></div>
+                        <div><span class="tag" id="dailyCategory">Your library</span><button id="copyPrompt" disabled>Copy prompt</button></div><a id="dailyPromptLink" href="/prompts" hidden>Open this idea ↗</a>
                     </section>
                 </div>
 
-                <section class="panel version-testing-panel">
+                <section class="panel version-testing-panel" id="versionTestingPanel" hidden>
                     <div class="version-testing-head"><div><p class="eyebrow">MIDJOURNEY UPDATE TESTING</p><h2>Version-copy results</h2><a class="rules-status" id="midjourneyRulesStatus" href="/style-bible">Loading rules status…</a></div><strong id="versionTestProgress">Loading</strong></div>
                     <div class="version-progress" aria-hidden="true"><span id="versionTestBar"></span></div>
                     <div class="version-testing-grid">
@@ -93,17 +111,18 @@
                 </section>
 
                 <section class="recent">
-                    <div class="section-heading"><div><p class="eyebrow">PICK UP WHERE YOU LEFT OFF</p><h2>Recent library activity</h2></div><a href="/prompts">View all</a></div>
-                    <div class="conversation-list" id="recentActivity">
-                        <button><span class="conversation-icon purple">✦</span><span><strong>AfroNova Collection</strong><small>Refining the visual direction for the next drop</small></span><time>Yesterday</time><b>›</b></button>
-                        <button><span class="conversation-icon blue">◌</span><span><strong>TikTok Content Ideas</strong><small>Short-form concepts for the studio process</small></span><time>2 days ago</time><b>›</b></button>
-                        <button><span class="conversation-icon amber">◇</span><span><strong>Business Planning</strong><small>Pricing and launch strategy</small></span><time>Aug 3</time><b>›</b></button>
+                    <div class="section-heading"><div><p class="eyebrow">YOUR OWN CREATIVE ARCHIVE</p><h2>From your library</h2></div></div>
+                    <p class="home-hint">Newest entries in each library.</p>
+                    <div class="home-library-grid" id="recentActivity">
+                        <section aria-labelledby="recentPromptsHeading"><h3 id="recentPromptsHeading">Saved ideas <a href="/prompts">View all →</a></h3><div class="conversation-list" id="recentPrompts"><p class="activity-loading">Loading saved ideas…</p></div></section>
+                        <section aria-labelledby="recentArtworksHeading"><h3 id="recentArtworksHeading">Artwork <a href="/image-studio">View all →</a></h3><div class="conversation-list" id="recentArtworks"><p class="activity-loading">Loading artwork…</p></div></section>
                     </div>
                 </section>
             </section>
         </main>
     </div>
     <div class="toast" id="toast" role="status"></div>
-    <script src="/static/app.js?v=5"></script>
+    <dialog id="copyPromptDialog" aria-labelledby="copyHeading"><div class="copy-dialog-heading"><h2 id="copyHeading">Copy your saved idea</h2><button type="button" id="closeCopyDialog" aria-label="Close copy dialog">×</button></div><p>Select the text below, then use your device’s Copy command.</p><textarea id="manualPromptCopy" readonly rows="10" aria-label="Saved prompt text"></textarea><button type="button" id="selectPromptText">Select all text</button></dialog>
+    <script src="/static/app.js?v=studio-home-1"></script>
 </body>
 </html>

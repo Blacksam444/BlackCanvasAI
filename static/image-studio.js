@@ -1,8 +1,9 @@
 let artworks = [];
-let filter = "All";
+let filter = new URLSearchParams(location.search).get("filter") === "favorites" ? "Favorites" : "All";
 let query = "";
 let pendingFile = null;
 let selectedId = null;
+let openedLinkedArtwork = false;
 
 const grid = document.querySelector("#artGrid");
 const drop = document.querySelector("#dropZone");
@@ -37,13 +38,35 @@ async function load() {
   const response = await fetch("/api/artworks");
   if (!response.ok) throw new Error();
   artworks = await response.json();
+  const filters = document.querySelector("#artFilters");
+  filters.querySelectorAll("[data-collection]").forEach((button) => button.remove());
+  const collections = [...new Set(artworks.map((artwork) => artwork.collection))].sort();
+  if (!["All", "Favorites", ...collections.map((collection) => `collection:${collection}`)].includes(filter)) filter = "All";
+  collections.forEach((collection) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.filter = `collection:${collection}`;
+    button.dataset.collection = "true";
+    button.textContent = ["All", "Favorites"].includes(collection) ? `Collection: ${collection}` : collection;
+    filters.appendChild(button);
+  });
+  filters.querySelectorAll("button").forEach((button) => button.classList.toggle("active", button.dataset.filter === filter));
   render();
+  if (!openedLinkedArtwork) {
+    openedLinkedArtwork = true;
+    const id = new URLSearchParams(location.search).get("artwork");
+    if (id) {
+      const artwork = artworks.find((item) => String(item.id) === id);
+      if (artwork) showDetail(artwork);
+      else notify("That image is no longer in Image Studio.");
+    }
+  }
 }
 
 function render() {
   grid.innerHTML = "";
   const shown = artworks.filter((artwork) => (
-    filter === "All" || (filter === "Favorites" ? artwork.favorite : artwork.collection === filter)
+    filter === "All" || (filter === "Favorites" ? artwork.favorite : artwork.collection === filter.slice("collection:".length))
   ) && `${artwork.title} ${artwork.collection} ${artwork.tags} ${artwork.notes}`.toLowerCase().includes(query));
   shown.forEach((artwork) => {
     const card = document.createElement("article");
@@ -87,6 +110,16 @@ function showDetail(artwork) {
   document.querySelector("#detailTitle").textContent = artwork.title;
   document.querySelector("#detailNotes").textContent = artwork.notes || "No notes added yet.";
   document.querySelector("#detailTags").innerHTML = (artwork.tags || "").split(",").filter(Boolean).map((tag) => `<span>${escapeHtml(tag.trim())}</span>`).join("");
+  const stageLabels = { reference: "Reference", progress: "Work in progress", finished: "Finished piece" };
+  document.querySelector("#artworkProjects").replaceChildren(...(artwork.projects || []).map((project) => {
+    const link = document.createElement("a");
+    link.href = `/projects?project=${encodeURIComponent(project.project_id)}`;
+    link.textContent = `${stageLabels[project.stage]} · ${project.title} →`;
+    link.style.color = "#c7b7ff";
+    return link;
+  }));
+  document.querySelector("#artworkDeleteNote").hidden = !(artwork.projects || []).length;
+  document.querySelector("#detailImage").alt = artwork.title;
   document.querySelector("#detailDialog").showModal();
 }
 
@@ -162,18 +195,21 @@ document.querySelector("#saveArtworkDetails").onclick = async (event) => {
 };
 
 document.querySelector("#artSearch").oninput = (event) => { query = event.target.value.toLowerCase().trim(); render(); };
-document.querySelectorAll("#artFilters button").forEach((button) => {
-  button.onclick = () => {
-    document.querySelectorAll("#artFilters button").forEach((item) => item.classList.remove("active"));
-    button.classList.add("active");
-    filter = button.dataset.filter;
-    render();
-  };
-});
+document.querySelector("#artFilters").onclick = (event) => {
+  const button = event.target.closest("button[data-filter]");
+  if (!button) return;
+  document.querySelectorAll("#artFilters button").forEach((item) => item.classList.remove("active"));
+  button.classList.add("active");
+  filter = button.dataset.filter;
+  render();
+};
 document.querySelector("#detailClose").onclick = () => document.querySelector("#detailDialog").close();
 document.querySelector("#removeArtwork").onclick = async () => {
   if (!selectedId) return;
-  await fetch(`/api/artworks/${selectedId}`, { method: "DELETE" });
+  const artwork = artworks.find((item) => item.id === selectedId);
+  if (artwork?.projects?.length && !confirm("Remove this image from Image Studio and all its linked projects?")) return;
+  const response = await fetch(`/api/artworks/${selectedId}`, { method: "DELETE" });
+  if (!response.ok) return notify("The artwork could not be removed. Please try again.");
   document.querySelector("#detailDialog").close();
   await load();
   notify("Artwork removed from this catalog.");

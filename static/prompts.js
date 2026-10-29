@@ -4,6 +4,7 @@ let query = "";
 const requestedParameters = new URLSearchParams(window.location.search);
 const requestedFilter = requestedParameters.get("filter");
 const requestedSort = requestedParameters.get("sort");
+let sourcePromptOpened = false;
 const supportedSorts = new Set(["newest", "oldest", "title", "collection", "favorites", "test-age"]);
 let sortMode = localStorage.getItem("blackCanvasPromptSort") || "newest";
 if (supportedSorts.has(requestedSort)) sortMode = requestedSort;
@@ -14,7 +15,10 @@ const grid = document.querySelector("#promptGrid");
 const empty = document.querySelector("#empty");
 const toast = document.querySelector("#toast");
 const dialog = document.querySelector("#promptDialog");
-const canonicalCategories = ["AfroNova", "Quiet Nova", "GraffitiX", "Content", "Business", "Unsorted"];
+const canonicalCategories = ["My own direction", "AfroNova", "Quiet Nova", "GraffitiX", "Content", "Business", "Unsorted"];
+
+document.querySelector('#filters button[data-filter="All"]')
+  .insertAdjacentHTML("afterend", '<button data-filter="My own direction">My own direction</button>');
 document.querySelector("#sortPrompts").insertAdjacentHTML("beforeend", '<option value="test-age">Oldest tests first</option>');
 document.querySelector('#filters button[data-filter="Untested copies"]')
   .insertAdjacentHTML("afterend", '<button data-filter="Retest recommended">Retest recommended</button>');
@@ -144,6 +148,12 @@ async function load() {
   prompts = await response.json();
   for (const id of [...selectedIds]) if (!prompts.some(prompt => prompt.id === id)) selectedIds.delete(id);
   render();
+  if (!sourcePromptOpened && requestedParameters.has("prompt")) {
+    sourcePromptOpened = true;
+    const source = prompts.find((prompt) => prompt.id === Number(requestedParameters.get("prompt")));
+    if (source && !source.trashed) openEditor(source);
+    else notify(source ? "That source idea is in Trash." : "The source idea could not be found.");
+  }
 }
 
 async function migrate() {
@@ -281,6 +291,19 @@ function openEditor(prompt = null) {
   document.querySelector("#dialogTitle").textContent = prompt ? "Review and organize" : "Add a prompt";
   document.querySelector("#savePrompt").textContent = prompt ? "Save changes" : "Save prompt";
   document.querySelector("#deletePrompt").hidden = !prompt;
+  const projectButton = document.querySelector("#startPromptProject");
+  projectButton.hidden = !prompt || Boolean(prompt.trashed);
+  projectButton.disabled = false;
+  projectButton.textContent = "Open as project →";
+  projectButton.onclick = async () => {
+    projectButton.disabled = true;
+    try {
+      const response = await fetch("/api/projects", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt_id: prompt.id }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(typeof result.detail === "string" ? result.detail : "The project could not be opened.");
+      location.href = `/projects?project=${encodeURIComponent(result.project.id)}`;
+    } catch (error) { notify(error.message || "Could not reach the studio. Please try again."); projectButton.disabled = false; }
+  };
   const syntaxRepair = document.querySelector("#syntaxRepair");
   syntaxRepair.hidden = !prompt?.syntax_issues?.length;
   document.querySelector("#syntaxRepairMessage").textContent = prompt?.syntax_issues?.join(" · ") || "";

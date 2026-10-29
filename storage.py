@@ -9,14 +9,7 @@ UPLOAD_DIR = DATA_DIR / "uploads"
 DB_PATH = DATA_DIR / "blackcanvas.db"
 MIDJOURNEY_RULES_PATH = BASE_DIR / "midjourney_rules.json"
 
-DEFAULT_PROMPTS = [
-    ("Cosmic Royalty Portrait", "AfroNova", "Create a bold portrait where cosmic elegance meets street-art energy. Feature a regal Black subject, luminous celestial textures, deep violet and gold tones, and gallery-quality detail.", 1),
-    ("Soft Morning Reflection", "Quiet Nova", "A contemplative Black figure in soft window light, surrounded by calm neutral tones, subtle texture, and generous negative space. The mood is intimate, grounded, and quietly powerful.", 0),
-    ("Neon City Expression", "GraffitiX", "An explosive urban portrait blending layered graffiti marks, neon color, expressive typography, torn-paper texture, and the energy of a midnight city wall.", 1),
-    ("Studio Process Reel", "Content", "Write a 30-second TikTok concept showing an artwork move from blank canvas to final reveal. Include a strong opening hook, three visual beats, on-screen text, and a natural call to action.", 0),
-    ("Artwork Pricing Check", "Business", "Help me price an original artwork. Consider dimensions, materials, hours worked, experience, uniqueness, packaging, platform fees, and a healthy profit margin.", 0),
-    ("Collection Story Builder", "AfroNova", "Develop a concise story for a cohesive art collection exploring Black identity, imagined futures, ancestry, and self-defined power.", 0),
-]
+DEFAULT_PROMPTS = []
 
 
 def connect() -> sqlite3.Connection:
@@ -60,6 +53,35 @@ def initialize() -> None:
                 filename TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+            CREATE TABLE IF NOT EXISTS projects (
+                id TEXT PRIMARY KEY,
+                source_prompt_id INTEGER UNIQUE,
+                title TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'planned',
+                materials TEXT NOT NULL DEFAULT '[]',
+                surface TEXT NOT NULL DEFAULT '',
+                checklist TEXT NOT NULL DEFAULT '[]',
+                notes TEXT NOT NULL DEFAULT '',
+                revision INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS project_artworks (
+                project_id TEXT NOT NULL,
+                artwork_id INTEGER NOT NULL,
+                stage TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (project_id, artwork_id)
+            );
+            CREATE TABLE IF NOT EXISTS creative_kits (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                name_key TEXT NOT NULL UNIQUE,
+                preferences TEXT NOT NULL,
+                revision INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
         """)
         prompt_columns = {row[1] for row in db.execute("PRAGMA table_info(prompts)")}
         if "source" not in prompt_columns:
@@ -84,7 +106,9 @@ def initialize() -> None:
             db.executemany("INSERT INTO prompts(title, category, text, favorite) VALUES (?, ?, ?, ?)", DEFAULT_PROMPTS)
 
 
-def rows(query: str, values: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+def rows(query: str, values: tuple[Any, ...] = (), *, connection=None) -> list[dict[str, Any]]:
+    if connection is not None:
+        return [dict(row) for row in connection.execute(query, values).fetchall()]
     with connect() as db:
         return [dict(row) for row in db.execute(query, values).fetchall()]
 
@@ -96,11 +120,22 @@ def execute(query: str, values: tuple[Any, ...] = ()) -> int:
 
 
 def backup_data() -> dict[str, Any]:
-    styles = rows("SELECT name, content FROM styles ORDER BY name")
-    return {
-        "version": 6,
-        "prompts": rows("SELECT id, title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result, version_test_notes, version_tested_at FROM prompts ORDER BY id"),
-        "styles": {item["name"]: json.loads(item["content"]) for item in styles},
-        "midjourney_rules": json.loads(MIDJOURNEY_RULES_PATH.read_text(encoding="utf-8")),
-        "artworks": rows("SELECT id, title, collection, tags, notes, favorite, filename, created_at FROM artworks ORDER BY id"),
-    }
+    with connect() as db:
+        # Keep linked projects and prompts in one point-in-time database snapshot.
+        db.execute("BEGIN")
+        styles = rows("SELECT name, content FROM styles ORDER BY name", connection=db)
+        return {
+            "version": 9,
+            "prompts": rows("SELECT id, title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result, version_test_notes, version_tested_at FROM prompts ORDER BY id", connection=db),
+            "styles": {item["name"]: json.loads(item["content"]) for item in styles},
+            "midjourney_rules": json.loads(MIDJOURNEY_RULES_PATH.read_text(encoding="utf-8")),
+            "artworks": rows("SELECT id, title, collection, tags, notes, favorite, filename, created_at FROM artworks ORDER BY id", connection=db),
+            "projects": [{**item, "materials": json.loads(item["materials"]), "checklist": json.loads(item["checklist"])}
+                         for item in rows("SELECT * FROM projects ORDER BY created_at, id", connection=db)],
+            "project_artworks": rows(
+                "SELECT pa.project_id, a.filename, pa.stage, pa.created_at FROM project_artworks pa "
+                "JOIN artworks a ON a.id = pa.artwork_id JOIN projects p ON p.id = pa.project_id "
+                "ORDER BY pa.created_at, pa.artwork_id", connection=db),
+            "creative_kits": [{**item, "preferences": json.loads(item["preferences"])} for item in rows(
+                "SELECT id, name, preferences, revision, created_at, updated_at FROM creative_kits ORDER BY name_key, id", connection=db)],
+        }

@@ -1,4 +1,5 @@
 import base64
+import binascii
 import json
 import re
 import shutil
@@ -6,15 +7,26 @@ import sqlite3
 import uuid
 import zipfile
 from datetime import date, datetime, timedelta, timezone
+from contextlib import closing
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator, model_validator
+from typing import Literal
+
+from think_tank import COMPOSITIONS, MATERIALS, SURFACES, USER_DIRECTION, build_ideas
 
 from storage import UPLOAD_DIR, backup_data, connect, execute, initialize, rows
+from projects import (
+    router as project_router, restore_projects, validate_project_backups,
+    PhotoStage, attach_artwork, restore_project_artworks, validate_project_artwork_backups,
+    project_overview,
+)
+from project_sheets import router as project_sheet_router
+from creative_kits import CreativePreferences, router as creative_kit_router, restore_kits, validate_kit_backups
 
 BASE_DIR = Path(__file__).resolve().parent
 MIDJOURNEY_RULES_PATH = BASE_DIR / "midjourney_rules.json"
@@ -177,6 +189,9 @@ def format_prompt_pack(prompts: list[dict]) -> str:
     return "\n\n".join(sections) + "\n"
 initialize()
 app = FastAPI(title="Black Canvas AI")
+app.include_router(project_router)
+app.include_router(project_sheet_router)
+app.include_router(creative_kit_router)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
@@ -187,6 +202,27 @@ def dashboard_file() -> FileResponse:
 
 class ChatMessage(BaseModel):
     message: str
+
+
+class ThinkTankPayload(CreativePreferences):
+    direction: str = Field(min_length=3, max_length=600)
+    variation: int = Field(default=0, ge=0, le=10000)
+    studio_notes: str = Field(default="", max_length=1200)
+
+    @field_validator("direction", "studio_notes", mode="before")
+    @classmethod
+    def trim_direction(cls, value):
+        return value.strip() if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def require_material(self):
+        if not self.materials and not self.other_materials:
+            raise ValueError("Choose a material or describe your own materials")
+        return self
+
+
+class ThinkTankRefinePayload(ThinkTankPayload):
+    composition_index: int = Field(ge=0, lt=len(COMPOSITIONS))
 
 
 class PromptPayload(BaseModel):
@@ -236,6 +272,8 @@ class ArtworkPayload(BaseModel):
     notes: str = ""
     favorite: bool = False
     data_url: str
+    project_id: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_-]{1,80}$")
+    project_stage: PhotoStage = "progress"
 
 
 class ArtworkDetailsPayload(BaseModel):
@@ -280,44 +318,43 @@ def clean_image_idea(message: str) -> str:
     idea = re.sub(r"\b(a)\s+(african)\b", r"an \2", idea, flags=re.IGNORECASE)
     simple_style = re.sub(r"[^a-z]", "", idea.lower())
     if simple_style in ("afronova", "afronovastyle"):
-        idea = "a regal Black visionary in the AfroNova style"
+        idea = "an artwork in the AfroNova style"
     elif simple_style in ("quietnova", "quietnovastyle"):
-        idea = "a contemplative Black figure in the Quiet Nova style"
+        idea = "an artwork in the Quiet Nova style"
     elif simple_style in ("graffitix", "graffitixstyle"):
-        idea = "an expressive Black urban creator in the GraffitiX style"
+        idea = "an artwork in the GraffitiX style"
     return idea or message.strip()
 
 
 def prompt_collection(idea: str) -> tuple[str, str, str, str]:
     lowered = idea.lower()
-    if "afro nova" in lowered or "afronova" in lowered:
+
+    def selected(*aliases: str) -> bool:
+        return any(lowered.strip() == alias or re.search(
+            rf"(?<!not )\bin\s+(?:the\s+)?{re.escape(alias)}\s+style\b", lowered
+        ) for alias in aliases)
+
+    if selected("afro nova", "afronova"):
         return ("AfroNova", "deep violet, midnight blue, luminous gold, and rich earth tones",
                 "Afrofuturist elegance, celestial symbolism, intricate textile detail, and regal visual language",
                 "powerful, visionary, dignified")
-    if "quiet nova" in lowered:
+    if selected("quiet nova"):
         return ("Quiet Nova", "warm earth tones, soft cream, muted blue, and restrained gold",
                 "subtle tactile texture, generous negative space, and softly rendered details",
                 "intimate, grounded, contemplative")
-    if "graffitix" in lowered or "graffiti x" in lowered:
+    if selected("graffitix", "graffiti x"):
         return ("GraffitiX", "electric magenta, cyan, black, and flashes of gold",
                 "layered spray-paint marks, torn-paper textures, expressive urban energy, and a restrained symbolic vocabulary of hand-drawn 444 numerals, crowns, skulls, X-eyes, crude diamonds, primitive pyramids, cryptic writing, crossed-out phrases, ledger marks, and loose scribbles; organize the composition around one main subject, one hero symbol, one or two supporting symbols, then secondary background writing",
                 "bold, rebellious, kinetic")
-    if any(word in lowered for word in ("graffiti", "street", "urban", "neon", "city", "hip-hop")):
-        return ("GraffitiX", "electric magenta, cyan, black, and flashes of gold",
-                "layered spray-paint marks, torn-paper textures, expressive urban energy, and a restrained symbolic vocabulary of hand-drawn 444 numerals, crowns, skulls, X-eyes, crude diamonds, primitive pyramids, cryptic writing, crossed-out phrases, ledger marks, and loose scribbles; organize the composition around one main subject, one hero symbol, one or two supporting symbols, then secondary background writing",
-                "bold, rebellious, kinetic")
-    if any(word in lowered for word in ("quiet", "calm", "peaceful", "soft", "gentle", "reflective", "morning")):
-        return ("Quiet Nova", "warm earth tones, soft cream, muted blue, and restrained gold",
-                "subtle tactile texture, generous negative space, and softly rendered details",
-                "intimate, grounded, contemplative")
-    return ("AfroNova", "deep violet, midnight blue, luminous gold, and rich earth tones",
-            "Afrofuturist elegance, celestial symbolism, intricate textile detail, and regal visual language",
-            "powerful, visionary, dignified")
+    return (USER_DIRECTION, "", "", "")
 
 
-def create_image_prompt(message: str) -> tuple[str, str]:
+def create_image_prompt(message: str, *, collection_override: str | None = None) -> tuple[str, str]:
     idea = clean_image_idea(message)
-    collection, palette, style, mood = prompt_collection(idea)
+    explicit_own = re.search(r"(?:^|[.;])\s*collection\s*:\s*My own direction\b", idea, re.IGNORECASE)
+    collection, palette, style, mood = prompt_collection(USER_DIRECTION if explicit_own else (collection_override or idea))
+    if collection == USER_DIRECTION:
+        return collection, f"{strip_midjourney_parameters(idea)} {midjourney_v82_suffix(idea)}"
     lowered = idea.lower()
     subject = re.split(r"\s+in\s+the\s+(?:AfroNova|Quiet Nova|GraffitiX)\s+style", idea, maxsplit=1, flags=re.IGNORECASE)[0]
     requested_mood = re.search(r"with\s+(?:an?\s+)?(.+?)\s+mood", idea, flags=re.IGNORECASE)
@@ -334,6 +371,7 @@ def create_image_prompt(message: str) -> tuple[str, str]:
     requested_media = re.search(r"(?:^|[.;])\s*physical media\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     requested_background = re.search(r"(?:^|[.;])\s*background marks\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     requested_lighting = re.search(r"(?:^|[.;])\s*lighting\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
+    requested_approach = re.search(r"(?:^|[.;])\s*visual approach\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     midjourney_suffix = midjourney_v82_suffix(idea)
     if "photorealistic" in lowered or "photograph" in lowered:
         medium = "cinematic photorealistic portrait photography"
@@ -345,6 +383,8 @@ def create_image_prompt(message: str) -> tuple[str, str]:
         medium = "bold contemporary graphic poster art"
     else:
         medium = "museum-quality fine-art digital painting with painterly realism"
+    if requested_approach:
+        medium = requested_approach.group(1).strip()
     safety = " age-appropriate styling and a dignified, authentic expression," if any(
         word in subject.lower() for word in ("child", "boy", "girl", "kid", "baby")
     ) else ""
@@ -434,6 +474,44 @@ def prompts() -> FileResponse:
 @app.get("/image-studio")
 def image_studio() -> FileResponse:
     return FileResponse(BASE_DIR / "templates" / "image-studio.html")
+
+
+@app.get("/think-tank")
+def think_tank() -> FileResponse:
+    return FileResponse(BASE_DIR / "templates" / "think-tank.html")
+
+
+@app.get("/api/think-tank/options")
+def think_tank_options() -> dict:
+    return {
+        "materials": {name: item["label"] for name, item in MATERIALS.items()}, "surfaces": SURFACES,
+        "compositions": [composition for _, composition in COMPOSITIONS],
+    }
+
+
+@app.post("/api/think-tank/generate")
+def generate_think_tank_ideas(payload: ThinkTankPayload) -> dict:
+    return {
+        "engine": "local",
+        "ideas": build_ideas(
+            payload.materials, payload.surface, payload.direction, payload.collection,
+            payload.variation, list_styles().get(payload.collection, {}), create_image_prompt,
+            palette_override=payload.palette, mood_override=payload.mood, studio_notes=payload.studio_notes,
+            style_direction=payload.style_direction, user_avoid=payload.avoid, other_materials=payload.other_materials,
+        ),
+    }
+
+
+@app.post("/api/think-tank/refine")
+def refine_think_tank_idea(payload: ThinkTankRefinePayload) -> dict:
+    ideas = build_ideas(
+        payload.materials, payload.surface, payload.direction, payload.collection,
+        payload.variation, list_styles().get(payload.collection, {}), create_image_prompt,
+        palette_override=payload.palette, mood_override=payload.mood, studio_notes=payload.studio_notes,
+        style_direction=payload.style_direction, user_avoid=payload.avoid, other_materials=payload.other_materials,
+        composition_index=payload.composition_index,
+    )
+    return {"engine": "local", "idea": ideas[0]}
 
 
 @app.get("/style-bible")
@@ -537,7 +615,8 @@ def summarize_version_tests(items: list[dict]) -> dict[str, int]:
 @app.get("/api/dashboard")
 def dashboard_summary() -> dict:
     verification = midjourney_verification_status()
-    with connect() as db:
+    with closing(connect()) as db:
+        db.execute("BEGIN")
         prompt_count = db.execute("SELECT COUNT(*) FROM prompts WHERE trashed = 0").fetchone()[0]
         artwork_count = db.execute("SELECT COUNT(*) FROM artworks").fetchone()[0]
         favorite_count = db.execute(
@@ -556,6 +635,8 @@ def dashboard_summary() -> dict:
         artwork_rows = [dict(item) for item in db.execute(
             "SELECT id, title, collection, notes FROM artworks ORDER BY id DESC LIMIT 3"
         ).fetchall()]
+        projects = project_overview(db)
+        kit_count = db.execute("SELECT COUNT(*) FROM creative_kits").fetchone()[0]
         version_testing = summarize_version_tests([dict(item) for item in db.execute(
             "SELECT parent_prompt_id, version_test_result, version_tested_at FROM prompts WHERE trashed = 0 AND parent_prompt_id IS NOT NULL"
         ).fetchall()])
@@ -577,7 +658,11 @@ def dashboard_summary() -> dict:
     activity.sort(key=lambda item: item["id"], reverse=True)
     return {
         "counts": {"prompts": prompt_count, "artworks": artwork_count,
-                   "favorites": favorite_count, "to_review": review_count},
+                   "favorites": favorite_count, "to_review": review_count,
+                   "projects": projects["counts"]["total"], "creative_kits": kit_count},
+        "projects": projects,
+        "recent_prompts": prompt_rows,
+        "recent_artworks": artwork_rows,
         "version_testing": version_testing,
         "midjourney_rules": {
             "version": MIDJOURNEY_RULES["version"],
@@ -1066,26 +1151,53 @@ def save_style(name: str, payload: StylePayload) -> dict[str, str]:
 @app.get("/api/artworks")
 def list_artworks() -> list[dict]:
     items = rows("SELECT id, title, collection, tags, notes, favorite, filename, created_at FROM artworks ORDER BY id DESC")
+    links = rows("SELECT pa.artwork_id, pa.project_id, pa.stage, p.title FROM project_artworks pa "
+                 "JOIN projects p ON p.id = pa.project_id ORDER BY pa.created_at DESC")
+    by_artwork = {}
+    for link in links:
+        by_artwork.setdefault(link.pop("artwork_id"), []).append(link)
     for item in items:
         item["url"] = f"/uploads/{item['filename']}"
+        item["projects"] = by_artwork.get(item["id"], [])
     return items
 
 
 @app.post("/api/artworks")
 def create_artwork(payload: ArtworkPayload) -> dict:
+    title = payload.title.strip()
+    if not title or len(title) > 200:
+        raise HTTPException(status_code=400, detail="Use an artwork title between 1 and 200 characters")
+    if payload.project_id:
+        with closing(connect()) as db:
+            if not db.execute("SELECT 1 FROM projects WHERE id = ?", (payload.project_id,)).fetchone():
+                raise HTTPException(status_code=404, detail="Project not found")
     match = re.fullmatch(r"data:(image/(?:jpeg|png|webp|gif));base64,(.+)", payload.data_url, re.DOTALL)
     if not match:
         raise HTTPException(status_code=400, detail="Unsupported image format")
-    image_bytes = base64.b64decode(match.group(2), validate=True)
+    try:
+        image_bytes = base64.b64decode(match.group(2), validate=True)
+    except (ValueError, binascii.Error) as error:
+        raise HTTPException(status_code=400, detail="The image could not be read; please choose it again") from error
+    if not image_bytes:
+        raise HTTPException(status_code=400, detail="Choose an image file")
     if len(image_bytes) > 10 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="Image must be smaller than 10 MB")
     extension = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif"}[match.group(1)]
     filename = f"{uuid.uuid4().hex}{extension}"
-    (UPLOAD_DIR / filename).write_bytes(image_bytes)
-    artwork_id = execute(
-        "INSERT INTO artworks(title, collection, tags, notes, favorite, filename) VALUES (?, ?, ?, ?, ?, ?)",
-        (payload.title.strip(), payload.collection, payload.tags.strip(), payload.notes.strip(), int(payload.favorite), filename),
-    )
+    image_path = UPLOAD_DIR / filename
+    try:
+        image_path.write_bytes(image_bytes)
+        with closing(connect()) as db, db:
+            cursor = db.execute(
+                "INSERT INTO artworks(title, collection, tags, notes, favorite, filename) VALUES (?, ?, ?, ?, ?, ?)",
+                (title, payload.collection, payload.tags.strip(), payload.notes.strip(), int(payload.favorite), filename),
+            )
+            artwork_id = cursor.lastrowid
+            if payload.project_id:
+                attach_artwork(db, payload.project_id, artwork_id, payload.project_stage)
+    except Exception:
+        image_path.unlink(missing_ok=True)
+        raise
     return {"id": artwork_id, "url": f"/uploads/{filename}"}
 
 
@@ -1113,10 +1225,11 @@ def update_artwork(artwork_id: int, payload: ArtworkDetailsPayload) -> dict:
 
 @app.delete("/api/artworks/{artwork_id}")
 def delete_artwork(artwork_id: int) -> dict[str, str]:
-    with connect() as db:
+    with closing(connect()) as db, db:
         item = db.execute("SELECT filename FROM artworks WHERE id = ?", (artwork_id,)).fetchone()
         if not item:
             raise HTTPException(status_code=404, detail="Artwork not found")
+        db.execute("DELETE FROM project_artworks WHERE artwork_id = ?", (artwork_id,))
         db.execute("DELETE FROM artworks WHERE id = ?", (artwork_id,))
     image_path = UPLOAD_DIR / item["filename"]
     if image_path.exists():
@@ -1292,7 +1405,7 @@ def backup_to_google_drive() -> dict:
         fields="id,name,webViewLink",
     ).execute()
     manifest = backup_data()
-    manifest.update({"backup_format": 6, "created_at": created_at.isoformat(), "artwork_file_count": 0})
+    manifest.update({"backup_format": 9, "created_at": created_at.isoformat(), "artwork_file_count": 0})
     uploaded_images = 0
     mime_types = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif"}
     for artwork in manifest.get("artworks", []):
@@ -1328,6 +1441,8 @@ def backup_to_google_drive() -> dict:
         "url": folder.get("webViewLink", ""),
         "artwork_files": uploaded_images,
         "prompts": len(manifest.get("prompts", [])),
+        "projects": len(manifest.get("projects", [])),
+        "creative_kits": len(manifest.get("creative_kits", [])),
     }
 
 
@@ -1387,11 +1502,14 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
         manifest = json.loads(service.files().get_media(fileId=manifest_file["id"]).execute())
     except (ValueError, json.JSONDecodeError) as error:
         raise HTTPException(status_code=400, detail="The backup manifest is invalid") from error
+    project_backups = validate_project_backups(manifest)
+    project_photo_backups = validate_project_artwork_backups(manifest)
+    kit_backups = validate_kit_backups(manifest)
 
     snapshot_root = UPLOAD_DIR.parent / "restore-snapshots"
     snapshot_dir = snapshot_root / datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S-%f_UTC")
     snapshot_dir.mkdir(parents=True, exist_ok=False)
-    with connect() as source_db, sqlite3.connect(snapshot_dir / "blackcanvas.db") as snapshot_db:
+    with closing(connect()) as source_db, closing(sqlite3.connect(snapshot_dir / "blackcanvas.db")) as snapshot_db:
         source_db.backup(snapshot_db)
     shutil.copy2(MIDJOURNEY_RULES_PATH, snapshot_dir / "midjourney_rules.json")
     if UPLOAD_DIR.exists():
@@ -1401,7 +1519,7 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
     restored_artworks = 0
     restored_images = 0
     remote_by_name = {item["name"]: item for item in children}
-    with connect() as db:
+    with closing(connect()) as db, db:
         for prompt in manifest.get("prompts", []):
             cursor = db.execute(
                 "INSERT OR IGNORE INTO prompts(title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result, version_test_notes, version_tested_at) "
@@ -1441,12 +1559,20 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
                 ),
             )
             restored_artworks += 1
+        previous_project_ids = {row["id"] for row in db.execute("SELECT id FROM projects")}
+        restored_project_count = restore_projects(db, project_backups, manifest, repair_midjourney_syntax)
+        new_project_ids = {row["id"] for row in db.execute("SELECT id FROM projects")} - previous_project_ids
+        restored_photo_links = restore_project_artworks(db, project_photo_backups, new_project_ids)
+        restored_kit_count = restore_kits(db, kit_backups)
     restored_rules = restore_midjourney_rules_from_manifest(manifest)
     return {
         "status": "restored",
         "prompts": restored_prompts,
         "artworks": restored_artworks,
         "images": restored_images,
+        "projects": restored_project_count,
+        "project_photos": restored_photo_links,
+        "creative_kits": restored_kit_count,
         "midjourney_rules": int(restored_rules),
         "safety_snapshot": snapshot_dir.name,
     }

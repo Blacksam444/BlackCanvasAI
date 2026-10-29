@@ -33,7 +33,7 @@ jobs:
         run: python -m unittest discover -v
 
       - name: Compile Python sources
-        run: python -m py_compile app.py storage.py
+        run: python -m py_compile app.py storage.py think_tank.py projects.py project_sheets.py creative_kits.py
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -46,3 +46,6 @@ jobs:
           for file in static/*.js; do
             node --check "$file"
           done
+
+      - name: Test Think Tank workspace and remix behavior
+        run: node --test test_think_tank_state.mjs

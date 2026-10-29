@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#09090b"><title>Projects · Black Canvas AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/projects.css?v=2"><link rel="stylesheet" href="/static/project-sheet-dialog.css?v=1">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <button class="close-menu" id="closeMenu" aria-label="Close menu">×</button>
+    <div class="brand"><div class="brand-mark">BC</div><div><strong>Black Canvas</strong><span>AI Studio</span></div></div>
+    <nav class="nav-list" aria-label="Main navigation">
+      <a class="nav-item" href="/"><span>⌂</span>Home</a>
+      <a class="nav-item" href="/think-tank"><span>✺</span>Art Think Tank</a>
+      <a class="nav-item active" href="/projects" aria-current="page"><span>☷</span>Projects</a>
+      <a class="nav-item" href="/image-studio"><span>✦</span>Image Studio</a>
+      <a class="nav-item" href="/chat"><span>◌</span>Chat</a>
+      <a class="nav-item" href="/prompts"><span>▤</span>Prompt Library</a>
+      <a class="nav-item" href="/style-bible"><span>◇</span>Style Bible</a>
+    </nav>
+    <div class="sidebar-footer"><a class="nav-item" href="/connections"><span>⚙</span>Connections</a><div class="profile"><div class="avatar">○</div><div><strong>Your studio</strong><span>Creator workspace</span></div></div></div>
+  </aside>
+  <main class="main-content">
+    <header class="topbar"><button class="menu-button" id="menuButton" aria-label="Open menu" aria-expanded="false">☰</button><a href="/think-tank">Find a new idea ↗</a></header>
+    <section class="project-workspace">
+      <div class="hero"><p class="eyebrow">FROM AN IDEA TO A FINISHED PIECE</p><h1>Your projects</h1><p>Make a plan that suits your practice. Pick it up wherever you work.</p></div>
+      <p id="pageStatus" role="status" aria-live="polite">Loading your projects…</p>
+      <section id="overview" aria-label="Project overview">
+        <div class="project-tools"><label>Search projects<input id="projectSearch" type="search" placeholder="Title, materials, or notes"></label><label>Status<select id="projectFilter"><option value="all">All projects</option><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="paused">Paused</option><option value="completed">Completed</option></select></label><button type="button" class="secondary" id="refreshProjects">Refresh</button></div>
+        <div id="projectGrid" class="project-grid"></div>
+        <div id="projectEmpty" class="project-empty" hidden><h2>No projects here yet</h2><p>Start with an idea you want to make, then shape its studio checklist.</p><a class="primary" href="/think-tank">Explore the Think Tank</a><a class="secondary" href="/prompts">Use a saved idea</a></div>
+      </section>
+      <section id="projectDetail" hidden aria-labelledby="projectHeading">
+        <a class="back-link" href="/projects">← All projects</a>
+        <div class="detail-heading"><div><p class="eyebrow">YOUR STUDIO PLAN</p><h2 id="projectHeading"></h2><p id="projectProgress"></p></div><span class="project-badge" id="projectStatusBadge"></span></div>
+        <progress id="projectProgressBar" max="100" value="0" aria-label="Checklist progress"></progress>
+        <div class="project-sheet-launch"><button type="button" class="secondary" id="openProjectSheet">Print / download plan</button><p class="project-hint">Make a copy for your worktable, with the notes and photos you choose.</p></div>
+        <details class="project-source"><summary>Source idea from Prompt Library</summary><p id="sourceTitle"></p><p id="sourceState"></p><pre id="sourceText"></pre><a href="/prompts" id="sourceLink">Open Prompt Library ↗</a></details>
+        <form id="projectForm">
+          <div class="project-fields"><label>Project title<input id="projectTitle" maxlength="200" required></label><label>Project status<select id="projectStatus"><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="paused">Paused</option><option value="completed">Completed</option></select></label><label>Working surface<input id="projectSurface" maxlength="240" placeholder="Choose the surface you want to use"></label><label>Materials <small>One per line; edit this list to suit your practice.</small><textarea id="projectMaterials" rows="4" maxlength="7500"></textarea></label></div>
+          <div class="checklist-heading"><div><p class="eyebrow">ONE STEP AT A TIME</p><h3>Studio checklist</h3></div><button type="button" class="secondary" id="addStep">＋ Add step</button></div>
+          <p class="project-hint">Edit, add, or remove steps. Check off each one as you work.</p><ol class="project-checklist" id="projectChecklist"></ol>
+          <label class="project-notes">Studio notes<textarea id="projectNotes" rows="6" maxlength="5000" placeholder="Experiments, dimensions, decisions, or what you want to try next"></textarea></label>
+          <p id="saveStatus" role="status" aria-live="polite"></p>
+          <p class="project-hint" id="draftNote">Save progress to make it available on your other connected devices.</p>
+          <div class="project-actions"><button class="primary" type="submit" id="saveProject">Save project</button><button class="secondary" type="button" id="reloadProject">Reload saved version</button><button class="secondary" type="button" id="recoverDraft" hidden>Review older draft</button></div>
+        </form>
+        <section class="project-photos" aria-labelledby="photosHeading">
+          <div class="checklist-heading"><div><p class="eyebrow">SEE YOUR PIECE TAKE SHAPE</p><h3 id="photosHeading">Project photos</h3></div><div class="photo-toolbar"><button type="button" class="secondary" id="refreshProjectPhotos">Refresh photos</button><button type="button" class="primary" id="addProjectPhoto">＋ Add photo</button></div></div>
+          <p class="project-hint">Keep references, experiments, and finished work together. Photos are saved in Image Studio and linked here.</p>
+          <label class="photo-filter">Show<select id="photoFilter"><option value="all">All project photos</option><option value="reference">References</option><option value="progress">Work in progress</option><option value="finished">Finished pieces</option></select></label>
+          <p id="photoStatus" role="status" aria-live="polite"></p>
+          <div class="project-photo-grid" id="projectPhotoGrid"></div>
+          <p class="project-hint" id="photoEmpty">Add your first photo, or choose one you already saved in Image Studio.</p>
+        </section>
+      </section>
+    </section>
+  </main>
+</div>
+<dialog id="projectPhotoDialog" class="project-photo-dialog">
+  <form id="projectPhotoForm">
+    <div class="photo-dialog-heading"><h2>Add a project photo</h2><button type="button" class="remove-step" id="closePhotoDialog" aria-label="Close photo dialog">×</button></div>
+    <label>Add from<select id="photoSource"><option value="upload">Upload a photo</option><option value="existing">Image Studio</option></select></label>
+    <div id="photoUploadFields">
+      <label>Choose image<input id="projectPhotoFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required></label>
+      <p class="project-hint">JPEG, PNG, WebP, or GIF, up to 10 MB.</p>
+      <label>Photo title<input id="projectPhotoTitle" maxlength="200" required placeholder="Give this moment a name"></label>
+      <label>Collection (optional)<input id="projectPhotoCollection" maxlength="200" placeholder="Name a collection, or leave blank"></label>
+      <label>Photo notes (optional)<textarea id="projectPhotoNotes" rows="3" maxlength="5000" placeholder="What changed, what worked, or what to try next"></textarea></label>
+    </div>
+    <div id="photoExistingFields" hidden><label>Search Image Studio<input id="photoSearch" type="search" placeholder="Title, collection, or notes"></label><label>Choose a saved image<select id="existingPhoto"></select></label><p class="project-hint" id="existingPhotoNote"></p></div>
+    <img id="projectPhotoPreview" alt="Selected photo preview" hidden>
+    <label>Use as<select id="projectPhotoStage"><option value="progress">Work in progress</option><option value="reference">Reference</option><option value="finished">Finished piece</option></select></label>
+    <p class="project-hint">Adding a photo saves it immediately. Save project separately to keep any plan edits.</p>
+    <p id="photoDialogStatus" role="status" aria-live="polite"></p>
+    <div class="project-actions"><button type="submit" class="primary" id="saveProjectPhoto">Add to project</button><button type="button" class="secondary" id="cancelPhotoDialog">Cancel</button></div>
+  </form>
+</dialog>
+<dialog id="projectSheetDialog" aria-labelledby="sheetDialogHeading">
+  <div class="sheet-dialog-heading"><div><p class="eyebrow">TAKE YOUR PLAN WITH YOU</p><h2 id="sheetDialogHeading">Project sheet</h2></div><button class="remove-step" id="closeProjectSheet" type="button" aria-label="Close project sheet">×</button></div>
+  <p class="project-hint" id="sheetDraftNotice">Making a copy does not save project changes.</p>
+  <form id="sheetOptions">
+    <div class="sheet-toggles"><label><input type="checkbox" id="sheetNotes" checked> Include notes (plan and photos)</label><label><input type="checkbox" id="sheetSource"> Include full source idea</label></div>
+    <details id="sheetPhotoOptions"><summary>Choose photos for this copy <span id="sheetPhotoCount"></span></summary><p class="project-hint">Choose up to 12 photos, up to 20 MB total. Images stay with the downloaded HTML copy.</p><div id="sheetPhotoChoices"></div><p class="project-hint" id="sheetNoPhotos">No photos linked yet. You can add them to the project later.</p></details>
+    <button type="submit" class="secondary" id="buildProjectSheet">Make preview</button>
+  </form>
+  <p id="sheetStatus" role="status" aria-live="polite"></p>
+  <div class="sheet-actions"><button class="primary" type="button" id="printProjectSheet" disabled>Print / Save PDF</button><button class="secondary" type="button" id="downloadProjectSheet" disabled>Download HTML</button><button class="secondary" type="button" id="downloadProjectText" disabled>Download text</button></div>
+  <p class="project-hint">HTML keeps the layout and selected images for offline use. Text keeps the plan and photo captions. PDF is available through your browser’s print options.</p>
+  <iframe id="projectSheetPreview" title="Project sheet preview" sandbox="allow-same-origin allow-modals" hidden></iframe>
+</dialog>
+<script src="/static/projects.js?v=sheet-1"></script>
+</body>
+</html>
