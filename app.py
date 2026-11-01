@@ -1,5 +1,6 @@
 import base64
 import binascii
+import hashlib
 import json
 import re
 import shutil
@@ -281,6 +282,7 @@ class ArtworkDetailsPayload(BaseModel):
     collection: str
     tags: str = ""
     notes: str = ""
+    expected_details_version: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
 
 
 class GoogleCredentialsPayload(BaseModel):
@@ -1148,6 +1150,12 @@ def save_style(name: str, payload: StylePayload) -> dict[str, str]:
     return {"status": "saved"}
 
 
+def artwork_details_version(item) -> str:
+    # Favorites and project links are independent of the editable artwork details.
+    details = [item[key] for key in ("title", "collection", "tags", "notes")]
+    return hashlib.sha256(json.dumps(details, ensure_ascii=False, separators=(",", ":")).encode("utf-8")).hexdigest()
+
+
 @app.get("/api/artworks")
 def list_artworks() -> list[dict]:
     items = rows("SELECT id, title, collection, tags, notes, favorite, filename, created_at FROM artworks ORDER BY id DESC")
@@ -1158,6 +1166,7 @@ def list_artworks() -> list[dict]:
         by_artwork.setdefault(link.pop("artwork_id"), []).append(link)
     for item in items:
         item["url"] = f"/uploads/{item['filename']}"
+        item["details_version"] = artwork_details_version(item)
         item["projects"] = by_artwork.get(item["id"], [])
     return items
 
@@ -1195,15 +1204,19 @@ def create_artwork(payload: ArtworkPayload) -> dict:
             artwork_id = cursor.lastrowid
             if payload.project_id:
                 attach_artwork(db, payload.project_id, artwork_id, payload.project_stage)
+            saved = dict(db.execute("SELECT * FROM artworks WHERE id = ?", (artwork_id,)).fetchone())
     except Exception:
         image_path.unlink(missing_ok=True)
         raise
-    return {"id": artwork_id, "url": f"/uploads/{filename}"}
+    return {**saved, "url": f"/uploads/{filename}", "details_version": artwork_details_version(saved)}
 
 
 @app.patch("/api/artworks/{artwork_id}/favorite")
 def favorite_artwork(artwork_id: int, favorite: bool) -> dict[str, bool]:
-    execute("UPDATE artworks SET favorite = ? WHERE id = ?", (int(favorite), artwork_id))
+    with closing(connect()) as db, db:
+        cursor = db.execute("UPDATE artworks SET favorite = ? WHERE id = ?", (int(favorite), artwork_id))
+        if not cursor.rowcount:
+            raise HTTPException(status_code=404, detail="Artwork not found")
     return {"favorite": favorite}
 
 
@@ -1212,23 +1225,34 @@ def update_artwork(artwork_id: int, payload: ArtworkDetailsPayload) -> dict:
     title = payload.title.strip()
     if not title:
         raise HTTPException(status_code=400, detail="Artwork title is required")
-    with connect() as db:
+    with closing(connect()) as db, db:
+        db.execute("BEGIN IMMEDIATE")
+        current = db.execute("SELECT title, collection, tags, notes FROM artworks WHERE id = ?", (artwork_id,)).fetchone()
+        if not current:
+            raise HTTPException(status_code=404, detail="Artwork not found")
+        if payload.expected_details_version is not None and payload.expected_details_version != artwork_details_version(current):
+            raise HTTPException(status_code=409, detail="This artwork changed on another device. Your edits are still here. Review the saved details before saving again.")
         cursor = db.execute(
             "UPDATE artworks SET title = ?, collection = ?, tags = ?, notes = ? WHERE id = ?",
             (title, payload.collection, payload.tags.strip(), payload.notes.strip(), artwork_id),
         )
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Artwork not found")
-    return {"id": artwork_id, "title": title, "collection": payload.collection,
-            "tags": payload.tags.strip(), "notes": payload.notes.strip()}
+    result = {"id": artwork_id, "title": title, "collection": payload.collection,
+              "tags": payload.tags.strip(), "notes": payload.notes.strip()}
+    result["details_version"] = artwork_details_version(result)
+    return result
 
 
 @app.delete("/api/artworks/{artwork_id}")
-def delete_artwork(artwork_id: int) -> dict[str, str]:
+def delete_artwork(artwork_id: int, expected_details_version: str | None = None) -> dict[str, str]:
     with closing(connect()) as db, db:
-        item = db.execute("SELECT filename FROM artworks WHERE id = ?", (artwork_id,)).fetchone()
+        db.execute("BEGIN IMMEDIATE")
+        item = db.execute("SELECT * FROM artworks WHERE id = ?", (artwork_id,)).fetchone()
         if not item:
             raise HTTPException(status_code=404, detail="Artwork not found")
+        if expected_details_version is not None and expected_details_version != artwork_details_version(item):
+            raise HTTPException(status_code=409, detail="This artwork changed on another device. Reload its saved details and review them before removing it.")
         db.execute("DELETE FROM project_artworks WHERE artwork_id = ?", (artwork_id,))
         db.execute("DELETE FROM artworks WHERE id = ?", (artwork_id,))
     image_path = UPLOAD_DIR / item["filename"]

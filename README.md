@@ -76,6 +76,27 @@ browser draft storage is blocked. Refresh kits to see other-device changes.
 Update selected kit from form replaces its preferences explicitly; revision
 checks prevent stale updates/removals. Removing a kit keeps ideas and projects.
 
+## Image Studio
+
+Open a catalog image and choose **Add to project**. Find a saved project, choose
+whether the image is a reference, work in progress, or finished piece, then add
+it. The image remains in the same artwork catalog and can be linked to multiple
+projects. Existing links appear in the artwork details; open one to continue at
+the project. The picker offers links to create a project when none exist.
+
+Failed uploads and detail saves keep the current file selection and form fields
+available for retry. Pending saves are disabled against repeated taps. Refresh
+artwork keeps search/filter choices and retains the last loaded catalog on
+failure. Favorite changes appear after the server confirms them.
+
+The editor detects details changed on another device and keeps your edits visible.
+Review latest saved details lets you load the saved version or explicitly keep
+your edits for the next save. Deleting from a stale artwork view is also rejected;
+reload its saved details before removal. Unsaved editor/upload work has a leaving
+guard while the page remains open. The current UI sends a derived
+`expected_details_version`; legacy API calls without it keep their previous
+unconditional behavior. No database migration or backup version change is needed.
+
 ## Projects
 
 Choose **Start project** on a Think Tank idea, or **Open as project** when viewing
@@ -103,7 +124,7 @@ another device without reloading your plan. Save project separately to keep plan
 Open a project photo in Image Studio to edit its title, collection, and notes, or
 follow the link back to its project. **Unlink** removes only the project link and
 keeps the catalog image. Removing an image from Image Studio removes all its
-project links too; the catalog asks for confirmation when the image is linked.
+project links too; the catalog asks for confirmation before removal.
 JPEG, PNG, WebP, and GIF uploads up to 10 MB are supported.
 
 **Print / download plan** opens a project sheet made from the fields currently
