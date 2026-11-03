@@ -5,7 +5,7 @@
   <meta name="theme-color" content="#09090b"><title>Projects · Black Canvas AI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/projects.css?v=2"><link rel="stylesheet" href="/static/project-sheet-dialog.css?v=1"><link rel="stylesheet" href="/static/project-photo-review.css?v=1">
+  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/projects.css?v=2"><link rel="stylesheet" href="/static/project-sheet-dialog.css?v=1"><link rel="stylesheet" href="/static/project-photo-review.css?v=1"><link rel="stylesheet" href="/static/project-create.css?v=1">
 </head>
 <body>
 <div class="app-shell">
@@ -29,16 +29,17 @@
       <div class="hero"><p class="eyebrow">FROM AN IDEA TO A FINISHED PIECE</p><h1>Your projects</h1><p>Make a plan that suits your practice. Pick it up wherever you work.</p></div>
       <p id="pageStatus" role="status" aria-live="polite">Loading your projects…</p>
       <section id="overview" aria-label="Project overview">
+        <div class="project-start"><div><h2>Start with your own idea</h2><p class="project-hint">Plan something new or pick up a piece already on your worktable.</p></div><button type="button" class="primary" id="newProject">＋ New project</button></div>
         <div class="project-tools"><label>Search projects<input id="projectSearch" type="search" placeholder="Title, materials, or notes"></label><label>Status<select id="projectFilter"><option value="all">All projects</option><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="paused">Paused</option><option value="completed">Completed</option></select></label><button type="button" class="secondary" id="refreshProjects">Refresh</button></div>
         <div id="projectGrid" class="project-grid"></div>
-        <div id="projectEmpty" class="project-empty" hidden><h2>No projects here yet</h2><p>Start with an idea you want to make, then shape its studio checklist.</p><a class="primary" href="/think-tank">Explore the Think Tank</a><a class="secondary" href="/prompts">Use a saved idea</a></div>
+        <div id="projectEmpty" class="project-empty" hidden><h2>No projects here yet</h2><p>Create your own project above, or start with a studio idea.</p><a class="secondary" href="/think-tank">Explore the Think Tank</a><a class="secondary" href="/prompts">Use a saved idea</a></div>
       </section>
       <section id="projectDetail" hidden aria-labelledby="projectHeading">
         <a class="back-link" href="/projects">← All projects</a>
-        <div class="detail-heading"><div><p class="eyebrow">YOUR STUDIO PLAN</p><h2 id="projectHeading"></h2><p id="projectProgress"></p></div><span class="project-badge" id="projectStatusBadge"></span></div>
+        <div class="detail-heading"><div><p class="eyebrow">YOUR STUDIO PLAN</p><h2 id="projectHeading" tabindex="-1"></h2><p id="projectProgress"></p></div><span class="project-badge" id="projectStatusBadge"></span></div>
         <progress id="projectProgressBar" max="100" value="0" aria-label="Checklist progress"></progress>
         <div class="project-sheet-launch"><button type="button" class="secondary" id="openProjectSheet">Print / download plan</button><p class="project-hint">Make a copy for your worktable, with the notes and photos you choose.</p></div>
-        <details class="project-source"><summary>Source idea from Prompt Library</summary><p id="sourceTitle"></p><p id="sourceState"></p><pre id="sourceText"></pre><a href="/prompts" id="sourceLink">Open Prompt Library ↗</a></details>
+        <details class="project-source"><summary id="projectSourceSummary">Source idea from Prompt Library</summary><p id="sourceTitle"></p><p id="sourceState"></p><pre id="sourceText"></pre><a href="/prompts" id="sourceLink">Open Prompt Library ↗</a></details>
         <form id="projectForm">
           <div class="project-fields"><label>Project title<input id="projectTitle" maxlength="200" required></label><label>Project status<select id="projectStatus"><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="paused">Paused</option><option value="completed">Completed</option></select></label><label>Working surface<input id="projectSurface" maxlength="240" placeholder="Choose the surface you want to use"></label><label>Materials <small>One per line; edit this list to suit your practice.</small><textarea id="projectMaterials" rows="4" maxlength="7500"></textarea></label></div>
           <div class="checklist-heading"><div><p class="eyebrow">ONE STEP AT A TIME</p><h3>Studio checklist</h3></div><button type="button" class="secondary" id="addStep">＋ Add step</button></div>
@@ -60,6 +61,24 @@
     </section>
   </main>
 </div>
+<dialog id="newProjectDialog" aria-labelledby="newProjectHeading">
+  <form id="newProjectForm">
+    <div class="photo-dialog-heading"><h2 id="newProjectHeading">Start your project</h2><button type="button" class="remove-step" id="closeNewProject" aria-label="Close new project">×</button></div>
+    <p class="project-hint">Give it a title. Add as much of the plan as you want now; you can build it as you work.</p>
+    <label>Project title<input id="newProjectTitle" maxlength="200" required placeholder="What are you working on?"></label>
+    <label>Status<select id="newProjectStatus"><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="paused">Paused</option><option value="completed">Completed</option></select></label>
+    <details id="newProjectPlan"><summary>Add materials, steps, or notes (optional)</summary>
+      <label>Working surface<input id="newProjectSurface" maxlength="240" placeholder="Choose your surface"></label>
+      <label>Materials <small>One per line, up to 30.</small><textarea id="newProjectMaterials" rows="3" maxlength="7500"></textarea></label>
+      <label>Studio steps <small>One per line, up to 60. You can edit and check them off in the project.</small><textarea id="newProjectSteps" rows="4" maxlength="120060"></textarea></label>
+      <label>Studio notes<textarea id="newProjectNotes" rows="4" maxlength="5000" placeholder="Your direction, dimensions, or what you want to try"></textarea></label>
+    </details>
+    <p class="project-hint" id="newProjectDraftNote">An unfinished form stays in this browser when storage is available. Create project to save it for your connected devices.</p>
+    <p id="newProjectMessage" role="status" aria-live="polite"></p>
+    <div id="newProjectConflict" hidden><p class="project-hint">Open saved project discards this form. Create a separate project saves these fields as another project.</p><div class="project-actions"><button type="button" class="secondary" id="openCreatedProject">Open saved project</button><button type="button" class="secondary" id="createSeparateProject">Create a separate project</button></div></div>
+    <div class="project-actions"><button type="submit" class="primary" id="createProject">Create project</button><button type="button" class="secondary" id="cancelNewProject">Keep for later</button><button type="button" class="secondary" id="discardNewProject">Discard form</button></div>
+  </form>
+</dialog>
 <dialog id="projectPhotoDialog" class="project-photo-dialog">
   <form id="projectPhotoForm">
     <div class="photo-dialog-heading"><h2>Add a project photo</h2><button type="button" class="remove-step" id="closePhotoDialog" aria-label="Close photo dialog">×</button></div>
@@ -113,6 +132,6 @@
   <p class="project-hint">HTML keeps the layout and selected images for offline use. Text keeps the plan and photo captions. PDF is available through your browser’s print options.</p>
   <iframe id="projectSheetPreview" title="Project sheet preview" sandbox="allow-same-origin allow-modals" hidden></iframe>
 </dialog>
-<script src="/static/projects.js?v=photo-review-1"></script>
+<script src="/static/projects.js?v=direct-1"></script><script src="/static/project-create.js?v=1"></script>
 </body>
 </html>

@@ -145,15 +145,22 @@ class ProjectSeedPayload(BaseModel):
         return values
 
 
-class ProjectUpdatePayload(ProjectSeedPayload):
+class ProjectPlanPayload(ProjectSeedPayload):
     title: str = Field(min_length=1, max_length=200)
     status: ProjectStatus = "planned"
-    revision: int = Field(ge=1)
 
     @field_validator("title", mode="before")
     @classmethod
     def trim_title(cls, value):
         return value.strip() if isinstance(value, str) else value
+
+
+class ProjectUpdatePayload(ProjectPlanPayload):
+    revision: int = Field(ge=1)
+
+
+class ProjectDirectCreatePayload(ProjectPlanPayload):
+    id: str = Field(pattern=r"^direct_[a-f0-9]{32}$")
 
 
 class ProjectCreatePayload(BaseModel):
@@ -193,6 +200,7 @@ def project_record(row) -> dict:
     total = len(result["checklist"])
     done = sum(bool(step["done"]) for step in result["checklist"])
     result["progress"] = {"done": done, "total": total, "percent": round(done / total * 100) if total else 0}
+    result["started_directly"] = result["source_prompt_id"] is None and bool(re.fullmatch(r"direct_[a-f0-9]{32}", result["id"]))
     return result
 
 
@@ -276,6 +284,30 @@ def create_project(payload: ProjectCreatePayload) -> dict:
             created = cursor.rowcount > 0
             project_id = db.execute("SELECT id FROM projects WHERE source_prompt_id = ?", (payload.prompt_id,)).fetchone()["id"]
     return {"project": get_project(project_id), "created": created}
+
+
+@router.post("/api/projects/direct")
+def create_direct_project(payload: ProjectDirectCreatePayload) -> dict:
+    """Use the caller's stable ID so a retried creation cannot duplicate work."""
+    now = datetime.now(timezone.utc).isoformat()
+    plan = payload.model_dump(exclude={"id"})
+    with closing(storage.connect()) as db, db:
+        db.execute("BEGIN IMMEDIATE")
+        existing = db.execute("SELECT * FROM projects WHERE id = ?", (payload.id,)).fetchone()
+        if existing:
+            saved = project_record(existing)
+            if saved["source_prompt_id"] is not None or any(saved[key] != value for key, value in plan.items()):
+                raise HTTPException(status_code=409, detail="This creation was already saved with different fields. Open the saved project, or create a separate project with this form.")
+            created = False
+        else:
+            db.execute(
+                "INSERT INTO projects(id, title, status, materials, surface, checklist, notes, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (payload.id, payload.title, payload.status, json.dumps(plan["materials"]), payload.surface,
+                 json.dumps(plan["checklist"]), payload.notes, now, now),
+            )
+            created = True
+    return {"project": get_project(payload.id), "created": created}
 
 
 @router.get("/api/projects/{project_id}")

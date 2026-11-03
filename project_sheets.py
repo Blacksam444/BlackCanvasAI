@@ -74,6 +74,7 @@ def create_project_sheet(project_id: str, payload: ProjectSheetPayload) -> dict:
     completed = sum(step["done"] for step in plan["checklist"])
     progress = f"{completed} of {len(plan['checklist'])} steps checked"
     source = project["source_prompt"] if payload.include_source else None
+    missing_source = "Started directly in Projects; no source idea linked." if project["started_directly"] else "Source idea unavailable."
     lines = ["BLACK CANVAS — PROJECT SHEET", plan["title"], f"{STATUS_LABELS[plan['status']]} · {progress}", snapshot, f"Prepared {prepared}"]
     if warning:
         lines.append(warning)
@@ -86,7 +87,7 @@ def create_project_sheet(project_id: str, payload: ProjectSheetPayload) -> dict:
     if payload.include_notes:
         lines.extend(["", "STUDIO NOTES", plan["notes"] or "No notes added."])
     if payload.include_source:
-        lines.extend(["", "SOURCE IDEA", source["title"] if source else "Source idea unavailable."])
+        lines.extend(["", "SOURCE IDEA", source["title"] if source else missing_source])
         if source:
             if source["trashed"]:
                 lines.append("Original idea is in Trash.")
@@ -110,7 +111,7 @@ def create_project_sheet(project_id: str, payload: ProjectSheetPayload) -> dict:
     if payload.include_source:
         source_body = (f'<h3>{escape(source["title"])}</h3>'
                        + ('<p class="muted">Original idea is in Trash.</p>' if source["trashed"] else "")
-                       + f'<p class="preserve">{escape(source["text"])}</p>') if source else "<p>Source idea unavailable.</p>"
+                       + f'<p class="preserve">{escape(source["text"])}</p>') if source else f"<p>{missing_source}</p>"
         source_html = f'<section class="source-idea"><h2>Source idea</h2>{source_body}</section>'
     photo_html = ""
     for photo in photos:

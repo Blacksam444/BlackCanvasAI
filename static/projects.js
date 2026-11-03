@@ -97,8 +97,8 @@ function validDraft(value) {
       && typeof step.text === "string" && step.text.length <= 2000 && typeof step.done === "boolean");
 }
 
-async function loadProject(id, recover = true) {
-  const project = await request(`/api/projects/${encodeURIComponent(id)}`);
+async function loadProject(id, recover = true, savedProject = null) {
+  const project = savedProject || await request(`/api/projects/${encodeURIComponent(id)}`);
   current = project;
   dirty = false;
   staleDraft = null;
@@ -108,10 +108,14 @@ async function loadProject(id, recover = true) {
   $("#projectDetail").hidden = false;
   $("#pageStatus").textContent = "Project saved in your studio. Changes below are saved when you choose Save project.";
   const source = project.source_prompt;
-  $("#sourceTitle").textContent = source?.title || "Source idea unavailable";
-  $("#sourceText").textContent = source?.text || "Your project checklist and notes are kept even if its source idea is unavailable.";
+  $("#projectSourceSummary").textContent = project.started_directly ? "Started directly in Projects" : "Source idea from Prompt Library";
+  $("#sourceTitle").textContent = source?.title || (project.started_directly ? "Your own project" : "Source idea unavailable");
+  $("#sourceText").textContent = source?.text || (project.started_directly
+    ? "You started this plan directly. Your materials, checklist, photos, and notes are kept in Projects."
+    : "Your project checklist and notes are kept even if its source idea is unavailable.");
   $("#sourceState").textContent = source?.trashed ? "The original idea is in Trash. Your project is still available." : (source?.category || "");
   $("#sourceLink").href = source ? `/prompts?prompt=${encodeURIComponent(source.id)}` : "/prompts";
+  $("#sourceLink").hidden = project.started_directly;
   applyForm(project);
   photos = project.artworks;
   renderPhotos();
@@ -144,14 +148,16 @@ function renderProjects() {
 }
 
 async function load() {
+  const id = new URLSearchParams(location.search).get("project");
   try {
     projects = await request("/api/projects");
     renderProjects();
-    const id = new URLSearchParams(location.search).get("project");
+    // A direct creation may finish while the initial overview is still loading.
+    if (current && current.id !== id) return;
     if (id) await loadProject(id);
-    else $("#pageStatus").textContent = projects.length ? `${projects.length} saved ${projects.length === 1 ? "project" : "projects"}.` : "Start a project from a Think Tank idea or a saved library prompt.";
+    else $("#pageStatus").textContent = projects.length ? `${projects.length} saved ${projects.length === 1 ? "project" : "projects"}.` : "Start your own project, explore the Think Tank, or use a saved library idea.";
   } catch (error) {
-    $("#pageStatus").textContent = error.message;
+    if (!current || current.id === id) $("#pageStatus").textContent = error.message;
   }
 }
 

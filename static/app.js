@@ -83,7 +83,7 @@ function renderProjects(overview) {
   }));
   $("#resumeEmpty").hidden = overview.recent.length > 0;
   $("#resumeEmpty h3").textContent = overview.counts.total ? "Your projects are marked complete" : "Your next piece starts here";
-  $("#resumeEmpty p").textContent = overview.counts.total ? "Revisit your finished projects, or find an idea for your next piece." : "Explore an idea, save it, and make a studio plan that suits you.";
+  $("#resumeEmpty p").textContent = overview.counts.total ? "Revisit your finished projects, or start your next piece." : "Start your own project or explore an idea for your next piece.";
 }
 
 function renderLibrary(selector, items, artwork) {

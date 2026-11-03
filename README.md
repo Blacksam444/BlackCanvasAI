@@ -99,6 +99,28 @@ unconditional behavior. No database migration or backup version change is needed
 
 ## Projects
 
+Choose **New project** in Projects to start from your own idea or a piece already
+underway. Only a title is required. Choose a status and optionally add your own
+surface, materials, steps (one per line), and notes. No visual direction or
+materials are assigned for you. Creation saves the plan directly in the existing
+project store without adding a Prompt Library entry. Photos, checklist progress,
+Home, printing, and backups work the same as for projects started from saved ideas.
+Home and the empty Image Studio project picker also link to this form.
+
+**Keep for later** retains the unfinished form in this browser and address when
+storage is available. **Discard form** clears it explicitly. Browser storage
+restrictions are reported; creation still works while the page is open. Create
+project saves the plan on the server for your other connected devices.
+
+Creation retries reuse the form's stable ID, including after a lost response and,
+when browser draft storage is available, a browser reload. This prevents duplicate
+projects from those retries. If that ID already has different
+saved fields or later progress, the form is kept and offers **Open saved project**
+or **Create a separate project**. Opening explicitly discards the new form; a
+separate project gets a new ID. The API is `POST /api/projects/direct` with an
+`id` in the form `direct_<32 lowercase hexadecimal characters>` and the plan
+fields. No schema migration or backup version change is needed.
+
 Choose **Start project** on a Think Tank idea, or **Open as project** when viewing
 a saved Prompt Library item. The idea is saved in the existing library first;
 the project links to it instead of keeping a second prompt store. Repeating the
