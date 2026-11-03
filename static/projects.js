@@ -18,7 +18,7 @@ const draftKey = () => `blackCanvasProjectDraft:${current.id}`;
 async function request(url, payload) {
   let response;
   try {
-    response = await fetch(url, payload === undefined ? {} : { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    response = await fetch(url, payload === undefined ? { cache: "no-store" } : { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
   } catch { throw new Error("Could not reach the studio. Your edits are still here; try again when connected."); }
   let result;
   try { result = await response.json(); }
@@ -232,8 +232,17 @@ function renderPhotos() {
   $("#projectPhotoGrid").replaceChildren(...shown.map((photo) => {
     const card = document.createElement("article");
     card.className = "project-photo-card";
-    card.innerHTML = `<a class="photo-image-link" href="/image-studio?artwork=${encodeURIComponent(photo.id)}"><img loading="lazy" alt="${escapeHtml(photo.title)}"></a><div class="photo-card-body"><span class="project-badge">${photoStages[photo.stage]}</span><h4>${escapeHtml(photo.title)}</h4><p>${escapeHtml(photo.notes || "")}</p><small>Added ${escapeHtml(new Date(photo.created_at).toLocaleDateString())}</small><div class="photo-card-actions"><a href="/image-studio?artwork=${encodeURIComponent(photo.id)}">View in Image Studio ↗</a><button type="button" class="secondary unlink-photo">Unlink</button></div></div>`;
+    card.dataset.photoId = photo.id;
+    card.innerHTML = `<a class="photo-image-link" href="/image-studio?artwork=${encodeURIComponent(photo.id)}" aria-label="Review ${escapeHtml(photo.title)}"><img loading="lazy" alt="${escapeHtml(photo.title)}"></a><div class="photo-card-body"><span class="project-badge">${photoStages[photo.stage]}</span><h4>${escapeHtml(photo.title)}</h4><p>${escapeHtml(photo.notes || "")}</p><small>Added ${escapeHtml(new Date(photo.created_at).toLocaleDateString())}</small><div class="photo-card-actions"><a href="/image-studio?artwork=${encodeURIComponent(photo.id)}">View in Image Studio ↗</a><button type="button" class="secondary change-photo-label">Change label</button><button type="button" class="secondary unlink-photo">Unlink</button></div></div>`;
     card.querySelector("img").src = photo.url;
+    card.querySelector(".photo-image-link").onclick = (event) => {
+      if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      openPhotoReview("single", photo.id);
+    };
+    card.querySelector(".change-photo-label").disabled = photoBusy;
+    card.querySelector(".change-photo-label").setAttribute("aria-label", `Change label for ${photo.title}`);
+    card.querySelector(".change-photo-label").onclick = () => openPhotoLabel(photo);
     card.querySelector(".unlink-photo").setAttribute("aria-label", `Unlink ${photo.title} from this project`);
     card.querySelector(".unlink-photo").disabled = photoBusy;
     card.querySelector(".unlink-photo").onclick = async () => {
@@ -251,21 +260,29 @@ function renderPhotos() {
   }));
   $("#photoEmpty").hidden = shown.length > 0;
   $("#photoEmpty").textContent = photos.length ? "No photos with this label. Try another filter or add a photo." : "Add your first photo, or choose one you already saved in Image Studio.";
+  $("#compareProjectPhotos").disabled = photoBusy || photos.length < 2;
+  $("#comparePhotoHint").textContent = photos.length < 2 ? "Link at least two photos to compare them." : "Choose any two linked photos, across all labels.";
+  if ($("#photoReviewDialog").open) renderPhotoReview();
 }
 
 function setPhotoBusy(value) {
   photoBusy = value;
-  document.querySelectorAll("#addProjectPhoto,#refreshProjectPhotos,.unlink-photo").forEach((control) => { control.disabled = value; });
+  document.querySelectorAll("#addProjectPhoto,#refreshProjectPhotos,.unlink-photo,.change-photo-label,#refreshReviewPhotos").forEach((control) => { control.disabled = value; });
+  $("#compareProjectPhotos").disabled = value || photos.length < 2;
 }
 
 async function photoRequest(url, method = "GET", payload) {
   let response;
   try {
-    response = await fetch(url, { method, ...(payload === undefined ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }) });
+    response = await fetch(url, { method, cache: "no-store", ...(payload === undefined ? {} : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }) });
   } catch { throw new Error("Could not reach the studio. Your photo selection is still here; please try again."); }
   let result;
   try { result = await response.json(); } catch { throw new Error("The photo request could not finish. Please try again."); }
-  if (!response.ok) throw new Error(typeof result.detail === "string" ? result.detail : "The photo could not be saved. Check the details and try again.");
+  if (!response.ok) {
+    const error = new Error(typeof result.detail === "string" ? result.detail : "The photo could not be saved. Check the details and try again.");
+    error.status = response.status;
+    throw error;
+  }
   return result;
 }
 
@@ -399,6 +416,179 @@ $("#refreshProjectPhotos").onclick = async () => {
     $("#photoStatus").textContent = "Photos refreshed. Your plan edits are still as you left them.";
   } catch (error) { $("#photoStatus").textContent = error.message; }
   finally { setPhotoBusy(false); }
+};
+
+let reviewLeftId = null;
+let reviewRightId = null;
+let reviewReturnId = null;
+let labelPhoto = null;
+let labelConflict = false;
+
+function focusPhoto(id, selector = ".photo-image-link") {
+  const target = document.querySelector(`.project-photo-card[data-photo-id="${Number(id)}"] ${selector}`);
+  (target || $("#compareProjectPhotos:not(:disabled)") || $("#addProjectPhoto")).focus();
+}
+
+function openPhotoReview(mode, id) {
+  if (!photos.length) return;
+  reviewReturnId = id || null;
+  reviewLeftId = id || photos.find((photo) => photo.stage === "reference")?.id || photos[0].id;
+  reviewRightId = photos.find((photo) => photo.id !== reviewLeftId && photo.stage !== "reference")?.id
+    || photos.find((photo) => photo.id !== reviewLeftId)?.id || null;
+  $("#photoReviewMode").value = mode;
+  $("#photoReviewStatus").textContent = "Reviewing photos does not change your saved work or plan edits.";
+  renderPhotoReview();
+  $("#photoReviewDialog").showModal();
+}
+
+function renderPhotoReview() {
+  const ids = photos.map((photo) => photo.id);
+  const lostSelection = (reviewLeftId !== null && !ids.includes(reviewLeftId))
+    || (reviewRightId !== null && !ids.includes(reviewRightId));
+  if (!ids.includes(reviewLeftId)) reviewLeftId = ids[0] || null;
+  if (!ids.includes(reviewRightId) || reviewRightId === reviewLeftId) reviewRightId = ids.find((id) => id !== reviewLeftId) || null;
+  if (photos.length < 2) $("#photoReviewMode").value = "single";
+  const compare = $("#photoReviewMode").value === "compare";
+  $("#photoReviewMode option[value=compare]").disabled = photos.length < 2;
+  $("#photoReviewMode").disabled = !photos.length;
+  $("#swapReviewPhotos").hidden = !compare;
+  $("#photoReviewPanes").classList.toggle("is-single", !compare);
+  $("#photoReviewPanes").hidden = !photos.length;
+  $("#reviewEmpty").hidden = !!photos.length;
+  $("#reviewRight").hidden = !compare;
+  if (lostSelection) $("#photoReviewStatus").textContent = "A selected photo is no longer linked. Showing the photos still in this project. Your plan edits are kept.";
+  [["#reviewLeft", reviewLeftId], ["#reviewRight", reviewRightId]].forEach(([selector, id], index) => {
+    const pane = $(selector);
+    const select = pane.querySelector("select");
+    select.replaceChildren(...photos.map((photo) => new Option(`${photo.title} · ${photoStages[photo.stage]}`, String(photo.id))));
+    select.value = String(id);
+    pane.querySelector("label").firstChild.textContent = compare ? `${index === 0 ? "First" : "Second"} photo` : "Photo";
+    const photo = photos.find((item) => item.id === id);
+    if (!photo) return;
+    const image = pane.querySelector("img");
+    const error = pane.querySelector(".review-image-error");
+    image.onload = () => { image.hidden = false; error.hidden = true; };
+    image.onerror = () => { image.hidden = true; error.hidden = false; };
+    image.hidden = false;
+    error.hidden = true;
+    image.alt = photo.title;
+    image.src = photo.url;
+    pane.querySelector(".project-badge").textContent = photoStages[photo.stage];
+    pane.querySelector("h3").textContent = photo.title;
+    pane.querySelector(".review-notes").textContent = photo.notes || "";
+    pane.querySelector(".review-studio").href = `/image-studio?artwork=${encodeURIComponent(photo.id)}`;
+    pane.querySelector(".review-alone").hidden = !compare;
+    pane.querySelector(".review-alone").onclick = () => {
+      reviewLeftId = photo.id;
+      reviewRightId = photos.find((item) => item.id !== photo.id)?.id || null;
+      $("#photoReviewMode").value = "single";
+      renderPhotoReview();
+      $("#reviewLeftPhoto").focus();
+    };
+  });
+}
+
+$("#compareProjectPhotos").onclick = () => openPhotoReview("compare");
+$("#closePhotoReview").onclick = () => $("#photoReviewDialog").close();
+$("#photoReviewDialog").addEventListener("close", () => focusPhoto(reviewReturnId));
+$("#photoReviewMode").onchange = renderPhotoReview;
+$("#reviewLeftPhoto").onchange = () => {
+  const next = Number($("#reviewLeftPhoto").value);
+  if (next === reviewRightId) reviewRightId = reviewLeftId;
+  reviewLeftId = next;
+  renderPhotoReview();
+};
+$("#reviewRightPhoto").onchange = () => {
+  const next = Number($("#reviewRightPhoto").value);
+  if (next === reviewLeftId) reviewLeftId = reviewRightId;
+  reviewRightId = next;
+  renderPhotoReview();
+};
+$("#swapReviewPhotos").onclick = () => {
+  [reviewLeftId, reviewRightId] = [reviewRightId, reviewLeftId];
+  renderPhotoReview();
+};
+$("#refreshReviewPhotos").onclick = async () => {
+  if (!current || photoBusy) return;
+  setPhotoBusy(true);
+  $("#photoReviewStatus").textContent = "Refreshing project photos…";
+  try {
+    const project = await photoRequest(`/api/projects/${encodeURIComponent(current.id)}`);
+    photos = project.artworks;
+    $("#photoReviewStatus").textContent = "Photos refreshed. Your plan edits are still as you left them.";
+    renderPhotos();
+  } catch (error) { $("#photoReviewStatus").textContent = error.message; }
+  finally { setPhotoBusy(false); }
+};
+
+function openPhotoLabel(photo) {
+  if (photoBusy) return;
+  labelPhoto = { ...photo };
+  labelConflict = false;
+  $("#photoLabelTitle").textContent = photo.title;
+  $("#photoSavedLabel").textContent = `Current label: ${photoStages[photo.stage]}`;
+  $("#photoLabelStage").value = photo.stage;
+  $("#photoLabelStatus").textContent = "";
+  $("#reviewSavedPhotoLabel").hidden = true;
+  $("#savePhotoLabel").disabled = false;
+  $("#photoLabelDialog").showModal();
+}
+function closePhotoLabel() { if (!photoBusy) $("#photoLabelDialog").close(); }
+$("#closePhotoLabel").onclick = closePhotoLabel;
+$("#cancelPhotoLabel").onclick = closePhotoLabel;
+$("#photoLabelDialog").addEventListener("cancel", (event) => { if (photoBusy) event.preventDefault(); });
+$("#photoLabelDialog").addEventListener("close", () => focusPhoto(labelPhoto?.id, ".change-photo-label"));
+function labelBusy(value) {
+  setPhotoBusy(value);
+  $("#photoLabelForm").querySelectorAll("select,button").forEach((control) => { control.disabled = value; });
+  $("#savePhotoLabel").disabled = value || labelConflict;
+}
+$("#photoLabelForm").onsubmit = async (event) => {
+  event.preventDefault();
+  if (photoBusy || !labelPhoto || labelConflict) return;
+  labelBusy(true);
+  $("#photoLabelStatus").textContent = "Saving photo label…";
+  let saved = false;
+  try {
+    const result = await photoRequest(`/api/projects/${encodeURIComponent(current.id)}/artworks/${labelPhoto.id}`, "PUT", {
+      stage: $("#photoLabelStage").value, expected_stage: labelPhoto.stage,
+    });
+    photos = result.artworks;
+    renderPhotos();
+    $("#photoStatus").textContent = "Photo label saved in this project. Your plan edits are still as you left them.";
+    saved = true;
+  } catch (error) {
+    $("#photoLabelStatus").textContent = error.message;
+    if (error.status === 409 || error.status === 404) {
+      labelConflict = true;
+      $("#reviewSavedPhotoLabel").hidden = false;
+    }
+  } finally {
+    labelBusy(false);
+    if (saved) $("#photoLabelDialog").close();
+  }
+};
+$("#reviewSavedPhotoLabel").onclick = async () => {
+  if (photoBusy) return;
+  labelBusy(true);
+  try {
+    const project = await photoRequest(`/api/projects/${encodeURIComponent(current.id)}`);
+    photos = project.artworks;
+    renderPhotos();
+    const photo = photos.find((item) => item.id === labelPhoto.id);
+    if (!photo) {
+      labelConflict = true;
+      $("#photoSavedLabel").textContent = "This photo is no longer linked to this project.";
+      $("#photoLabelStatus").textContent = "Close this dialog to see the saved gallery. The image can be linked again from Image Studio if it is still there.";
+    } else {
+      labelPhoto = { ...photo };
+      labelConflict = false;
+      $("#photoSavedLabel").textContent = `Saved label: ${photoStages[photo.stage]}`;
+      $("#photoLabelStatus").textContent = "Saved label loaded for review. Your selected label is still shown; choose Save label to apply it.";
+      $("#reviewSavedPhotoLabel").hidden = true;
+    }
+  } catch (error) { $("#photoLabelStatus").textContent = error.message; }
+  finally { labelBusy(false); }
 };
 
 let sheetCopy = null;

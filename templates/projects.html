@@ -5,7 +5,7 @@
   <meta name="theme-color" content="#09090b"><title>Projects · Black Canvas AI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/projects.css?v=2"><link rel="stylesheet" href="/static/project-sheet-dialog.css?v=1">
+  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/projects.css?v=2"><link rel="stylesheet" href="/static/project-sheet-dialog.css?v=1"><link rel="stylesheet" href="/static/project-photo-review.css?v=1">
 </head>
 <body>
 <div class="app-shell">
@@ -51,7 +51,7 @@
         <section class="project-photos" aria-labelledby="photosHeading">
           <div class="checklist-heading"><div><p class="eyebrow">SEE YOUR PIECE TAKE SHAPE</p><h3 id="photosHeading">Project photos</h3></div><div class="photo-toolbar"><button type="button" class="secondary" id="refreshProjectPhotos">Refresh photos</button><button type="button" class="primary" id="addProjectPhoto">＋ Add photo</button></div></div>
           <p class="project-hint">Keep references, experiments, and finished work together. Photos are saved in Image Studio and linked here.</p>
-          <label class="photo-filter">Show<select id="photoFilter"><option value="all">All project photos</option><option value="reference">References</option><option value="progress">Work in progress</option><option value="finished">Finished pieces</option></select></label>
+          <div class="photo-review-launch"><label class="photo-filter">Show<select id="photoFilter"><option value="all">All project photos</option><option value="reference">References</option><option value="progress">Work in progress</option><option value="finished">Finished pieces</option></select></label><div><button type="button" class="secondary" id="compareProjectPhotos" disabled>Compare photos</button><p class="project-hint" id="comparePhotoHint">Link at least two photos to compare them.</p></div></div>
           <p id="photoStatus" role="status" aria-live="polite"></p>
           <div class="project-photo-grid" id="projectPhotoGrid"></div>
           <p class="project-hint" id="photoEmpty">Add your first photo, or choose one you already saved in Image Studio.</p>
@@ -79,6 +79,27 @@
     <div class="project-actions"><button type="submit" class="primary" id="saveProjectPhoto">Add to project</button><button type="button" class="secondary" id="cancelPhotoDialog">Cancel</button></div>
   </form>
 </dialog>
+<dialog id="photoReviewDialog" aria-labelledby="photoReviewHeading">
+  <div class="photo-dialog-heading"><div><p class="eyebrow">LOOK AT YOUR WORK</p><h2 id="photoReviewHeading">Project photo review</h2></div><button type="button" class="remove-step" id="closePhotoReview" aria-label="Close photo review">×</button></div>
+  <p class="project-hint">Choose the photos you want to study. Images are shown in full, with their original proportions.</p>
+  <div class="photo-review-tools"><label>View<select id="photoReviewMode"><option value="single">One photo</option><option value="compare">Compare two photos</option></select></label><button type="button" class="secondary" id="swapReviewPhotos">Swap sides</button><button type="button" class="secondary" id="refreshReviewPhotos">Refresh photos</button></div>
+  <p id="photoReviewStatus" role="status" aria-live="polite"></p>
+  <div id="photoReviewPanes" class="photo-review-panes">
+    <section class="photo-review-pane" id="reviewLeft"><label>Photo<select id="reviewLeftPhoto"></select></label><div class="review-image"><img alt=""><p class="review-image-error" hidden>Image unavailable. Refresh photos to try again.</p></div><div class="review-caption"><span class="project-badge"></span><h3></h3><p class="review-notes"></p><div class="review-links"><button type="button" class="secondary review-alone">View alone</button><a class="review-studio" href="/image-studio">Open in Image Studio ↗</a></div></div></section>
+    <section class="photo-review-pane" id="reviewRight"><label>Photo<select id="reviewRightPhoto"></select></label><div class="review-image"><img alt=""><p class="review-image-error" hidden>Image unavailable. Refresh photos to try again.</p></div><div class="review-caption"><span class="project-badge"></span><h3></h3><p class="review-notes"></p><div class="review-links"><button type="button" class="secondary review-alone">View alone</button><a class="review-studio" href="/image-studio">Open in Image Studio ↗</a></div></div></section>
+  </div>
+  <p class="project-hint" id="reviewEmpty" hidden>No photos are linked now. Close this review to add a photo.</p>
+</dialog>
+<dialog id="photoLabelDialog" class="project-photo-dialog" aria-labelledby="photoLabelHeading">
+  <form id="photoLabelForm">
+    <div class="photo-dialog-heading"><h2 id="photoLabelHeading">Change photo label</h2><button type="button" class="remove-step" id="closePhotoLabel" aria-label="Close photo label">×</button></div>
+    <p id="photoLabelTitle"></p><p class="project-hint" id="photoSavedLabel"></p>
+    <label>Use in this project as<select id="photoLabelStage"><option value="reference">Reference</option><option value="progress">Work in progress</option><option value="finished">Finished piece</option></select></label>
+    <p class="project-hint">This changes only the label in this project. Your plan and other projects keep their current settings.</p>
+    <p id="photoLabelStatus" role="status" aria-live="polite"></p>
+    <div class="project-actions"><button type="submit" class="primary" id="savePhotoLabel">Save label</button><button type="button" class="secondary" id="reviewSavedPhotoLabel" hidden>Review saved label</button><button type="button" class="secondary" id="cancelPhotoLabel">Cancel</button></div>
+  </form>
+</dialog>
 <dialog id="projectSheetDialog" aria-labelledby="sheetDialogHeading">
   <div class="sheet-dialog-heading"><div><p class="eyebrow">TAKE YOUR PLAN WITH YOU</p><h2 id="sheetDialogHeading">Project sheet</h2></div><button class="remove-step" id="closeProjectSheet" type="button" aria-label="Close project sheet">×</button></div>
   <p class="project-hint" id="sheetDraftNotice">Making a copy does not save project changes.</p>
@@ -92,6 +113,6 @@
   <p class="project-hint">HTML keeps the layout and selected images for offline use. Text keeps the plan and photo captions. PDF is available through your browser’s print options.</p>
   <iframe id="projectSheetPreview" title="Project sheet preview" sandbox="allow-same-origin allow-modals" hidden></iframe>
 </dialog>
-<script src="/static/projects.js?v=sheet-1"></script>
+<script src="/static/projects.js?v=photo-review-1"></script>
 </body>
 </html>

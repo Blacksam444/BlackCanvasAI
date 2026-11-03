@@ -127,6 +127,22 @@ keeps the catalog image. Removing an image from Image Studio removes all its
 project links too; the catalog asks for confirmation before removal.
 JPEG, PNG, WebP, and GIF uploads up to 10 MB are supported.
 
+Click a project photo to review it larger without leaving the plan, or choose
+**Compare photos** to study any two linked images side by side, including on a
+phone. Both images keep their full proportions. Choose images across all labels,
+swap sides, or view either alone. Refresh inside the review keeps your selections
+when they are still linked, and handles photos removed on another device.
+Missing images show a retry message. Reviewing does not save plan changes.
+
+**Change label** updates a linked photo to reference, work in progress, or finished
+piece without unlinking or uploading it again. The change saves immediately for
+this project only; catalog details, other projects, and project status are kept.
+If another device changed the label, review its saved label before applying your
+choice. Failed requests keep your selection for retry. Label changes use a
+required `expected_stage` checked in a write transaction; no schema or backup
+format change is needed. Unsaved plan fields stay in place during photo review
+and label changes.
+
 **Print / download plan** opens a project sheet made from the fields currently
 shown on your device, including unsaved edits. Choose whether to include notes,
 the full source idea, and up to 12 linked photos (20 MB combined). Preview the copy,

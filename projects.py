@@ -25,6 +25,11 @@ class ProjectArtworkPayload(BaseModel):
     stage: PhotoStage = "progress"
 
 
+class ProjectArtworkStagePayload(BaseModel):
+    stage: PhotoStage
+    expected_stage: PhotoStage
+
+
 class ProjectArtworkBackup(BaseModel):
     project_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,80}$")
     filename: str = Field(min_length=1, max_length=255)
@@ -78,6 +83,26 @@ def unlink_project_artwork(project_id: str, artwork_id: int) -> dict:
         if not db.execute("SELECT 1 FROM projects WHERE id = ?", (project_id,)).fetchone():
             raise HTTPException(status_code=404, detail="Project not found")
         db.execute("DELETE FROM project_artworks WHERE project_id = ? AND artwork_id = ?", (project_id, artwork_id))
+        photos = project_artworks(db, project_id)
+    return {"artworks": photos}
+
+
+@router.put("/api/projects/{project_id}/artworks/{artwork_id}")
+def update_project_artwork_stage(project_id: str, artwork_id: int, payload: ProjectArtworkStagePayload) -> dict:
+    with closing(storage.connect()) as db, db:
+        db.execute("BEGIN IMMEDIATE")
+        photo = db.execute(
+            "SELECT stage FROM project_artworks WHERE project_id = ? AND artwork_id = ?",
+            (project_id, artwork_id),
+        ).fetchone()
+        if not photo:
+            raise HTTPException(status_code=404, detail="This photo is no longer linked to the project. Refresh photos to see the saved gallery.")
+        if photo["stage"] != payload.expected_stage:
+            raise HTTPException(status_code=409, detail="The photo label changed on another device. Review the saved label before saving your choice.")
+        db.execute(
+            "UPDATE project_artworks SET stage = ? WHERE project_id = ? AND artwork_id = ?",
+            (payload.stage, project_id, artwork_id),
+        )
         photos = project_artworks(db, project_id)
     return {"artworks": photos}
 

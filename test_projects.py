@@ -15,7 +15,7 @@ from projects import (
     ProjectCreatePayload, ProjectUpdatePayload, create_project, get_project, list_projects,
     projects_page, restore_projects, seed_project, update_project, validate_project_backups,
     ProjectArtworkPayload, link_project_artwork, unlink_project_artwork, validate_project_artwork_backups,
-    restore_project_artworks,
+    restore_project_artworks, ProjectArtworkStagePayload, update_project_artwork_stage,
 )
 import storage
 from project_sheets import ProjectSheetPayload, create_project_sheet
@@ -270,6 +270,82 @@ class ProjectTests(unittest.TestCase):
         self.assertEqual(list_artworks()[0]["projects"], [])
         self.assertEqual(len(list(storage.UPLOAD_DIR.iterdir())), 1)
         self.assertEqual(unlink_project_artwork(project["id"], photo["id"])["artworks"], [])
+
+    def test_label_change_preserves_catalog_plan_and_other_project_role(self):
+        project = self.project()
+        source = create_prompt(PromptPayload(title="Second plan", category="Personal", text="Another study"))
+        second = create_project(ProjectCreatePayload(prompt_id=source["id"]))["project"]
+        photo = self.photo(project["id"], "reference")
+        link_project_artwork(second["id"], ProjectArtworkPayload(artwork_id=photo["id"], stage="progress"))
+        original = get_project(project["id"])
+        before = list_artworks()[0]
+        filename = storage.rows("SELECT filename FROM artworks WHERE id = ?", (photo["id"],))[0]["filename"]
+        image_bytes = (storage.UPLOAD_DIR / filename).read_bytes()
+        result = update_project_artwork_stage(project["id"], photo["id"], ProjectArtworkStagePayload(
+            expected_stage="reference", stage="finished"))
+        self.assertEqual(result["artworks"][0]["stage"], "finished")
+        reopened = get_project(project["id"])
+        self.assertEqual({key: value for key, value in original.items() if key != "artworks"},
+                         {key: value for key, value in reopened.items() if key != "artworks"})
+        self.assertEqual(original["artworks"][0]["created_at"], reopened["artworks"][0]["created_at"])
+        self.assertEqual(get_project(second["id"])["artworks"][0]["stage"], "progress")
+        after = list_artworks()[0]
+        self.assertEqual({key: value for key, value in before.items() if key != "projects"},
+                         {key: value for key, value in after.items() if key != "projects"})
+        self.assertEqual((storage.UPLOAD_DIR / filename).read_bytes(), image_bytes)
+        self.assertEqual(len(list(storage.UPLOAD_DIR.iterdir())), 1)
+
+    def test_stale_photo_label_requires_review_before_replacement(self):
+        project = self.project()
+        photo = self.photo(project["id"])
+        update_project_artwork_stage(project["id"], photo["id"], ProjectArtworkStagePayload(
+            expected_stage="progress", stage="finished"))
+        with self.assertRaises(HTTPException) as error:
+            update_project_artwork_stage(project["id"], photo["id"], ProjectArtworkStagePayload(
+                expected_stage="progress", stage="reference"))
+        self.assertEqual(error.exception.status_code, 409)
+        self.assertEqual(get_project(project["id"])["artworks"][0]["stage"], "finished")
+        result = update_project_artwork_stage(project["id"], photo["id"], ProjectArtworkStagePayload(
+            expected_stage="finished", stage="reference"))
+        self.assertEqual(result["artworks"][0]["stage"], "reference")
+
+    def test_unlinked_missing_or_deleted_photo_is_not_recreated_by_label_save(self):
+        project = self.project()
+        photo = self.photo(project["id"])
+        unlink_project_artwork(project["id"], photo["id"])
+        payload = ProjectArtworkStagePayload(expected_stage="progress", stage="finished")
+        for project_id, artwork_id in ((project["id"], photo["id"]), ("missing", photo["id"]), (project["id"], 999999)):
+            with self.subTest(project_id=project_id, artwork_id=artwork_id), self.assertRaises(HTTPException) as error:
+                update_project_artwork_stage(project_id, artwork_id, payload)
+            self.assertEqual(error.exception.status_code, 404)
+        link_project_artwork(project["id"], ProjectArtworkPayload(artwork_id=photo["id"]))
+        delete_artwork(photo["id"])
+        with self.assertRaises(HTTPException) as error:
+            update_project_artwork_stage(project["id"], photo["id"], payload)
+        self.assertEqual(error.exception.status_code, 404)
+        self.assertEqual(storage.rows("SELECT * FROM project_artworks"), [])
+
+    def test_photo_label_payload_requires_known_current_and_new_labels(self):
+        for data in ({"stage": "finished"}, {"expected_stage": "progress"},
+                     {"expected_stage": "invented", "stage": "finished"},
+                     {"expected_stage": "progress", "stage": "invented"}):
+            with self.subTest(data=data), self.assertRaises(ValidationError):
+                ProjectArtworkStagePayload(**data)
+
+    def test_label_noop_and_backup_restore_keep_chosen_stage(self):
+        project = self.project()
+        photo = self.photo(project["id"], "reference")
+        for stage in ("reference", "finished"):
+            update_project_artwork_stage(project["id"], photo["id"], ProjectArtworkStagePayload(
+                expected_stage="reference", stage=stage))
+        manifest = storage.backup_data()
+        self.assertEqual(manifest["version"], 9)
+        links = validate_project_artwork_backups(manifest)
+        self.assertEqual(links[0].stage, "finished")
+        with storage.connect() as db:
+            db.execute("DELETE FROM project_artworks WHERE project_id = ?", (project["id"],))
+            self.assertEqual(restore_project_artworks(db, links, {project["id"]}), 1)
+        self.assertEqual(get_project(project["id"])["artworks"][0]["stage"], "finished")
 
     def test_photo_can_belong_to_two_projects_and_catalog_deletion_cleans_all_links(self):
         first = self.project()
