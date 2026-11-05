@@ -19,6 +19,18 @@
 #newProjectDraftNote { margin-top:24px; }
 #newProjectDialog :disabled { opacity:.55; cursor:wait; }
 #projectHeading:focus { outline:2px solid var(--purple); outline-offset:6px; }
+.project-plan-tools { display:flex; gap:12px; flex-wrap:wrap; }
+#planReuseSaved { padding:18px 22px; border:1px solid #625078; border-radius:12px; background:#21182d; overflow-wrap:anywhere; }
+#planReuseSaved>p:first-child { font-size:14px; line-height:1.7; color:#e7d9fa; margin:0 0 8px; }
+#planReuseSaved a { color:#cdb3f7; font-size:14px; display:inline-block; padding:10px 0; }
+#planReuseSaved:focus { outline:2px solid var(--purple); outline-offset:4px; }
+#newProjectReuseNote { border-left:3px solid #9571c8; padding:10px 14px; background:#21182d; overflow-wrap:anywhere; }
+.reused-steps-heading { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:24px; }
+.reused-steps-heading h3 { font:700 18px Manrope; margin:0; }
+#reusedStepsList { list-style:none; padding:0; display:grid; gap:14px; }
+#reusedStepsList li { display:grid; grid-template-columns:minmax(0,1fr) 44px; align-items:center; gap:8px; border:1px solid #39303f; padding:12px; border-radius:9px; }
+#reusedStepsList li label { margin:0; }
+#reusedStepsList button { min-width:44px; }
 @media(max-width:750px) {
   .project-start { flex-direction:column; align-items:stretch; padding:18px; }
   #newProjectDialog { padding:20px; }

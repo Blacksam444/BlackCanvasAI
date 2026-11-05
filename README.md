@@ -135,6 +135,21 @@ prevent a stale device from silently overwriting newer saves; older drafts can
 be reviewed explicitly before replacement. Source ideas in Trash do not remove
 the project or its checklist.
 
+**Use plan for new project** starts another piece from the plan currently shown,
+including unsaved edits. Choose a new title, review or change the copied surface,
+materials, notes, and individual steps, then create it. Multiline steps stay intact.
+The initial status is planned and every copied step starts unchecked; the status
+can be changed before creation. Photos remain linked to their existing projects.
+The new plan saves as an independent project without adding or copying a Prompt
+Library entry. The original stays open with its edits and progress, and a saved
+confirmation provides a link to the new project.
+
+Unfinished reused plans use browser draft schema 2 in the existing new-project
+draft key; ordinary schema 1 drafts still restore. Resuming a copy keeps its
+reviewed fields and stable creation ID, including after a lost response. Replacing
+a different unfinished form requires an explicit choice. With browser storage
+blocked, creating a copy still leaves the original's unsaved fields open.
+
 **Project photos** lets you upload images from your phone or computer, or link
 images already in Image Studio. Label each as a reference, work in progress, or a
 finished piece, then filter the project gallery by that label. Uploads are saved

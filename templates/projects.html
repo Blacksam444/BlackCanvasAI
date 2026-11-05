@@ -5,7 +5,7 @@
   <meta name="theme-color" content="#09090b"><title>Projects · Black Canvas AI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/projects.css?v=2"><link rel="stylesheet" href="/static/project-sheet-dialog.css?v=1"><link rel="stylesheet" href="/static/project-photo-review.css?v=1"><link rel="stylesheet" href="/static/project-create.css?v=1">
+  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/projects.css?v=2"><link rel="stylesheet" href="/static/project-sheet-dialog.css?v=1"><link rel="stylesheet" href="/static/project-photo-review.css?v=1"><link rel="stylesheet" href="/static/project-create.css?v=2">
 </head>
 <body>
 <div class="app-shell">
@@ -38,7 +38,8 @@
         <a class="back-link" href="/projects">← All projects</a>
         <div class="detail-heading"><div><p class="eyebrow">YOUR STUDIO PLAN</p><h2 id="projectHeading" tabindex="-1"></h2><p id="projectProgress"></p></div><span class="project-badge" id="projectStatusBadge"></span></div>
         <progress id="projectProgressBar" max="100" value="0" aria-label="Checklist progress"></progress>
-        <div class="project-sheet-launch"><button type="button" class="secondary" id="openProjectSheet">Print / download plan</button><p class="project-hint">Make a copy for your worktable, with the notes and photos you choose.</p></div>
+        <div class="project-sheet-launch"><div class="project-plan-tools"><button type="button" class="secondary" id="openProjectSheet">Print / download plan</button><button type="button" class="secondary" id="reuseProjectPlan">Use plan for new project</button></div><p class="project-hint">Take your plan to the worktable or use it to start another piece.</p></div>
+        <div id="planReuseSaved" tabindex="-1" hidden><p id="planReuseMessage" role="status"></p><a id="planReuseLink" href="/projects">Open new project →</a><p class="project-hint">Your original plan is still open below. Save project when you want to keep its edits.</p></div>
         <details class="project-source"><summary id="projectSourceSummary">Source idea from Prompt Library</summary><p id="sourceTitle"></p><p id="sourceState"></p><pre id="sourceText"></pre><a href="/prompts" id="sourceLink">Open Prompt Library ↗</a></details>
         <form id="projectForm">
           <div class="project-fields"><label>Project title<input id="projectTitle" maxlength="200" required></label><label>Project status<select id="projectStatus"><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="paused">Paused</option><option value="completed">Completed</option></select></label><label>Working surface<input id="projectSurface" maxlength="240" placeholder="Choose the surface you want to use"></label><label>Materials <small>One per line; edit this list to suit your practice.</small><textarea id="projectMaterials" rows="4" maxlength="7500"></textarea></label></div>
@@ -65,17 +66,19 @@
   <form id="newProjectForm">
     <div class="photo-dialog-heading"><h2 id="newProjectHeading">Start your project</h2><button type="button" class="remove-step" id="closeNewProject" aria-label="Close new project">×</button></div>
     <p class="project-hint">Give it a title. Add as much of the plan as you want now; you can build it as you work.</p>
+    <p class="project-hint" id="newProjectReuseNote" hidden></p>
     <label>Project title<input id="newProjectTitle" maxlength="200" required placeholder="What are you working on?"></label>
     <label>Status<select id="newProjectStatus"><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="paused">Paused</option><option value="completed">Completed</option></select></label>
     <details id="newProjectPlan"><summary>Add materials, steps, or notes (optional)</summary>
       <label>Working surface<input id="newProjectSurface" maxlength="240" placeholder="Choose your surface"></label>
       <label>Materials <small>One per line, up to 30.</small><textarea id="newProjectMaterials" rows="3" maxlength="7500"></textarea></label>
-      <label>Studio steps <small>One per line, up to 60. You can edit and check them off in the project.</small><textarea id="newProjectSteps" rows="4" maxlength="120060"></textarea></label>
+      <label id="newProjectStepsField">Studio steps <small>One per line, up to 60. You can edit and check them off in the project.</small><textarea id="newProjectSteps" rows="4" maxlength="120060"></textarea></label>
+      <section id="reusedProjectSteps" hidden aria-labelledby="reusedStepsHeading"><div class="reused-steps-heading"><h3 id="reusedStepsHeading">Studio steps</h3><button type="button" class="secondary" id="addReusedStep">＋ Add step</button></div><p class="project-hint">Review or change each step. All steps start unchecked in the new project.</p><ol id="reusedStepsList"></ol><p class="project-hint" id="reusedStepsEmpty" hidden>No steps in this plan yet. Add the steps you want.</p></section>
       <label>Studio notes<textarea id="newProjectNotes" rows="4" maxlength="5000" placeholder="Your direction, dimensions, or what you want to try"></textarea></label>
     </details>
     <p class="project-hint" id="newProjectDraftNote">An unfinished form stays in this browser when storage is available. Create project to save it for your connected devices.</p>
     <p id="newProjectMessage" role="status" aria-live="polite"></p>
-    <div id="newProjectConflict" hidden><p class="project-hint">Open saved project discards this form. Create a separate project saves these fields as another project.</p><div class="project-actions"><button type="button" class="secondary" id="openCreatedProject">Open saved project</button><button type="button" class="secondary" id="createSeparateProject">Create a separate project</button></div></div>
+    <div id="newProjectConflict" hidden><p class="project-hint" id="newProjectConflictHint">Open saved project discards this form. Create a separate project saves these fields as another project.</p><div class="project-actions"><button type="button" class="secondary" id="openCreatedProject">Open saved project</button><button type="button" class="secondary" id="createSeparateProject">Create a separate project</button></div></div>
     <div class="project-actions"><button type="submit" class="primary" id="createProject">Create project</button><button type="button" class="secondary" id="cancelNewProject">Keep for later</button><button type="button" class="secondary" id="discardNewProject">Discard form</button></div>
   </form>
 </dialog>
@@ -132,6 +135,6 @@
   <p class="project-hint">HTML keeps the layout and selected images for offline use. Text keeps the plan and photo captions. PDF is available through your browser’s print options.</p>
   <iframe id="projectSheetPreview" title="Project sheet preview" sandbox="allow-same-origin allow-modals" hidden></iframe>
 </dialog>
-<script src="/static/projects.js?v=direct-1"></script><script src="/static/project-create.js?v=1"></script>
+<script src="/static/projects.js?v=reuse-1"></script><script src="/static/project-create.js?v=2"></script>
 </body>
 </html>

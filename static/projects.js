@@ -104,6 +104,7 @@ async function loadProject(id, recover = true, savedProject = null) {
   staleDraft = null;
   $("#recoverDraft").hidden = true;
   $("#projectHeading").textContent = project.title;
+  $("#planReuseSaved").hidden = true;
   $("#overview").hidden = true;
   $("#projectDetail").hidden = false;
   $("#pageStatus").textContent = "Project saved in your studio. Changes below are saved when you choose Save project.";
@@ -172,6 +173,7 @@ $("#projectForm").onsubmit = async (event) => {
     return;
   }
   busy = true;
+  $("#reuseProjectPlan").disabled = true;
   $("#projectForm").querySelectorAll("input,select,textarea,button").forEach((control) => { control.disabled = true; });
   $("#saveStatus").textContent = "Saving your project…";
   try {
@@ -187,6 +189,7 @@ $("#projectForm").onsubmit = async (event) => {
     $("#saveStatus").textContent = error.message;
   } finally {
     busy = false;
+    $("#reuseProjectPlan").disabled = false;
     $("#projectForm").querySelectorAll("input,select,textarea,button").forEach((control) => { control.disabled = false; });
   }
 };
