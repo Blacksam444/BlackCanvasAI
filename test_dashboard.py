@@ -43,7 +43,7 @@ class DashboardTests(unittest.TestCase):
                                   (complete, "2026-10-29T16:00:00+00:00")):
             storage.execute("UPDATE projects SET updated_at = ? WHERE id = ?", (saved_at, project["id"]))
         overview = dashboard_summary()["projects"]
-        self.assertEqual(overview["counts"], {"planned": 2, "in_progress": 1, "paused": 1, "completed": 1, "total": 5, "ongoing": 4})
+        self.assertEqual(overview["counts"], {"planned": 2, "in_progress": 1, "paused": 1, "completed": 1, "total": 5, "ongoing": 4, "archived": 0})
         self.assertEqual([project["id"] for project in overview["recent"]], [planned["id"], active["id"], paused["id"]])
         self.assertEqual(overview["recent"][0]["progress"], {"done": 1, "total": 2, "percent": 50})
         self.assertNotIn("checklist", overview["recent"][0])

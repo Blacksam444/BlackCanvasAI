@@ -82,8 +82,12 @@ function renderProjects(overview) {
     return link;
   }));
   $("#resumeEmpty").hidden = overview.recent.length > 0;
-  $("#resumeEmpty h3").textContent = overview.counts.total ? "Your projects are marked complete" : "Your next piece starts here";
-  $("#resumeEmpty p").textContent = overview.counts.total ? "Revisit your finished projects, or start your next piece." : "Start your own project or explore an idea for your next piece.";
+  const archived = overview.counts.archived || 0;
+  $("#archivedProjectsLink").hidden = !archived;
+  $("#archivedProjectsLink").textContent = `Archived (${archived})`;
+  $("#resumeEmpty h3").textContent = overview.counts.completed ? "Your projects are marked complete" : archived ? "Your projects are archived" : "Your next piece starts here";
+  $("#resumeEmpty p").textContent = overview.counts.completed ? "Revisit your finished projects, or start your next piece."
+    : archived ? "Open the archive to restore a project, or start your next piece." : "Start your own project or explore an idea for your next piece.";
 }
 
 function renderLibrary(selector, items, artwork) {

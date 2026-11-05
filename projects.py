@@ -163,6 +163,11 @@ class ProjectDirectCreatePayload(ProjectPlanPayload):
     id: str = Field(pattern=r"^direct_[a-f0-9]{32}$")
 
 
+class ProjectArchivePayload(BaseModel):
+    archived: bool = Field(strict=True)
+    archive_revision: int = Field(ge=1, strict=True)
+
+
 class ProjectCreatePayload(BaseModel):
     prompt_id: int = Field(ge=1)
     seed: ProjectSeedPayload | None = None
@@ -171,6 +176,8 @@ class ProjectCreatePayload(BaseModel):
 class ProjectBackupPayload(ProjectUpdatePayload):
     id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,80}$")
     source_prompt_id: int | None = Field(default=None, ge=1)
+    archived: bool = False
+    archive_revision: int = Field(default=1, ge=1)
     created_at: datetime
     updated_at: datetime
 
@@ -197,6 +204,7 @@ def project_record(row) -> dict:
     result = dict(row)
     result["materials"] = json.loads(result["materials"])
     result["checklist"] = json.loads(result["checklist"])
+    result["archived"] = bool(result["archived"])
     total = len(result["checklist"])
     done = sum(bool(step["done"]) for step in result["checklist"])
     result["progress"] = {"done": done, "total": total, "percent": round(done / total * 100) if total else 0}
@@ -206,14 +214,16 @@ def project_record(row) -> dict:
 
 def project_overview(db) -> dict:
     counts = {"planned": 0, "in_progress": 0, "paused": 0, "completed": 0}
-    for row in db.execute("SELECT status, COUNT(*) AS count FROM projects GROUP BY status"):
+    for row in db.execute("SELECT status, COUNT(*) AS count FROM projects WHERE archived = 0 GROUP BY status"):
         if row["status"] in counts:
             counts[row["status"]] = row["count"]
     counts["total"] = sum(counts.values())
     counts["ongoing"] = counts["total"] - counts["completed"]
+    counts["archived"] = db.execute("SELECT COUNT(*) FROM projects WHERE archived = 1").fetchone()[0]
+    counts["total"] += counts["archived"]
     recent = []
     for row in db.execute(
-        "SELECT * FROM projects WHERE status IN ('planned', 'in_progress', 'paused') "
+        "SELECT * FROM projects WHERE archived = 0 AND status IN ('planned', 'in_progress', 'paused') "
         "ORDER BY julianday(updated_at) DESC, id LIMIT 3"
     ):
         project = project_record(row)
@@ -315,6 +325,33 @@ def project_detail(project_id: str) -> dict:
     return get_project(project_id)
 
 
+def archive_state(db, project_id: str) -> dict:
+    row = db.execute("SELECT archived, archive_revision FROM projects WHERE id = ?", (project_id,)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return {"archived": bool(row["archived"]), "archive_revision": row["archive_revision"]}
+
+
+@router.get("/api/projects/{project_id}/archive")
+def get_project_archive(project_id: str) -> dict:
+    with closing(storage.connect()) as db:
+        return archive_state(db, project_id)
+
+
+@router.put("/api/projects/{project_id}/archive")
+def update_project_archive(project_id: str, payload: ProjectArchivePayload) -> dict:
+    # Archive changes are independent of plan edits and their browser drafts.
+    with closing(storage.connect()) as db, db:
+        db.execute("BEGIN IMMEDIATE")
+        saved = archive_state(db, project_id)
+        if saved["archive_revision"] != payload.archive_revision:
+            raise HTTPException(status_code=409, detail="The archive state changed on another device. Review its saved state before trying again; your plan edits are kept.")
+        if saved["archived"] != payload.archived:
+            db.execute("UPDATE projects SET archived = ?, archive_revision = archive_revision + 1 WHERE id = ?",
+                       (int(payload.archived), project_id))
+        return archive_state(db, project_id)
+
+
 @router.put("/api/projects/{project_id}")
 def update_project(project_id: str, payload: ProjectUpdatePayload) -> dict:
     with closing(storage.connect()) as db, db:
@@ -385,10 +422,10 @@ def restore_projects(db, projects: list[ProjectBackupPayload], manifest: dict, n
     restored = 0
     for item in projects:
         cursor = db.execute(
-            "INSERT OR IGNORE INTO projects(id, source_prompt_id, title, status, materials, surface, checklist, notes, revision, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO projects(id, source_prompt_id, title, status, materials, surface, checklist, notes, revision, archived, archive_revision, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (item.id, prompt_map.get(item.source_prompt_id), item.title, item.status, json.dumps(item.materials), item.surface,
-             json.dumps([step.model_dump() for step in item.checklist]), item.notes, item.revision,
+             json.dumps([step.model_dump() for step in item.checklist]), item.notes, item.revision, int(item.archived), item.archive_revision,
              item.created_at.isoformat(), item.updated_at.isoformat()),
         )
         restored += max(cursor.rowcount, 0)

@@ -5,7 +5,7 @@
   <meta name="theme-color" content="#09090b"><title>Projects · Black Canvas AI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/projects.css?v=2"><link rel="stylesheet" href="/static/project-sheet-dialog.css?v=1"><link rel="stylesheet" href="/static/project-photo-review.css?v=1"><link rel="stylesheet" href="/static/project-create.css?v=2">
+  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/projects.css?v=2"><link rel="stylesheet" href="/static/project-sheet-dialog.css?v=1"><link rel="stylesheet" href="/static/project-photo-review.css?v=1"><link rel="stylesheet" href="/static/project-create.css?v=2"><link rel="stylesheet" href="/static/project-archive.css?v=1">
 </head>
 <body>
 <div class="app-shell">
@@ -30,16 +30,18 @@
       <p id="pageStatus" role="status" aria-live="polite">Loading your projects…</p>
       <section id="overview" aria-label="Project overview">
         <div class="project-start"><div><h2>Start with your own idea</h2><p class="project-hint">Plan something new or pick up a piece already on your worktable.</p></div><button type="button" class="primary" id="newProject">＋ New project</button></div>
-        <div class="project-tools"><label>Search projects<input id="projectSearch" type="search" placeholder="Title, materials, or notes"></label><label>Status<select id="projectFilter"><option value="all">All projects</option><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="paused">Paused</option><option value="completed">Completed</option></select></label><button type="button" class="secondary" id="refreshProjects">Refresh</button></div>
+        <div class="project-tools"><label>Search projects<input id="projectSearch" type="search" placeholder="Title, materials, or notes"></label><label>Project list<select id="projectScope"><option value="current">Current projects</option><option value="archived">Archived</option><option value="all">All saved projects</option></select></label><label>Status<select id="projectFilter"><option value="all">All statuses</option><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="paused">Paused</option><option value="completed">Completed</option></select></label><button type="button" class="secondary" id="refreshProjects">Refresh</button></div>
+        <p id="projectListStatus" class="project-hint" role="status" aria-live="polite"></p>
         <div id="projectGrid" class="project-grid"></div>
-        <div id="projectEmpty" class="project-empty" hidden><h2>No projects here yet</h2><p>Create your own project above, or start with a studio idea.</p><a class="secondary" href="/think-tank">Explore the Think Tank</a><a class="secondary" href="/prompts">Use a saved idea</a></div>
+        <div id="projectEmpty" class="project-empty" hidden><h2>No projects here yet</h2><p>Create your own project above, or start with a studio idea.</p><a class="secondary" id="showArchivedProjects" href="/projects?view=archived" hidden>Open archive →</a><a class="secondary" href="/think-tank">Explore the Think Tank</a><a class="secondary" href="/prompts">Use a saved idea</a></div>
       </section>
       <section id="projectDetail" hidden aria-labelledby="projectHeading">
         <a class="back-link" href="/projects">← All projects</a>
-        <div class="detail-heading"><div><p class="eyebrow">YOUR STUDIO PLAN</p><h2 id="projectHeading" tabindex="-1"></h2><p id="projectProgress"></p></div><span class="project-badge" id="projectStatusBadge"></span></div>
+        <div class="detail-heading"><div><p class="eyebrow">YOUR STUDIO PLAN</p><h2 id="projectHeading" tabindex="-1"></h2><p id="projectProgress"></p></div><div class="project-state-badges"><span class="project-badge" id="projectArchiveBadge" hidden>Archived</span><span class="project-badge" id="projectStatusBadge"></span></div></div>
         <progress id="projectProgressBar" max="100" value="0" aria-label="Checklist progress"></progress>
         <div class="project-sheet-launch"><div class="project-plan-tools"><button type="button" class="secondary" id="openProjectSheet">Print / download plan</button><button type="button" class="secondary" id="reuseProjectPlan">Use plan for new project</button></div><p class="project-hint">Take your plan to the worktable or use it to start another piece.</p></div>
         <div id="planReuseSaved" tabindex="-1" hidden><p id="planReuseMessage" role="status"></p><a id="planReuseLink" href="/projects">Open new project →</a><p class="project-hint">Your original plan is still open below. Save project when you want to keep its edits.</p></div>
+        <section id="projectArchivePanel" aria-labelledby="archiveHeading"><div><h3 id="archiveHeading">Put this project away</h3><p id="archiveExplanation" class="project-hint"></p></div><div class="archive-actions"><button type="button" class="secondary" id="toggleProjectArchive">Archive project</button><button type="button" class="secondary" id="reviewArchiveState" hidden>Review saved archive state</button></div><p id="archiveStatus" role="status" aria-live="polite"></p></section>
         <details class="project-source"><summary id="projectSourceSummary">Source idea from Prompt Library</summary><p id="sourceTitle"></p><p id="sourceState"></p><pre id="sourceText"></pre><a href="/prompts" id="sourceLink">Open Prompt Library ↗</a></details>
         <form id="projectForm">
           <div class="project-fields"><label>Project title<input id="projectTitle" maxlength="200" required></label><label>Project status<select id="projectStatus"><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="paused">Paused</option><option value="completed">Completed</option></select></label><label>Working surface<input id="projectSurface" maxlength="240" placeholder="Choose the surface you want to use"></label><label>Materials <small>One per line; edit this list to suit your practice.</small><textarea id="projectMaterials" rows="4" maxlength="7500"></textarea></label></div>
@@ -135,6 +137,6 @@
   <p class="project-hint">HTML keeps the layout and selected images for offline use. Text keeps the plan and photo captions. PDF is available through your browser’s print options.</p>
   <iframe id="projectSheetPreview" title="Project sheet preview" sandbox="allow-same-origin allow-modals" hidden></iframe>
 </dialog>
-<script src="/static/projects.js?v=reuse-1"></script><script src="/static/project-create.js?v=2"></script>
+<script src="/static/projects.js?v=archive-1"></script><script src="/static/project-create.js?v=2"></script>
 </body>
 </html>

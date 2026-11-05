@@ -1159,10 +1159,11 @@ def artwork_details_version(item) -> str:
 @app.get("/api/artworks")
 def list_artworks() -> list[dict]:
     items = rows("SELECT id, title, collection, tags, notes, favorite, filename, created_at FROM artworks ORDER BY id DESC")
-    links = rows("SELECT pa.artwork_id, pa.project_id, pa.stage, p.title FROM project_artworks pa "
+    links = rows("SELECT pa.artwork_id, pa.project_id, pa.stage, p.title, p.archived FROM project_artworks pa "
                  "JOIN projects p ON p.id = pa.project_id ORDER BY pa.created_at DESC")
     by_artwork = {}
     for link in links:
+        link["archived"] = bool(link["archived"])
         by_artwork.setdefault(link.pop("artwork_id"), []).append(link)
     for item in items:
         item["url"] = f"/uploads/{item['filename']}"

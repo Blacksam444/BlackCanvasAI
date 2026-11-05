@@ -5,6 +5,8 @@ let current = null;
 let dirty = false;
 let busy = false;
 let staleDraft = null;
+let archiveBusy = false;
+let archiveConflict = false;
 let photos = [];
 let catalog = [];
 let photoBusy = false;
@@ -23,7 +25,11 @@ async function request(url, payload) {
   let result;
   try { result = await response.json(); }
   catch { throw new Error("The studio could not finish that request. Please try again."); }
-  if (!response.ok) throw new Error(typeof result.detail === "string" ? result.detail : "Check the project fields, then try again.");
+  if (!response.ok) {
+    const error = new Error(typeof result.detail === "string" ? result.detail : "Check the project fields, then try again.");
+    error.status = response.status;
+    throw error;
+  }
   return result;
 }
 
@@ -100,6 +106,9 @@ function validDraft(value) {
 async function loadProject(id, recover = true, savedProject = null) {
   const project = savedProject || await request(`/api/projects/${encodeURIComponent(id)}`);
   current = project;
+  archiveConflict = false;
+  $("#archiveStatus").textContent = "";
+  renderArchivePanel();
   dirty = false;
   staleDraft = null;
   $("#recoverDraft").hidden = true;
@@ -141,11 +150,19 @@ async function loadProject(id, recover = true, savedProject = null) {
 function renderProjects() {
   const query = $("#projectSearch").value.trim().toLowerCase();
   const filter = $("#projectFilter").value;
-  const shown = projects.filter((project) => (filter === "all" || project.status === filter)
+  const scope = $("#projectScope").value;
+  const archivedCount = projects.filter((project) => project.archived).length;
+  $("#projectScope option[value=archived]").textContent = `Archived (${archivedCount})`;
+  const shown = projects.filter((project) => (scope === "all" || (scope === "archived" ? project.archived : !project.archived))
+    && (filter === "all" || project.status === filter)
     && `${project.title} ${project.materials.join(" ")} ${project.notes}`.toLowerCase().includes(query));
-  $("#projectGrid").innerHTML = shown.map((project) => `<a class="project-card" href="/projects?project=${encodeURIComponent(project.id)}"><span class="project-badge">${statuses[project.status]}</span><h2>${escapeHtml(project.title)}</h2><p>${escapeHtml(project.materials.join(" · ") || "Choose your project materials")}</p><progress max="100" value="${project.progress.percent}" aria-label="${project.progress.percent}% of checklist complete"></progress><small>${project.progress.done} of ${project.progress.total} steps · Open project →</small></a>`).join("");
+  $("#projectGrid").innerHTML = shown.map((project) => `<a class="project-card" href="/projects?project=${encodeURIComponent(project.id)}"><span class="project-badge">${project.archived ? "Archived · " : ""}${statuses[project.status]}</span><h2>${escapeHtml(project.title)}</h2><p>${escapeHtml(project.materials.join(" · ") || "Choose your project materials")}</p><progress max="100" value="${project.progress.percent}" aria-label="${project.progress.percent}% of checklist complete"></progress><small>${project.progress.done} of ${project.progress.total} steps · Open project →</small></a>`).join("");
   $("#projectEmpty").hidden = shown.length > 0;
-  $("#projectEmpty h2").textContent = projects.length ? "No matching projects" : "No projects here yet";
+  $("#projectListStatus").textContent = `${shown.length} shown · ${projects.length - archivedCount} current · ${archivedCount} archived`;
+  $("#projectEmpty h2").textContent = query || filter !== "all" ? "No matching projects" : scope === "archived" ? "No archived projects" : projects.length ? "No projects in this list" : "No projects here yet";
+  $("#projectEmpty p").textContent = query || filter !== "all" ? "Try changing your search, status, or project list."
+    : scope === "archived" ? "Projects you archive stay here with their plans and photos." : "Create your own project above, or open the archive to revisit saved work.";
+  $("#showArchivedProjects").hidden = !archivedCount || scope === "archived";
 }
 
 async function load() {
@@ -178,7 +195,10 @@ $("#projectForm").onsubmit = async (event) => {
   $("#saveStatus").textContent = "Saving your project…";
   try {
     const saved = await request(`/api/projects/${encodeURIComponent(current.id)}`, payload);
+    const archive = { archived: current.archived, archive_revision: current.archive_revision };
     current = saved;
+    if (archive.archive_revision > saved.archive_revision) Object.assign(current, archive);
+    renderArchivePanel();
     dirty = false;
     try { localStorage.removeItem(draftKey()); } catch { /* The server save succeeded. */ }
     applyForm(saved);
@@ -220,6 +240,7 @@ $("#recoverDraft").onclick = () => {
 };
 $("#projectSearch").oninput = renderProjects;
 $("#projectFilter").onchange = renderProjects;
+$("#projectScope").onchange = renderProjects;
 $("#refreshProjects").onclick = load;
 const closeMenu = () => {
   $("#sidebar").classList.remove("open");
@@ -235,6 +256,52 @@ $("#closeMenu").onclick = closeMenu;
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && $("#sidebar").classList.contains("open")) closeMenu(); });
 window.addEventListener("beforeunload", (event) => { if (dirty) { event.preventDefault(); event.returnValue = ""; } });
 window.addEventListener("resize", resizeSteps);
+
+function renderArchivePanel() {
+  if (!current) return;
+  $("#projectArchiveBadge").hidden = !current.archived;
+  $("#archiveHeading").textContent = current.archived ? "This project is archived" : "Put this project away";
+  $("#archiveExplanation").textContent = current.archived
+    ? "The plan and photos are still available here. Restore it to include it in your current project list."
+    : "Keep the plan, progress, and photos saved while removing this project from your current list and Home’s resume list.";
+  $("#toggleProjectArchive").textContent = current.archived ? "Restore to current projects" : "Archive project";
+  $("#toggleProjectArchive").disabled = archiveBusy || archiveConflict;
+  $("#reviewArchiveState").hidden = !archiveConflict;
+  $("#reviewArchiveState").disabled = archiveBusy;
+}
+
+function acceptArchiveState(id, state) {
+  if (current?.id !== id) return;
+  if (state.archive_revision >= current.archive_revision) Object.assign(current, state);
+  projects = projects.map((project) => project.id === id ? { ...project, archived: current.archived, archive_revision: current.archive_revision } : project);
+  renderProjects();
+}
+
+$("#toggleProjectArchive").onclick = async () => {
+  if (!current || archiveBusy || archiveConflict) return;
+  const id = current.id;
+  const payload = { archived: !current.archived, archive_revision: current.archive_revision };
+  archiveBusy = true; renderArchivePanel();
+  $("#archiveStatus").textContent = payload.archived ? "Archiving project…" : "Restoring project…";
+  try {
+    acceptArchiveState(id, await request(`/api/projects/${encodeURIComponent(id)}/archive`, payload));
+    $("#archiveStatus").textContent = `${current.archived ? "Project archived" : "Project restored to your current list"}. Your plan edits are still as you left them. Save project separately to keep plan changes.`;
+  } catch (error) {
+    $("#archiveStatus").textContent = error.message;
+    archiveConflict = error.status === 409;
+  } finally { archiveBusy = false; renderArchivePanel(); }
+};
+$("#reviewArchiveState").onclick = async () => {
+  if (!current || archiveBusy) return;
+  const id = current.id;
+  archiveBusy = true; renderArchivePanel();
+  try {
+    acceptArchiveState(id, await request(`/api/projects/${encodeURIComponent(id)}/archive`));
+    archiveConflict = false;
+    $("#archiveStatus").textContent = `Saved state reviewed: ${current.archived ? "archived" : "in current projects"}. Your plan fields are kept. Choose the action above if you want to change the archive state.`;
+  } catch (error) { $("#archiveStatus").textContent = error.message; }
+  finally { archiveBusy = false; renderArchivePanel(); }
+};
 
 function renderPhotos() {
   const shown = photos.filter((photo) => $("#photoFilter").value === "all" || photo.stage === $("#photoFilter").value);
@@ -697,4 +764,6 @@ $("#downloadProjectSheet").onclick = () => downloadSheet("html");
 $("#downloadProjectText").onclick = () => downloadSheet("txt");
 const requestedStatus = new URLSearchParams(location.search).get("status");
 if (Object.hasOwn(statuses, requestedStatus)) $("#projectFilter").value = requestedStatus;
+const requestedScope = new URLSearchParams(location.search).get("view");
+if (["current", "archived", "all"].includes(requestedScope)) $("#projectScope").value = requestedScope;
 load();

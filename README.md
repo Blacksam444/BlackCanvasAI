@@ -18,6 +18,8 @@ one of the three most recently saved unfinished projects with its checklist
 progress and an available progress/finished photo. The project counts open the
 matching status filter; Creative kits opens the optional kit panel in Think Tank.
 Empty studios get starting links, and completed projects remain in Projects.
+Saved project totals include archived work. The resume list and status counts
+include current projects; an archive link appears when projects are put away.
 
 Newest prompts and artwork are grouped by library and link directly to their
 saved records. The featured saved idea supports exact copying, with selection
@@ -95,7 +97,7 @@ your edits for the next save. Deleting from a stale artwork view is also rejecte
 reload its saved details before removal. Unsaved editor/upload work has a leaving
 guard while the page remains open. The current UI sends a derived
 `expected_details_version`; legacy API calls without it keep their previous
-unconditional behavior. No database migration or backup version change is needed.
+unconditional behavior. The details version is derived from editable fields.
 
 ## Projects
 
@@ -119,7 +121,7 @@ saved fields or later progress, the form is kept and offers **Open saved project
 or **Create a separate project**. Opening explicitly discards the new form; a
 separate project gets a new ID. The API is `POST /api/projects/direct` with an
 `id` in the form `direct_<32 lowercase hexadecimal characters>` and the plan
-fields. No schema migration or backup version change is needed.
+fields.
 
 Choose **Start project** on a Think Tank idea, or **Open as project** when viewing
 a saved Prompt Library item. The idea is saved in the existing library first;
@@ -150,6 +152,20 @@ reviewed fields and stable creation ID, including after a lost response. Replaci
 a different unfinished form requires an explicit choice. With browser storage
 blocked, creating a copy still leaves the original's unsaved fields open.
 
+**Archive project** puts a project away while preserving its status, checklist,
+notes, source idea, and photo links. It disappears from the default Current list
+and Home's resume list. Choose **Archived** under Project list to search it, open
+it, or **Restore to current projects**. **All saved projects** includes both lists.
+Archived plans can still be edited, printed, or reused for a new current project.
+Opening an archived project from its source idea keeps it archived.
+
+Archive changes save immediately and leave unfinished plan fields in place.
+Save project separately to keep those edits. A separate archive revision prevents
+stale devices from silently reversing each other's archive choices; Review saved
+archive state refreshes only that state. Plan revisions and browser drafts stay
+independent. Image Studio's project picker hides archived work until **Include
+archived projects** is selected, and existing artwork links identify archived plans.
+
 **Project photos** lets you upload images from your phone or computer, or link
 images already in Image Studio. Label each as a reference, work in progress, or a
 finished piece, then filter the project gallery by that label. Uploads are saved
@@ -176,8 +192,7 @@ piece without unlinking or uploading it again. The change saves immediately for
 this project only; catalog details, other projects, and project status are kept.
 If another device changed the label, review its saved label before applying your
 choice. Failed requests keep your selection for retry. Label changes use a
-required `expected_stage` checked in a write transaction; no schema or backup
-format change is needed. Unsaved plan fields stay in place during photo review
+required `expected_stage` checked in a write transaction. Unsaved plan fields stay in place during photo review
 and label changes.
 
 **Print / download plan** opens a project sheet made from the fields currently
@@ -189,7 +204,10 @@ a sheet does not save or replace project changes. If another device saved a newe
 plan, the sheet identifies that it uses your device's older fields. Refresh photos
 before reopening the sheet to include photos added from another device.
 
-Backup format 9 includes creative kits, projects, and photo links. Kit restore
+Backup format 10 includes project archive flags/revisions, creative kits, projects,
+and photo links. Existing databases add archive columns with current-project
+defaults. Older backups without archive fields restore as current projects;
+restoring any backup preserves existing archive/restore choices by project ID. Kit restore
 adds missing kits and preserves existing kits by ID or name. Google Drive restore remaps
 source prompt IDs and artwork IDs and adds missing projects without overwriting
 existing project progress or photo links. Photo links restore for newly added

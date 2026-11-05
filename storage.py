@@ -63,6 +63,8 @@ def initialize() -> None:
                 checklist TEXT NOT NULL DEFAULT '[]',
                 notes TEXT NOT NULL DEFAULT '',
                 revision INTEGER NOT NULL DEFAULT 1,
+                archived INTEGER NOT NULL DEFAULT 0,
+                archive_revision INTEGER NOT NULL DEFAULT 1,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
@@ -83,6 +85,11 @@ def initialize() -> None:
                 updated_at TEXT NOT NULL
             );
         """)
+        project_columns = {row[1] for row in db.execute("PRAGMA table_info(projects)")}
+        if "archived" not in project_columns:
+            db.execute("ALTER TABLE projects ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
+        if "archive_revision" not in project_columns:
+            db.execute("ALTER TABLE projects ADD COLUMN archive_revision INTEGER NOT NULL DEFAULT 1")
         prompt_columns = {row[1] for row in db.execute("PRAGMA table_info(prompts)")}
         if "source" not in prompt_columns:
             db.execute("ALTER TABLE prompts ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'")
@@ -125,12 +132,12 @@ def backup_data() -> dict[str, Any]:
         db.execute("BEGIN")
         styles = rows("SELECT name, content FROM styles ORDER BY name", connection=db)
         return {
-            "version": 9,
+            "version": 10,
             "prompts": rows("SELECT id, title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result, version_test_notes, version_tested_at FROM prompts ORDER BY id", connection=db),
             "styles": {item["name"]: json.loads(item["content"]) for item in styles},
             "midjourney_rules": json.loads(MIDJOURNEY_RULES_PATH.read_text(encoding="utf-8")),
             "artworks": rows("SELECT id, title, collection, tags, notes, favorite, filename, created_at FROM artworks ORDER BY id", connection=db),
-            "projects": [{**item, "materials": json.loads(item["materials"]), "checklist": json.loads(item["checklist"])}
+            "projects": [{**item, "materials": json.loads(item["materials"]), "checklist": json.loads(item["checklist"]), "archived": bool(item["archived"])}
                          for item in rows("SELECT * FROM projects ORDER BY created_at, id", connection=db)],
             "project_artworks": rows(
                 "SELECT pa.project_id, a.filename, pa.stage, pa.created_at FROM project_artworks pa "

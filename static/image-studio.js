@@ -40,6 +40,7 @@ function controls() {
   $("#refreshAttachmentProjects").disabled = busy || attachmentLoading;
   $("#attachmentSearch").disabled = busy || attachmentLoading;
   $("#attachmentProject").disabled = busy || attachmentLoading;
+  $("#attachmentIncludeArchived").disabled = busy || attachmentLoading;
   document.querySelectorAll(".art-favorite").forEach((button) => { button.disabled = busy || favoritePending.has(Number(button.dataset.id)); });
 }
 function setBusy(value) { busy = value; controls(); }
@@ -106,7 +107,7 @@ function showDetail(artwork) {
   $("#detailCollection").textContent = artwork.collection; $("#detailTitle").textContent = artwork.title;
   $("#detailNotes").textContent = artwork.notes || "No notes added yet."; $("#detailStatus").textContent = "";
   $("#detailTags").innerHTML = (artwork.tags || "").split(",").filter(Boolean).map((tag) => `<span>${escapeHtml(tag.trim())}</span>`).join("");
-  $("#artworkProjects").replaceChildren(...selectedArtwork.projects.map((project) => { const link = document.createElement("a"); link.href = `/projects?project=${encodeURIComponent(project.project_id)}`; link.textContent = `${stageLabels[project.stage]} · ${project.title} →`; return link; }));
+  $("#artworkProjects").replaceChildren(...selectedArtwork.projects.map((project) => { const link = document.createElement("a"); link.href = `/projects?project=${encodeURIComponent(project.project_id)}`; link.textContent = `${project.archived ? "Archived · " : ""}${stageLabels[project.stage]} · ${project.title} →`; return link; }));
   $("#artworkDeleteNote").hidden = !selectedArtwork.projects.length;
   if (!$("#detailDialog").open) $("#detailDialog").showModal();
 }
@@ -201,12 +202,13 @@ $("#createArtworkPrompt").onclick = () => { if (!selectedArtwork) return; const 
 function renderProjectChoices() {
   const selected = $("#attachmentProject").value;
   const search = $("#attachmentSearch").value.trim().toLowerCase();
-  const available = attachmentProjects.filter((project) => !selectedArtwork.projects.some((link) => link.project_id === project.id));
+  const available = attachmentProjects.filter((project) => (!project.archived || $("#attachmentIncludeArchived").checked)
+    && !selectedArtwork.projects.some((link) => link.project_id === project.id));
   const shown = available.filter((project) => `${project.title} ${project.materials.join(" ")}`.toLowerCase().includes(search));
-  $("#attachmentProject").replaceChildren(new Option("Choose a project", ""), ...shown.map((project) => new Option(`${project.title} · ${projectStatuses[project.status]}`, project.id)));
+  $("#attachmentProject").replaceChildren(new Option("Choose a project", ""), ...shown.map((project) => new Option(`${project.title} · ${project.archived ? "Archived · " : ""}${projectStatuses[project.status]}`, project.id)));
   if (shown.some((project) => project.id === selected)) $("#attachmentProject").value = selected;
   $("#attachmentEmpty").hidden = attachmentProjects.length > 0;
-  $("#attachmentHint").textContent = shown.length ? "Choose the project and how you want to use this image. Existing links are kept." : (attachmentProjects.length ? "No matching unlinked projects. Try another search, or use an existing project link in the artwork details." : "Create a project first, then return here to connect this image.");
+  $("#attachmentHint").textContent = shown.length ? "Choose the project and how you want to use this image. Existing links are kept." : (attachmentProjects.length ? "No matching unlinked projects. Try another search, include archived projects, or use an existing link in the artwork details." : "Create a project first, then return here to connect this image.");
   controls();
 }
 async function loadAttachmentProjects() {
@@ -225,6 +227,7 @@ $("#addArtworkToProject").onclick = () => {
 $("#closeAttachArtwork").onclick = () => { if (!busy) { $("#attachArtworkDialog").close(); showDetail(selectedArtwork); } };
 $("#attachArtworkDialog").addEventListener("cancel", (event) => { event.preventDefault(); if (!busy) { $("#attachArtworkDialog").close(); showDetail(selectedArtwork); } });
 $("#attachmentSearch").oninput = renderProjectChoices;
+$("#attachmentIncludeArchived").onchange = renderProjectChoices;
 $("#attachmentProject").onchange = controls;
 $("#refreshAttachmentProjects").onclick = loadAttachmentProjects;
 $("#attachArtworkForm").onsubmit = async (event) => {
@@ -235,7 +238,7 @@ $("#attachArtworkForm").onsubmit = async (event) => {
   try {
     const result = await request(`/api/projects/${encodeURIComponent(project.id)}/artworks`, "POST", { artwork_id: selectedArtwork.id, stage });
     const actual = result.artworks.find((item) => item.id === selectedArtwork.id);
-    selectedArtwork.projects = [...selectedArtwork.projects.filter((item) => item.project_id !== project.id), { project_id: project.id, title: project.title, stage: actual.stage }];
+    selectedArtwork.projects = [...selectedArtwork.projects.filter((item) => item.project_id !== project.id), { project_id: project.id, title: project.title, stage: actual.stage, archived: project.archived }];
     syncItem(selectedArtwork); $("#attachArtworkDialog").close(); showDetail(selectedArtwork);
     $("#detailStatus").textContent = `Image ${result.created ? "added" : "already linked"} as ${stageLabels[actual.stage].toLowerCase()}. Open the project above to continue.`;
   } catch (error) { $("#attachmentStatus").textContent = error.message; }

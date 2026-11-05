@@ -167,7 +167,7 @@ class ProjectTests(unittest.TestCase):
         project = update_project(project["id"], self.payload(project, status="paused", notes="Try a wider surface.",
             checklist=[{**step, "done": True} for step in project["checklist"]]))
         manifest = storage.backup_data()
-        self.assertEqual(manifest["version"], 9)
+        self.assertEqual(manifest["version"], 10)
         self.assertIsInstance(manifest["projects"][0]["checklist"], list)
         backups = validate_project_backups(json.loads(json.dumps(manifest)))
         with patch("storage.DB_PATH", self.directory / "restored.db"):
@@ -339,7 +339,7 @@ class ProjectTests(unittest.TestCase):
             update_project_artwork_stage(project["id"], photo["id"], ProjectArtworkStagePayload(
                 expected_stage="reference", stage=stage))
         manifest = storage.backup_data()
-        self.assertEqual(manifest["version"], 9)
+        self.assertEqual(manifest["version"], 10)
         links = validate_project_artwork_backups(manifest)
         self.assertEqual(links[0].stage, "finished")
         with storage.connect() as db:
