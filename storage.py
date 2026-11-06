@@ -75,6 +75,11 @@ def initialize() -> None:
                 created_at TEXT NOT NULL,
                 PRIMARY KEY (project_id, artwork_id)
             );
+            CREATE TABLE IF NOT EXISTS project_covers (
+                project_id TEXT PRIMARY KEY,
+                artwork_id INTEGER,
+                revision INTEGER NOT NULL DEFAULT 1
+            );
             CREATE TABLE IF NOT EXISTS creative_kits (
                 id TEXT PRIMARY KEY,
                 name TEXT NOT NULL,
@@ -132,7 +137,7 @@ def backup_data() -> dict[str, Any]:
         db.execute("BEGIN")
         styles = rows("SELECT name, content FROM styles ORDER BY name", connection=db)
         return {
-            "version": 10,
+            "version": 11,
             "prompts": rows("SELECT id, title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result, version_test_notes, version_tested_at FROM prompts ORDER BY id", connection=db),
             "styles": {item["name"]: json.loads(item["content"]) for item in styles},
             "midjourney_rules": json.loads(MIDJOURNEY_RULES_PATH.read_text(encoding="utf-8")),
@@ -143,6 +148,10 @@ def backup_data() -> dict[str, Any]:
                 "SELECT pa.project_id, a.filename, pa.stage, pa.created_at FROM project_artworks pa "
                 "JOIN artworks a ON a.id = pa.artwork_id JOIN projects p ON p.id = pa.project_id "
                 "ORDER BY pa.created_at, pa.artwork_id", connection=db),
+            "project_covers": rows(
+                "SELECT pc.project_id, a.filename, pc.revision FROM project_covers pc "
+                "JOIN projects p ON p.id = pc.project_id LEFT JOIN artworks a ON a.id = pc.artwork_id "
+                "ORDER BY pc.project_id", connection=db),
             "creative_kits": [{**item, "preferences": json.loads(item["preferences"])} for item in rows(
                 "SELECT id, name, preferences, revision, created_at, updated_at FROM creative_kits ORDER BY name_key, id", connection=db)],
         }

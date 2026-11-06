@@ -15,7 +15,7 @@ Open `http://127.0.0.1:8000`.
 
 Home shows saved project, in-progress, completed, and creative kit counts. Resume
 one of the three most recently saved unfinished projects with its checklist
-progress and an available progress/finished photo. The project counts open the
+progress and available project cover. The project counts open the
 matching status filter; Creative kits opens the optional kit panel in Think Tank.
 Empty studios get starting links, and completed projects remain in Projects.
 Saved project totals include archived work. The resume list and status counts
@@ -180,6 +180,20 @@ keeps the catalog image. Removing an image from Image Studio removes all its
 project links too; the catalog asks for confirmation before removal.
 JPEG, PNG, WebP, and GIF uploads up to 10 MB are supported.
 
+**Choose cover** in an open project uses any of its linked photos, including a
+reference, as the image shown in Projects and Home. Preview the image, then
+**Save cover**. **Automatic** uses the latest available progress or finished
+photo. Covers show full image proportions and use the same catalog image; no
+second upload is needed. Choices save immediately for connected devices while
+your plan fields stay in place. Refresh cover picks up other-device changes.
+
+Cover revisions protect against conflicting choices. Refresh saved cover and
+photos lets you review the current choice while retaining your pending selection.
+Unlinking or deleting a selected image resets affected projects to Automatic.
+A selected image whose file becomes unavailable shows a placeholder until you
+choose another photo or Automatic. Archiving keeps the cover; reusing a plan
+starts the new project with Automatic and its own photo links.
+
 Click a project photo to review it larger without leaving the plan, or choose
 **Compare photos** to study any two linked images side by side, including on a
 phone. Both images keep their full proportions. Choose images across all labels,
@@ -204,8 +218,11 @@ a sheet does not save or replace project changes. If another device saved a newe
 plan, the sheet identifies that it uses your device's older fields. Refresh photos
 before reopening the sheet to include photos added from another device.
 
-Backup format 10 includes project archive flags/revisions, creative kits, projects,
-and photo links. Existing databases add archive columns with current-project
+Backup format 11 includes project covers by filename and revision, project archive
+flags/revisions, creative kits, projects, and photo links. Cover restore remaps
+artwork IDs by filename and only adds choices for newly restored projects, keeping
+later cover choices or resets in existing work. Older backups without covers use
+Automatic. Existing databases add archive columns with current-project
 defaults. Older backups without archive fields restore as current projects;
 restoring any backup preserves existing archive/restore choices by project ID. Kit restore
 adds missing kits and preserves existing kits by ID or name. Google Drive restore remaps
@@ -219,7 +236,7 @@ files; Google Drive folder backups include the actual images.
 
 ```powershell
 python -m unittest discover -v
-python -m py_compile app.py storage.py think_tank.py projects.py project_sheets.py creative_kits.py
+python -m py_compile app.py storage.py think_tank.py projects.py project_sheets.py creative_kits.py project_covers.py
 node --test test_think_tank_state.mjs
 ```
 

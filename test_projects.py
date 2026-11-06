@@ -19,6 +19,7 @@ from projects import (
 )
 import storage
 from project_sheets import ProjectSheetPayload, create_project_sheet
+from project_covers import CoverPayload, update_cover
 from creative_kits import KitPayload, KitUpdatePayload, create_kit, list_kits, update_kit
 
 
@@ -167,7 +168,7 @@ class ProjectTests(unittest.TestCase):
         project = update_project(project["id"], self.payload(project, status="paused", notes="Try a wider surface.",
             checklist=[{**step, "done": True} for step in project["checklist"]]))
         manifest = storage.backup_data()
-        self.assertEqual(manifest["version"], 10)
+        self.assertEqual(manifest["version"], 11)
         self.assertIsInstance(manifest["projects"][0]["checklist"], list)
         backups = validate_project_backups(json.loads(json.dumps(manifest)))
         with patch("storage.DB_PATH", self.directory / "restored.db"):
@@ -285,8 +286,8 @@ class ProjectTests(unittest.TestCase):
             expected_stage="reference", stage="finished"))
         self.assertEqual(result["artworks"][0]["stage"], "finished")
         reopened = get_project(project["id"])
-        self.assertEqual({key: value for key, value in original.items() if key != "artworks"},
-                         {key: value for key, value in reopened.items() if key != "artworks"})
+        self.assertEqual({key: value for key, value in original.items() if key not in {"artworks", "cover"}},
+                         {key: value for key, value in reopened.items() if key not in {"artworks", "cover"}})
         self.assertEqual(original["artworks"][0]["created_at"], reopened["artworks"][0]["created_at"])
         self.assertEqual(get_project(second["id"])["artworks"][0]["stage"], "progress")
         after = list_artworks()[0]
@@ -339,7 +340,7 @@ class ProjectTests(unittest.TestCase):
             update_project_artwork_stage(project["id"], photo["id"], ProjectArtworkStagePayload(
                 expected_stage="reference", stage=stage))
         manifest = storage.backup_data()
-        self.assertEqual(manifest["version"], 10)
+        self.assertEqual(manifest["version"], 11)
         links = validate_project_artwork_backups(manifest)
         self.assertEqual(links[0].stage, "finished")
         with storage.connect() as db:
@@ -461,7 +462,8 @@ class ProjectTests(unittest.TestCase):
 
     def test_folder_restore_recovers_photo_files_and_links_without_live_drive_calls(self):
         project = self.project()
-        self.photo(project["id"], "finished")
+        chosen_photo = self.photo(project["id"], "finished")
+        update_cover(project["id"], CoverPayload(artwork_id=chosen_photo["id"], cover_revision=1))
         kit = create_kit(KitPayload(name="My restored kit", preferences={"palette": "Blue gray"}))["kit"]
         manifest = storage.backup_data()
         filename = manifest["artworks"][0]["filename"]
@@ -491,16 +493,20 @@ class ProjectTests(unittest.TestCase):
             restored = restore_google_backup("local-fixture")
             self.assertEqual((restored["projects"], restored["project_photos"], restored["images"]), (1, 1, 1))
             self.assertEqual(restored["creative_kits"], 1)
+            self.assertEqual(restored["project_covers"], 1)
             self.assertEqual(list_kits()[0]["id"], kit["id"])
             update_kit(kit["id"], KitUpdatePayload(name=kit["name"], revision=kit["revision"], preferences={"palette": "My newer palette"}))
             photo = get_project(project["id"])["artworks"][0]
             self.assertEqual(photo["stage"], "finished")
             self.assertEqual((upload_path / filename).read_bytes(), image_bytes)
             self.assertNotEqual(photo["id"], manifest["artworks"][0]["id"])
+            self.assertEqual(get_project(project["id"])["cover_artwork_id"], photo["id"])
             unlink_project_artwork(project["id"], photo["id"])
             repeated = restore_google_backup("local-fixture")
             self.assertEqual((repeated["projects"], repeated["project_photos"]), (0, 0))
             self.assertEqual(repeated["creative_kits"], 0)
+            self.assertEqual(repeated["project_covers"], 0)
+            self.assertIsNone(get_project(project["id"])["cover_artwork_id"])
             self.assertEqual(list_kits()[0]["preferences"]["palette"], "My newer palette")
             self.assertEqual(get_project(project["id"])["artworks"], [])
             self.assertEqual(len(list_artworks()), 2)

@@ -7,13 +7,13 @@ from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import PurePosixPath, PureWindowsPath
 from typing import Literal
-from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 import storage
+from project_covers import clear_artwork_cover, cover_state
 
 router = APIRouter()
 ProjectStatus = Literal["planned", "in_progress", "paused", "completed"]
@@ -74,7 +74,8 @@ def link_project_artwork(project_id: str, payload: ProjectArtworkPayload) -> dic
     with closing(storage.connect()) as db, db:
         created = attach_artwork(db, project_id, payload.artwork_id, payload.stage)
         photos = project_artworks(db, project_id)
-    return {"created": created, "artworks": photos}
+        cover = cover_state(db, project_id)
+    return {"created": created, "artworks": photos, **cover}
 
 
 @router.delete("/api/projects/{project_id}/artworks/{artwork_id}")
@@ -83,8 +84,10 @@ def unlink_project_artwork(project_id: str, artwork_id: int) -> dict:
         if not db.execute("SELECT 1 FROM projects WHERE id = ?", (project_id,)).fetchone():
             raise HTTPException(status_code=404, detail="Project not found")
         db.execute("DELETE FROM project_artworks WHERE project_id = ? AND artwork_id = ?", (project_id, artwork_id))
+        clear_artwork_cover(db, artwork_id, project_id)
         photos = project_artworks(db, project_id)
-    return {"artworks": photos}
+        cover = cover_state(db, project_id)
+    return {"artworks": photos, **cover}
 
 
 @router.put("/api/projects/{project_id}/artworks/{artwork_id}")
@@ -104,7 +107,8 @@ def update_project_artwork_stage(project_id: str, artwork_id: int, payload: Proj
             (payload.stage, project_id, artwork_id),
         )
         photos = project_artworks(db, project_id)
-    return {"artworks": photos}
+        cover = cover_state(db, project_id)
+    return {"artworks": photos, **cover}
 
 
 class ProjectStep(BaseModel):
@@ -227,23 +231,14 @@ def project_overview(db) -> dict:
         "ORDER BY julianday(updated_at) DESC, id LIMIT 3"
     ):
         project = project_record(row)
-        cover = None
-        for photo in db.execute(
-            "SELECT a.filename, a.title, pa.stage FROM project_artworks pa JOIN artworks a ON a.id = pa.artwork_id "
-            "WHERE pa.project_id = ? AND pa.stage IN ('progress', 'finished') "
-            "ORDER BY julianday(pa.created_at) DESC, a.id DESC", (project["id"],),
-        ):
-            image_path = (storage.UPLOAD_DIR / photo["filename"]).resolve()
-            if image_path.is_relative_to(storage.UPLOAD_DIR.resolve()) and image_path.is_file():
-                cover = {"url": f"/uploads/{quote(photo['filename'], safe='')}", "title": photo["title"], "stage": photo["stage"]}
-                break
         recent.append({key: project[key] for key in ("id", "title", "status", "materials", "surface", "progress", "updated_at")})
-        recent[-1]["cover"] = cover
+        recent[-1].update(cover_state(db, project["id"]))
     return {"counts": counts, "recent": recent}
 
 
 def get_project(project_id: str) -> dict:
     with closing(storage.connect()) as db:
+        db.execute("BEGIN")
         row = db.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Project not found")
@@ -251,6 +246,7 @@ def get_project(project_id: str) -> dict:
         source = db.execute("SELECT id, title, category, text, trashed FROM prompts WHERE id = ?", (row["source_prompt_id"],)).fetchone()
         result["source_prompt"] = dict(source) if source else None
         result["artworks"] = project_artworks(db, project_id)
+        result.update(cover_state(db, project_id))
     return result
 
 
@@ -262,10 +258,12 @@ def projects_page() -> FileResponse:
 @router.get("/api/projects")
 def list_projects() -> list[dict]:
     with closing(storage.connect()) as db:
+        db.execute("BEGIN")
         result = []
         for row in db.execute("SELECT * FROM projects ORDER BY updated_at DESC, id"):
             item = project_record(row)
             del item["checklist"]
+            item.update(cover_state(db, item["id"]))
             result.append(item)
         return result
 

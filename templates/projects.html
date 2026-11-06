@@ -6,6 +6,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/projects.css?v=2"><link rel="stylesheet" href="/static/project-sheet-dialog.css?v=1"><link rel="stylesheet" href="/static/project-photo-review.css?v=1"><link rel="stylesheet" href="/static/project-create.css?v=2"><link rel="stylesheet" href="/static/project-archive.css?v=1">
+  <link rel="stylesheet" href="/static/project-covers.css?v=1">
 </head>
 <body>
 <div class="app-shell">
@@ -39,6 +40,7 @@
         <a class="back-link" href="/projects">← All projects</a>
         <div class="detail-heading"><div><p class="eyebrow">YOUR STUDIO PLAN</p><h2 id="projectHeading" tabindex="-1"></h2><p id="projectProgress"></p></div><div class="project-state-badges"><span class="project-badge" id="projectArchiveBadge" hidden>Archived</span><span class="project-badge" id="projectStatusBadge"></span></div></div>
         <progress id="projectProgressBar" max="100" value="0" aria-label="Checklist progress"></progress>
+        <section id="projectCoverPanel" aria-labelledby="projectCoverHeading"><div class="project-cover-picture"><img id="projectCoverImage" alt="" hidden><span id="projectCoverPlaceholder">Your project photo</span></div><div class="project-cover-details"><h3 id="projectCoverHeading">Project cover</h3><p id="projectCoverDescription"></p><div class="project-cover-actions"><button type="button" class="secondary" id="chooseProjectCover">Choose cover</button><button type="button" class="secondary" id="refreshProjectCover">Refresh cover</button></div><p id="coverStatus" role="status" aria-live="polite"></p></div></section>
         <div class="project-sheet-launch"><div class="project-plan-tools"><button type="button" class="secondary" id="openProjectSheet">Print / download plan</button><button type="button" class="secondary" id="reuseProjectPlan">Use plan for new project</button></div><p class="project-hint">Take your plan to the worktable or use it to start another piece.</p></div>
         <div id="planReuseSaved" tabindex="-1" hidden><p id="planReuseMessage" role="status"></p><a id="planReuseLink" href="/projects">Open new project →</a><p class="project-hint">Your original plan is still open below. Save project when you want to keep its edits.</p></div>
         <section id="projectArchivePanel" aria-labelledby="archiveHeading"><div><h3 id="archiveHeading">Put this project away</h3><p id="archiveExplanation" class="project-hint"></p></div><div class="archive-actions"><button type="button" class="secondary" id="toggleProjectArchive">Archive project</button><button type="button" class="secondary" id="reviewArchiveState" hidden>Review saved archive state</button></div><p id="archiveStatus" role="status" aria-live="polite"></p></section>
@@ -64,6 +66,7 @@
     </section>
   </main>
 </div>
+<dialog id="projectCoverDialog" aria-labelledby="coverDialogHeading"><form id="projectCoverForm"><div class="photo-dialog-heading"><h2 id="coverDialogHeading">Choose a project cover</h2><button type="button" class="remove-step" id="closeProjectCover" aria-label="Close cover choices">×</button></div><p class="project-hint">Use any linked photo, or let Automatic use the latest available progress or finished photo. The cover appears in Projects and Home.</p><p id="savedCoverChoice" class="project-hint"></p><label>Cover photo<select id="coverPhotoChoice"></select></label><img id="coverChoicePreview" alt="" hidden><p id="coverChoiceCaption" class="project-hint"></p><p id="coverChoiceEmpty" class="project-hint" hidden>No photos are linked yet. Add one in Project photos, then choose it here.</p><p id="coverChoiceStatus" role="status" aria-live="polite"></p><button type="button" class="secondary" id="refreshCoverChoices">Refresh saved cover and photos</button><div class="project-actions"><button type="submit" class="primary" id="saveProjectCover">Save cover</button><button type="button" class="secondary" id="cancelProjectCover">Cancel</button></div></form></dialog>
 <dialog id="newProjectDialog" aria-labelledby="newProjectHeading">
   <form id="newProjectForm">
     <div class="photo-dialog-heading"><h2 id="newProjectHeading">Start your project</h2><button type="button" class="remove-step" id="closeNewProject" aria-label="Close new project">×</button></div>
@@ -137,6 +140,6 @@
   <p class="project-hint">HTML keeps the layout and selected images for offline use. Text keeps the plan and photo captions. PDF is available through your browser’s print options.</p>
   <iframe id="projectSheetPreview" title="Project sheet preview" sandbox="allow-same-origin allow-modals" hidden></iframe>
 </dialog>
-<script src="/static/projects.js?v=archive-1"></script><script src="/static/project-create.js?v=2"></script>
+<script src="/static/project-covers.js?v=1"></script><script src="/static/projects.js?v=covers-1"></script><script src="/static/project-create.js?v=2"></script>
 </body>
 </html>

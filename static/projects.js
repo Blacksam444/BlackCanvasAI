@@ -128,6 +128,7 @@ async function loadProject(id, recover = true, savedProject = null) {
   $("#sourceLink").hidden = project.started_directly;
   applyForm(project);
   photos = project.artworks;
+  renderProjectCover();
   renderPhotos();
   $("#saveStatus").textContent = `Saved ${new Date(project.updated_at).toLocaleString()}.`;
   if (recover) {
@@ -156,7 +157,8 @@ function renderProjects() {
   const shown = projects.filter((project) => (scope === "all" || (scope === "archived" ? project.archived : !project.archived))
     && (filter === "all" || project.status === filter)
     && `${project.title} ${project.materials.join(" ")} ${project.notes}`.toLowerCase().includes(query));
-  $("#projectGrid").innerHTML = shown.map((project) => `<a class="project-card" href="/projects?project=${encodeURIComponent(project.id)}"><span class="project-badge">${project.archived ? "Archived · " : ""}${statuses[project.status]}</span><h2>${escapeHtml(project.title)}</h2><p>${escapeHtml(project.materials.join(" · ") || "Choose your project materials")}</p><progress max="100" value="${project.progress.percent}" aria-label="${project.progress.percent}% of checklist complete"></progress><small>${project.progress.done} of ${project.progress.total} steps · Open project →</small></a>`).join("");
+  $("#projectGrid").innerHTML = shown.map((project) => `<a class="project-card" href="/projects?project=${encodeURIComponent(project.id)}"><div class="project-card-picture">${project.cover ? `<img loading="lazy" src="${escapeHtml(project.cover.url)}" alt="${escapeHtml(project.cover.title)}">` : `<span>${project.cover_unavailable ? "Cover unavailable" : "Your project photo"}</span>`}</div><span class="project-badge">${project.archived ? "Archived · " : ""}${statuses[project.status]}</span><h2>${escapeHtml(project.title)}</h2><p>${escapeHtml(project.materials.join(" · ") || "Choose your project materials")}</p><progress max="100" value="${project.progress.percent}" aria-label="${project.progress.percent}% of checklist complete"></progress><small>${project.progress.done} of ${project.progress.total} steps · Open project →</small></a>`).join("");
+  document.querySelectorAll(".project-card-picture img").forEach((image) => { image.onerror = () => { const label = document.createElement("span"); label.textContent = "Cover image unavailable"; image.replaceWith(label); }; });
   $("#projectEmpty").hidden = shown.length > 0;
   $("#projectListStatus").textContent = `${shown.length} shown · ${projects.length - archivedCount} current · ${archivedCount} archived`;
   $("#projectEmpty h2").textContent = query || filter !== "all" ? "No matching projects" : scope === "archived" ? "No archived projects" : projects.length ? "No projects in this list" : "No projects here yet";
@@ -196,9 +198,12 @@ $("#projectForm").onsubmit = async (event) => {
   try {
     const saved = await request(`/api/projects/${encodeURIComponent(current.id)}`, payload);
     const archive = { archived: current.archived, archive_revision: current.archive_revision };
+    const cover = coverFields(current);
     current = saved;
     if (archive.archive_revision > saved.archive_revision) Object.assign(current, archive);
+    if (cover.cover_revision >= saved.cover_revision) Object.assign(current, cover);
     renderArchivePanel();
+    renderProjectCover();
     dirty = false;
     try { localStorage.removeItem(draftKey()); } catch { /* The server save succeeded. */ }
     applyForm(saved);
@@ -327,6 +332,7 @@ function renderPhotos() {
       try {
         const result = await photoRequest(`/api/projects/${encodeURIComponent(current.id)}/artworks/${photo.id}`, "DELETE");
         photos = result.artworks;
+        acceptProjectCover(result);
         renderPhotos();
         $("#photoStatus").textContent = "Photo unlinked. It is still saved in Image Studio.";
       } catch (error) { $("#photoStatus").textContent = error.message; }
@@ -345,6 +351,7 @@ function setPhotoBusy(value) {
   photoBusy = value;
   document.querySelectorAll("#addProjectPhoto,#refreshProjectPhotos,.unlink-photo,.change-photo-label,#refreshReviewPhotos").forEach((control) => { control.disabled = value; });
   $("#compareProjectPhotos").disabled = value || photos.length < 2;
+  renderProjectCover();
 }
 
 async function photoRequest(url, method = "GET", payload) {
@@ -464,12 +471,14 @@ $("#projectPhotoForm").onsubmit = async (event) => {
         reader.readAsDataURL(file);
       });
       const result = await photoRequest("/api/artworks", "POST", payload);
+      if (result.project_cover) acceptProjectCover(result.project_cover);
       // Update only the gallery so unsaved plan fields remain in place.
       photos = [{ id: result.id, title: payload.title, collection: payload.collection, notes: payload.notes,
         url: result.url, stage: payload.project_stage, created_at: new Date().toISOString() }, ...photos];
     } else {
       const result = await photoRequest(`/api/projects/${encodeURIComponent(current.id)}/artworks`, "POST", payload);
       photos = result.artworks;
+      acceptProjectCover(result);
     }
     saved = true;
     $("#photoFilter").value = "all";
@@ -488,6 +497,7 @@ $("#refreshProjectPhotos").onclick = async () => {
   try {
     const project = await request(`/api/projects/${encodeURIComponent(current.id)}`);
     photos = project.artworks;
+    acceptProjectCover(project);
     renderPhotos();
     $("#photoStatus").textContent = "Photos refreshed. Your plan edits are still as you left them.";
   } catch (error) { $("#photoStatus").textContent = error.message; }
@@ -591,6 +601,7 @@ $("#refreshReviewPhotos").onclick = async () => {
   try {
     const project = await photoRequest(`/api/projects/${encodeURIComponent(current.id)}`);
     photos = project.artworks;
+    acceptProjectCover(project);
     $("#photoReviewStatus").textContent = "Photos refreshed. Your plan edits are still as you left them.";
     renderPhotos();
   } catch (error) { $("#photoReviewStatus").textContent = error.message; }
@@ -630,6 +641,7 @@ $("#photoLabelForm").onsubmit = async (event) => {
       stage: $("#photoLabelStage").value, expected_stage: labelPhoto.stage,
     });
     photos = result.artworks;
+    acceptProjectCover(result);
     renderPhotos();
     $("#photoStatus").textContent = "Photo label saved in this project. Your plan edits are still as you left them.";
     saved = true;
@@ -650,6 +662,7 @@ $("#reviewSavedPhotoLabel").onclick = async () => {
   try {
     const project = await photoRequest(`/api/projects/${encodeURIComponent(current.id)}`);
     photos = project.artworks;
+    acceptProjectCover(project);
     renderPhotos();
     const photo = photos.find((item) => item.id === labelPhoto.id);
     if (!photo) {

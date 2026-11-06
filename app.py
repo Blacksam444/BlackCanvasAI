@@ -27,6 +27,7 @@ from projects import (
     project_overview,
 )
 from project_sheets import router as project_sheet_router
+from project_covers import router as project_cover_router, clear_artwork_cover, cover_state, restore_covers, validate_cover_backups
 from creative_kits import CreativePreferences, router as creative_kit_router, restore_kits, validate_kit_backups
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -192,6 +193,7 @@ initialize()
 app = FastAPI(title="Black Canvas AI")
 app.include_router(project_router)
 app.include_router(project_sheet_router)
+app.include_router(project_cover_router)
 app.include_router(creative_kit_router)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
@@ -1205,11 +1207,13 @@ def create_artwork(payload: ArtworkPayload) -> dict:
             artwork_id = cursor.lastrowid
             if payload.project_id:
                 attach_artwork(db, payload.project_id, artwork_id, payload.project_stage)
+            project_cover = cover_state(db, payload.project_id) if payload.project_id else None
             saved = dict(db.execute("SELECT * FROM artworks WHERE id = ?", (artwork_id,)).fetchone())
     except Exception:
         image_path.unlink(missing_ok=True)
         raise
-    return {**saved, "url": f"/uploads/{filename}", "details_version": artwork_details_version(saved)}
+    return {**saved, "url": f"/uploads/{filename}", "details_version": artwork_details_version(saved),
+            **({"project_cover": project_cover} if project_cover is not None else {})}
 
 
 @app.patch("/api/artworks/{artwork_id}/favorite")
@@ -1255,6 +1259,7 @@ def delete_artwork(artwork_id: int, expected_details_version: str | None = None)
         if expected_details_version is not None and expected_details_version != artwork_details_version(item):
             raise HTTPException(status_code=409, detail="This artwork changed on another device. Reload its saved details and review them before removing it.")
         db.execute("DELETE FROM project_artworks WHERE artwork_id = ?", (artwork_id,))
+        clear_artwork_cover(db, artwork_id)
         db.execute("DELETE FROM artworks WHERE id = ?", (artwork_id,))
     image_path = UPLOAD_DIR / item["filename"]
     if image_path.exists():
@@ -1529,6 +1534,7 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
         raise HTTPException(status_code=400, detail="The backup manifest is invalid") from error
     project_backups = validate_project_backups(manifest)
     project_photo_backups = validate_project_artwork_backups(manifest)
+    project_cover_backups = validate_cover_backups(manifest)
     kit_backups = validate_kit_backups(manifest)
 
     snapshot_root = UPLOAD_DIR.parent / "restore-snapshots"
@@ -1588,6 +1594,7 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
         restored_project_count = restore_projects(db, project_backups, manifest, repair_midjourney_syntax)
         new_project_ids = {row["id"] for row in db.execute("SELECT id FROM projects")} - previous_project_ids
         restored_photo_links = restore_project_artworks(db, project_photo_backups, new_project_ids)
+        restored_cover_count = restore_covers(db, project_cover_backups, new_project_ids)
         restored_kit_count = restore_kits(db, kit_backups)
     restored_rules = restore_midjourney_rules_from_manifest(manifest)
     return {
@@ -1597,6 +1604,7 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
         "images": restored_images,
         "projects": restored_project_count,
         "project_photos": restored_photo_links,
+        "project_covers": restored_cover_count,
         "creative_kits": restored_kit_count,
         "midjourney_rules": int(restored_rules),
         "safety_snapshot": snapshot_dir.name,

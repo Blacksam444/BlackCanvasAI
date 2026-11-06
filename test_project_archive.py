@@ -109,7 +109,7 @@ class ProjectArchiveTests(TestCase):
         project = self.project()
         self.archive(project)
         manifest = storage.backup_data()
-        self.assertEqual(manifest["version"], 10)
+        self.assertEqual(manifest["version"], 11)
         self.assertIs(manifest["projects"][0]["archived"], True)
         backups = validate_project_backups(json.loads(json.dumps(manifest)))
         with patch("storage.DB_PATH", self.directory / "restored.db"):
