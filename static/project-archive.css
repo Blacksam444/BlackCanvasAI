@@ -1,0 +1,24 @@
+.project-workspace .project-tools { grid-template-columns:minmax(0,1fr) 180px 160px auto; }
+.project-tools label { min-width:0; }
+.project-state-badges { display:flex; gap:10px; flex-wrap:wrap; }
+#projectArchiveBadge { background:#38303f; color:#ddd4e5; }
+#projectArchivePanel { border:1px solid #3f3549; border-radius:12px; padding:20px; margin:24px 0; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px 24px; align-items:center; }
+#projectArchivePanel h3 { font:700 16px/1.5 Manrope; margin:0; }
+#projectArchivePanel .project-hint { margin:7px 0 0; max-width:650px; }
+.archive-actions { display:flex; flex-wrap:wrap; gap:10px; }
+.archive-actions button { min-height:44px; }
+#archiveStatus { grid-column:1/-1; color:#ccbce9; font-size:13px; line-height:1.7; margin:0; }
+.home-project-links { display:flex; flex-wrap:wrap; gap:14px; align-items:center; }
+.home-project-links [hidden] { display:none; }
+.archive-picker-toggle { display:flex!important; gap:10px; align-items:center; line-height:1.6; }
+.archive-picker-toggle input[type=checkbox] { width:20px!important; height:20px; margin:0!important; accent-color:#a384ef; }
+@media(max-width:1000px) {
+  .project-workspace .project-tools { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+  .project-tools label:first-child { grid-column:1/-1; }
+  #projectArchivePanel { grid-template-columns:1fr; }
+  .home-project-links { justify-content:flex-start; }
+}
+@media(max-width:750px) {
+  #projectArchivePanel { padding:18px; }
+  .archive-actions { flex-direction:column; align-items:stretch; }
+}

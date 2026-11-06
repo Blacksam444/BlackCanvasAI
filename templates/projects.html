@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#09090b"><title>Projects · Black Canvas AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/projects.css?v=2"><link rel="stylesheet" href="/static/project-sheet-dialog.css?v=1"><link rel="stylesheet" href="/static/project-photo-review.css?v=1"><link rel="stylesheet" href="/static/project-create.css?v=2"><link rel="stylesheet" href="/static/project-archive.css?v=1">
+  <link rel="stylesheet" href="/static/project-covers.css?v=1">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <button class="close-menu" id="closeMenu" aria-label="Close menu">×</button>
+    <div class="brand"><div class="brand-mark">BC</div><div><strong>Black Canvas</strong><span>AI Studio</span></div></div>
+    <nav class="nav-list" aria-label="Main navigation">
+      <a class="nav-item" href="/"><span>⌂</span>Home</a>
+      <a class="nav-item" href="/think-tank"><span>✺</span>Art Think Tank</a>
+      <a class="nav-item active" href="/projects" aria-current="page"><span>☷</span>Projects</a>
+      <a class="nav-item" href="/image-studio"><span>✦</span>Image Studio</a>
+      <a class="nav-item" href="/chat"><span>◌</span>Chat</a>
+      <a class="nav-item" href="/prompts"><span>▤</span>Prompt Library</a>
+      <a class="nav-item" href="/style-bible"><span>◇</span>Style Bible</a>
+    </nav>
+    <div class="sidebar-footer"><a class="nav-item" href="/connections"><span>⚙</span>Connections</a><div class="profile"><div class="avatar">○</div><div><strong>Your studio</strong><span>Creator workspace</span></div></div></div>
+  </aside>
+  <main class="main-content">
+    <header class="topbar"><button class="menu-button" id="menuButton" aria-label="Open menu" aria-expanded="false">☰</button><a href="/think-tank">Find a new idea ↗</a></header>
+    <section class="project-workspace">
+      <div class="hero"><p class="eyebrow">FROM AN IDEA TO A FINISHED PIECE</p><h1>Your projects</h1><p>Make a plan that suits your practice. Pick it up wherever you work.</p></div>
+      <p id="pageStatus" role="status" aria-live="polite">Loading your projects…</p>
+      <section id="overview" aria-label="Project overview">
+        <div class="project-start"><div><h2>Start with your own idea</h2><p class="project-hint">Plan something new or pick up a piece already on your worktable.</p></div><button type="button" class="primary" id="newProject">＋ New project</button></div>
+        <div class="project-tools"><label>Search projects<input id="projectSearch" type="search" placeholder="Title, materials, or notes"></label><label>Project list<select id="projectScope"><option value="current">Current projects</option><option value="archived">Archived</option><option value="all">All saved projects</option></select></label><label>Status<select id="projectFilter"><option value="all">All statuses</option><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="paused">Paused</option><option value="completed">Completed</option></select></label><button type="button" class="secondary" id="refreshProjects">Refresh</button></div>
+        <p id="projectListStatus" class="project-hint" role="status" aria-live="polite"></p>
+        <div id="projectGrid" class="project-grid"></div>
+        <div id="projectEmpty" class="project-empty" hidden><h2>No projects here yet</h2><p>Create your own project above, or start with a studio idea.</p><a class="secondary" id="showArchivedProjects" href="/projects?view=archived" hidden>Open archive →</a><a class="secondary" href="/think-tank">Explore the Think Tank</a><a class="secondary" href="/prompts">Use a saved idea</a></div>
+      </section>
+      <section id="projectDetail" hidden aria-labelledby="projectHeading">
+        <a class="back-link" href="/projects">← All projects</a>
+        <div class="detail-heading"><div><p class="eyebrow">YOUR STUDIO PLAN</p><h2 id="projectHeading" tabindex="-1"></h2><p id="projectProgress"></p></div><div class="project-state-badges"><span class="project-badge" id="projectArchiveBadge" hidden>Archived</span><span class="project-badge" id="projectStatusBadge"></span></div></div>
+        <progress id="projectProgressBar" max="100" value="0" aria-label="Checklist progress"></progress>
+        <section id="projectCoverPanel" aria-labelledby="projectCoverHeading"><div class="project-cover-picture"><img id="projectCoverImage" alt="" hidden><span id="projectCoverPlaceholder">Your project photo</span></div><div class="project-cover-details"><h3 id="projectCoverHeading">Project cover</h3><p id="projectCoverDescription"></p><div class="project-cover-actions"><button type="button" class="secondary" id="chooseProjectCover">Choose cover</button><button type="button" class="secondary" id="refreshProjectCover">Refresh cover</button></div><p id="coverStatus" role="status" aria-live="polite"></p></div></section>
+        <div class="project-sheet-launch"><div class="project-plan-tools"><button type="button" class="secondary" id="openProjectSheet">Print / download plan</button><button type="button" class="secondary" id="reuseProjectPlan">Use plan for new project</button></div><p class="project-hint">Take your plan to the worktable or use it to start another piece.</p></div>
+        <div id="planReuseSaved" tabindex="-1" hidden><p id="planReuseMessage" role="status"></p><a id="planReuseLink" href="/projects">Open new project →</a><p class="project-hint">Your original plan is still open below. Save project when you want to keep its edits.</p></div>
+        <section id="projectArchivePanel" aria-labelledby="archiveHeading"><div><h3 id="archiveHeading">Put this project away</h3><p id="archiveExplanation" class="project-hint"></p></div><div class="archive-actions"><button type="button" class="secondary" id="toggleProjectArchive">Archive project</button><button type="button" class="secondary" id="reviewArchiveState" hidden>Review saved archive state</button></div><p id="archiveStatus" role="status" aria-live="polite"></p></section>
+        <details class="project-source"><summary id="projectSourceSummary">Source idea from Prompt Library</summary><p id="sourceTitle"></p><p id="sourceState"></p><pre id="sourceText"></pre><a href="/prompts" id="sourceLink">Open Prompt Library ↗</a></details>
+        <form id="projectForm">
+          <div class="project-fields"><label>Project title<input id="projectTitle" maxlength="200" required></label><label>Project status<select id="projectStatus"><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="paused">Paused</option><option value="completed">Completed</option></select></label><label>Working surface<input id="projectSurface" maxlength="240" placeholder="Choose the surface you want to use"></label><label>Materials <small>One per line; edit this list to suit your practice.</small><textarea id="projectMaterials" rows="4" maxlength="7500"></textarea></label></div>
+          <div class="checklist-heading"><div><p class="eyebrow">ONE STEP AT A TIME</p><h3>Studio checklist</h3></div><button type="button" class="secondary" id="addStep">＋ Add step</button></div>
+          <p class="project-hint">Edit, add, or remove steps. Check off each one as you work.</p><ol class="project-checklist" id="projectChecklist"></ol>
+          <label class="project-notes">Studio notes<textarea id="projectNotes" rows="6" maxlength="5000" placeholder="Experiments, dimensions, decisions, or what you want to try next"></textarea></label>
+          <p id="saveStatus" role="status" aria-live="polite"></p>
+          <p class="project-hint" id="draftNote">Save progress to make it available on your other connected devices.</p>
+          <div class="project-actions"><button class="primary" type="submit" id="saveProject">Save project</button><button class="secondary" type="button" id="reloadProject">Reload saved version</button><button class="secondary" type="button" id="recoverDraft" hidden>Review older draft</button></div>
+        </form>
+        <section class="project-photos" aria-labelledby="photosHeading">
+          <div class="checklist-heading"><div><p class="eyebrow">SEE YOUR PIECE TAKE SHAPE</p><h3 id="photosHeading">Project photos</h3></div><div class="photo-toolbar"><button type="button" class="secondary" id="refreshProjectPhotos">Refresh photos</button><button type="button" class="primary" id="addProjectPhoto">＋ Add photo</button></div></div>
+          <p class="project-hint">Keep references, experiments, and finished work together. Photos are saved in Image Studio and linked here.</p>
+          <div class="photo-review-launch"><label class="photo-filter">Show<select id="photoFilter"><option value="all">All project photos</option><option value="reference">References</option><option value="progress">Work in progress</option><option value="finished">Finished pieces</option></select></label><div><button type="button" class="secondary" id="compareProjectPhotos" disabled>Compare photos</button><p class="project-hint" id="comparePhotoHint">Link at least two photos to compare them.</p></div></div>
+          <p id="photoStatus" role="status" aria-live="polite"></p>
+          <div class="project-photo-grid" id="projectPhotoGrid"></div>
+          <p class="project-hint" id="photoEmpty">Add your first photo, or choose one you already saved in Image Studio.</p>
+        </section>
+      </section>
+    </section>
+  </main>
+</div>
+<dialog id="projectCoverDialog" aria-labelledby="coverDialogHeading"><form id="projectCoverForm"><div class="photo-dialog-heading"><h2 id="coverDialogHeading">Choose a project cover</h2><button type="button" class="remove-step" id="closeProjectCover" aria-label="Close cover choices">×</button></div><p class="project-hint">Use any linked photo, or let Automatic use the latest available progress or finished photo. The cover appears in Projects and Home.</p><p id="savedCoverChoice" class="project-hint"></p><label>Cover photo<select id="coverPhotoChoice"></select></label><img id="coverChoicePreview" alt="" hidden><p id="coverChoiceCaption" class="project-hint"></p><p id="coverChoiceEmpty" class="project-hint" hidden>No photos are linked yet. Add one in Project photos, then choose it here.</p><p id="coverChoiceStatus" role="status" aria-live="polite"></p><button type="button" class="secondary" id="refreshCoverChoices">Refresh saved cover and photos</button><div class="project-actions"><button type="submit" class="primary" id="saveProjectCover">Save cover</button><button type="button" class="secondary" id="cancelProjectCover">Cancel</button></div></form></dialog>
+<dialog id="newProjectDialog" aria-labelledby="newProjectHeading">
+  <form id="newProjectForm">
+    <div class="photo-dialog-heading"><h2 id="newProjectHeading">Start your project</h2><button type="button" class="remove-step" id="closeNewProject" aria-label="Close new project">×</button></div>
+    <p class="project-hint">Give it a title. Add as much of the plan as you want now; you can build it as you work.</p>
+    <p class="project-hint" id="newProjectReuseNote" hidden></p>
+    <label>Project title<input id="newProjectTitle" maxlength="200" required placeholder="What are you working on?"></label>
+    <label>Status<select id="newProjectStatus"><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="paused">Paused</option><option value="completed">Completed</option></select></label>
+    <details id="newProjectPlan"><summary>Add materials, steps, or notes (optional)</summary>
+      <label>Working surface<input id="newProjectSurface" maxlength="240" placeholder="Choose your surface"></label>
+      <label>Materials <small>One per line, up to 30.</small><textarea id="newProjectMaterials" rows="3" maxlength="7500"></textarea></label>
+      <label id="newProjectStepsField">Studio steps <small>One per line, up to 60. You can edit and check them off in the project.</small><textarea id="newProjectSteps" rows="4" maxlength="120060"></textarea></label>
+      <section id="reusedProjectSteps" hidden aria-labelledby="reusedStepsHeading"><div class="reused-steps-heading"><h3 id="reusedStepsHeading">Studio steps</h3><button type="button" class="secondary" id="addReusedStep">＋ Add step</button></div><p class="project-hint">Review or change each step. All steps start unchecked in the new project.</p><ol id="reusedStepsList"></ol><p class="project-hint" id="reusedStepsEmpty" hidden>No steps in this plan yet. Add the steps you want.</p></section>
+      <label>Studio notes<textarea id="newProjectNotes" rows="4" maxlength="5000" placeholder="Your direction, dimensions, or what you want to try"></textarea></label>
+    </details>
+    <p class="project-hint" id="newProjectDraftNote">An unfinished form stays in this browser when storage is available. Create project to save it for your connected devices.</p>
+    <p id="newProjectMessage" role="status" aria-live="polite"></p>
+    <div id="newProjectConflict" hidden><p class="project-hint" id="newProjectConflictHint">Open saved project discards this form. Create a separate project saves these fields as another project.</p><div class="project-actions"><button type="button" class="secondary" id="openCreatedProject">Open saved project</button><button type="button" class="secondary" id="createSeparateProject">Create a separate project</button></div></div>
+    <div class="project-actions"><button type="submit" class="primary" id="createProject">Create project</button><button type="button" class="secondary" id="cancelNewProject">Keep for later</button><button type="button" class="secondary" id="discardNewProject">Discard form</button></div>
+  </form>
+</dialog>
+<dialog id="projectPhotoDialog" class="project-photo-dialog">
+  <form id="projectPhotoForm">
+    <div class="photo-dialog-heading"><h2>Add a project photo</h2><button type="button" class="remove-step" id="closePhotoDialog" aria-label="Close photo dialog">×</button></div>
+    <label>Add from<select id="photoSource"><option value="upload">Upload a photo</option><option value="existing">Image Studio</option></select></label>
+    <div id="photoUploadFields">
+      <label>Choose image<input id="projectPhotoFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required></label>
+      <p class="project-hint">JPEG, PNG, WebP, or GIF, up to 10 MB.</p>
+      <label>Photo title<input id="projectPhotoTitle" maxlength="200" required placeholder="Give this moment a name"></label>
+      <label>Collection (optional)<input id="projectPhotoCollection" maxlength="200" placeholder="Name a collection, or leave blank"></label>
+      <label>Photo notes (optional)<textarea id="projectPhotoNotes" rows="3" maxlength="5000" placeholder="What changed, what worked, or what to try next"></textarea></label>
+    </div>
+    <div id="photoExistingFields" hidden><label>Search Image Studio<input id="photoSearch" type="search" placeholder="Title, collection, or notes"></label><label>Choose a saved image<select id="existingPhoto"></select></label><p class="project-hint" id="existingPhotoNote"></p></div>
+    <img id="projectPhotoPreview" alt="Selected photo preview" hidden>
+    <label>Use as<select id="projectPhotoStage"><option value="progress">Work in progress</option><option value="reference">Reference</option><option value="finished">Finished piece</option></select></label>
+    <p class="project-hint">Adding a photo saves it immediately. Save project separately to keep any plan edits.</p>
+    <p id="photoDialogStatus" role="status" aria-live="polite"></p>
+    <div class="project-actions"><button type="submit" class="primary" id="saveProjectPhoto">Add to project</button><button type="button" class="secondary" id="cancelPhotoDialog">Cancel</button></div>
+  </form>
+</dialog>
+<dialog id="photoReviewDialog" aria-labelledby="photoReviewHeading">
+  <div class="photo-dialog-heading"><div><p class="eyebrow">LOOK AT YOUR WORK</p><h2 id="photoReviewHeading">Project photo review</h2></div><button type="button" class="remove-step" id="closePhotoReview" aria-label="Close photo review">×</button></div>
+  <p class="project-hint">Choose the photos you want to study. Images are shown in full, with their original proportions.</p>
+  <div class="photo-review-tools"><label>View<select id="photoReviewMode"><option value="single">One photo</option><option value="compare">Compare two photos</option></select></label><button type="button" class="secondary" id="swapReviewPhotos">Swap sides</button><button type="button" class="secondary" id="refreshReviewPhotos">Refresh photos</button></div>
+  <p id="photoReviewStatus" role="status" aria-live="polite"></p>
+  <div id="photoReviewPanes" class="photo-review-panes">
+    <section class="photo-review-pane" id="reviewLeft"><label>Photo<select id="reviewLeftPhoto"></select></label><div class="review-image"><img alt=""><p class="review-image-error" hidden>Image unavailable. Refresh photos to try again.</p></div><div class="review-caption"><span class="project-badge"></span><h3></h3><p class="review-notes"></p><div class="review-links"><button type="button" class="secondary review-alone">View alone</button><a class="review-studio" href="/image-studio">Open in Image Studio ↗</a></div></div></section>
+    <section class="photo-review-pane" id="reviewRight"><label>Photo<select id="reviewRightPhoto"></select></label><div class="review-image"><img alt=""><p class="review-image-error" hidden>Image unavailable. Refresh photos to try again.</p></div><div class="review-caption"><span class="project-badge"></span><h3></h3><p class="review-notes"></p><div class="review-links"><button type="button" class="secondary review-alone">View alone</button><a class="review-studio" href="/image-studio">Open in Image Studio ↗</a></div></div></section>
+  </div>
+  <p class="project-hint" id="reviewEmpty" hidden>No photos are linked now. Close this review to add a photo.</p>
+</dialog>
+<dialog id="photoLabelDialog" class="project-photo-dialog" aria-labelledby="photoLabelHeading">
+  <form id="photoLabelForm">
+    <div class="photo-dialog-heading"><h2 id="photoLabelHeading">Change photo label</h2><button type="button" class="remove-step" id="closePhotoLabel" aria-label="Close photo label">×</button></div>
+    <p id="photoLabelTitle"></p><p class="project-hint" id="photoSavedLabel"></p>
+    <label>Use in this project as<select id="photoLabelStage"><option value="reference">Reference</option><option value="progress">Work in progress</option><option value="finished">Finished piece</option></select></label>
+    <p class="project-hint">This changes only the label in this project. Your plan and other projects keep their current settings.</p>
+    <p id="photoLabelStatus" role="status" aria-live="polite"></p>
+    <div class="project-actions"><button type="submit" class="primary" id="savePhotoLabel">Save label</button><button type="button" class="secondary" id="reviewSavedPhotoLabel" hidden>Review saved label</button><button type="button" class="secondary" id="cancelPhotoLabel">Cancel</button></div>
+  </form>
+</dialog>
+<dialog id="projectSheetDialog" aria-labelledby="sheetDialogHeading">
+  <div class="sheet-dialog-heading"><div><p class="eyebrow">TAKE YOUR PLAN WITH YOU</p><h2 id="sheetDialogHeading">Project sheet</h2></div><button class="remove-step" id="closeProjectSheet" type="button" aria-label="Close project sheet">×</button></div>
+  <p class="project-hint" id="sheetDraftNotice">Making a copy does not save project changes.</p>
+  <form id="sheetOptions">
+    <div class="sheet-toggles"><label><input type="checkbox" id="sheetNotes" checked> Include notes (plan and photos)</label><label><input type="checkbox" id="sheetSource"> Include full source idea</label></div>
+    <details id="sheetPhotoOptions"><summary>Choose photos for this copy <span id="sheetPhotoCount"></span></summary><p class="project-hint">Choose up to 12 photos, up to 20 MB total. Images stay with the downloaded HTML copy.</p><div id="sheetPhotoChoices"></div><p class="project-hint" id="sheetNoPhotos">No photos linked yet. You can add them to the project later.</p></details>
+    <button type="submit" class="secondary" id="buildProjectSheet">Make preview</button>
+  </form>
+  <p id="sheetStatus" role="status" aria-live="polite"></p>
+  <div class="sheet-actions"><button class="primary" type="button" id="printProjectSheet" disabled>Print / Save PDF</button><button class="secondary" type="button" id="downloadProjectSheet" disabled>Download HTML</button><button class="secondary" type="button" id="downloadProjectText" disabled>Download text</button></div>
+  <p class="project-hint">HTML keeps the layout and selected images for offline use. Text keeps the plan and photo captions. PDF is available through your browser’s print options.</p>
+  <iframe id="projectSheetPreview" title="Project sheet preview" sandbox="allow-same-origin allow-modals" hidden></iframe>
+</dialog>
+<script src="/static/project-covers.js?v=1"></script><script src="/static/projects.js?v=covers-1"></script><script src="/static/project-create.js?v=2"></script>
+</body>
+</html>

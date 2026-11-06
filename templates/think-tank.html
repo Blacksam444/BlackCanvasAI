@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#09090b"><title>Art Think Tank · Black Canvas AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/think-tank.css?v=4"><link rel="stylesheet" href="/static/creative-kits.css?v=1">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar" id="sidebar">
+    <button class="tank-close-menu" id="closeMenu" type="button" aria-label="Close menu">×</button>
+    <div class="brand"><div class="brand-mark">BC</div><div><strong>Black Canvas</strong><span>AI Studio</span></div></div>
+    <nav class="nav-list" aria-label="Main navigation">
+      <a class="nav-item" href="/"><span>⌂</span>Home</a>
+      <a class="nav-item active" href="/think-tank" aria-current="page"><span>✺</span>Art Think Tank</a><a class="nav-item" href="/projects"><span>☷</span>Projects</a>
+      <a class="nav-item" href="/image-studio"><span>✦</span>Image Studio</a>
+      <a class="nav-item" href="/chat"><span>◌</span>Chat</a>
+      <a class="nav-item" href="/prompts"><span>▤</span>Prompt Library</a>
+      <a class="nav-item" href="/style-bible"><span>◇</span>Style Bible</a>
+    </nav>
+    <div class="sidebar-footer"><a class="nav-item" href="/connections"><span>⚙</span>Connections</a><div class="profile"><div class="avatar">○</div><div><strong>Your studio</strong><span>Creator workspace</span></div></div></div>
+  </aside>
+  <main class="main-content">
+    <header class="topbar"><button class="menu-button" id="menuButton" aria-label="Open menu" aria-expanded="false">☰</button><a class="tank-library" href="/prompts">Open Prompt Library ↗</a></header>
+    <section class="tank-workspace">
+      <nav class="tank-breadcrumb" aria-label="Breadcrumb"><a href="/">Home</a><span>/</span>Art Think Tank<span>/</span>Physical Art</nav>
+      <div class="hero"><p class="eyebrow">FROM A SPARK TO THE STUDIO</p><h1>Art Think Tank</h1><p>Start with what’s on your worktable. Find your next physical artwork.</p></div>
+      <ol class="tank-progress" aria-label="Creative process"><li>01 · Physical Art</li><li>02 · Materials</li><li>03 · Direction</li><li>04 · Three ideas</li></ol>
+      <details class="creative-kits" id="creativeKits">
+        <summary>Your saved creative kits</summary>
+        <p class="tank-hint">Keep materials and visual preferences you enjoy. Kits are saved in this studio for your connected devices. Apply one when you want to use it.</p>
+        <div class="kit-picker"><label for="kitSelect">Saved kit<select id="kitSelect" disabled><option value="">Loading saved kits…</option></select></label><button type="button" class="tank-secondary" id="refreshKits" disabled>Refresh kits</button></div>
+        <dl id="kitPreview" hidden></dl>
+        <div class="kit-actions"><button type="button" class="tank-primary" id="applyKit" disabled>Apply to form</button><button type="button" class="tank-secondary" id="undoKit" hidden>Undo last apply</button><button type="button" class="tank-secondary" id="removeKit" disabled>Remove selected kit</button></div>
+        <p class="tank-hint">Applying a kit fills materials, surface, preset, style, colors, mood, and exclusions. Your subject stays in place. Existing ideas keep their own refinements.</p>
+        <form id="kitSaveForm"><label for="kitName">Save the preferences currently in your form<input id="kitName" required maxlength="80" placeholder="Name your creative kit" disabled></label><div class="kit-actions"><button type="submit" class="tank-secondary" id="saveNewKit" disabled>Save as new kit</button><button type="button" class="tank-secondary" id="updateKit" disabled>Update selected kit from form</button></div><p class="tank-hint">Use a new name for a new kit, or update the selected kit. Your subject and generated idea cards are saved separately.</p></form>
+        <p id="kitStatus" role="status" aria-live="polite">Loading saved kits…</p>
+      </details>
+      <form id="tankForm" class="tank-form">
+        <fieldset><legend><span>01</span> Your materials</legend><p class="tank-hint">Choose what you want to work with, or add your own.</p><div class="material-options" id="materialOptions"></div><label class="tank-label" for="otherMaterials">Other materials (optional)</label><input id="otherMaterials" name="other_materials" maxlength="240" placeholder="Describe any other materials you use"><label class="tank-label" for="surface">Working surface</label><select id="surface" name="surface" required></select></fieldset>
+        <fieldset><legend><span>02</span> Your direction</legend><label class="tank-label" for="direction">What do you want to explore?</label><textarea id="direction" name="direction" rows="4" minlength="3" maxlength="600" required placeholder="Describe any subject, scene, or abstract idea you enjoy"></textarea><label class="tank-label" for="collection">Optional collection preset</label><select id="collection" name="collection"><option>My own direction</option><option>AfroNova</option><option>Quiet Nova</option><option>GraffitiX</option></select><p class="tank-hint">Start with your own preferences. Collection presets from the <a href="/style-bible">Style Bible</a> are optional.</p><label class="tank-label" for="styleDirection">Your style / influences (optional)</label><input id="styleDirection" name="style_direction" maxlength="600" placeholder="Describe the visual approach you like"><label class="tank-label" for="palette">Colors you like (optional)</label><input id="palette" name="palette" maxlength="2600" placeholder="Any colors or combinations you prefer"><label class="tank-label" for="mood">Mood / feeling (optional)</label><input id="mood" name="mood" maxlength="2600" placeholder="How would you like the artwork to feel?"><label class="tank-label" for="avoid">Things to avoid (optional)</label><textarea id="avoid" name="avoid" rows="2" maxlength="1200" placeholder="Subjects, colors, or visual qualities you don’t want"></textarea></fieldset>
+        <div class="tank-form-footer"><p>Built with the studio’s local prompt engine.</p><button class="tank-primary" id="generateIdeas" type="submit" disabled>Create 3 ideas <span aria-hidden="true">↗</span></button></div>
+      </form>
+      <p id="tankStatus" role="status" aria-live="polite">Loading materials…</p>
+      <p class="tank-hint" id="workspaceNote">Your workspace is remembered on this device. Save an idea to add it to your Prompt Library.</p>
+      <section id="results" class="tank-results" hidden aria-labelledby="resultsTitle" aria-busy="false">
+        <div class="tank-results-heading"><div><p class="eyebrow">TAKE ONE TO THE WORKTABLE</p><h2 id="resultsTitle" tabindex="-1">Three starting points</h2><p id="resultSummary"></p></div><button class="tank-secondary" id="remixIdeas" type="button">↻ Remix these ideas</button></div>
+        <p class="tank-hint" id="remixHint">Develop an idea to refine its direction, mood, palette, and notes. Remix one or all three while keeping each idea’s refinements.</p>
+        <div class="idea-grid" id="ideaGrid"></div>
+      </section>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script type="module" src="/static/think-tank.js?v=kits-1"></script>
+</body>
+</html>
