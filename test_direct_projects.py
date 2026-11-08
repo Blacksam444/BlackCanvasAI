@@ -110,7 +110,7 @@ class DirectProjectTests(TestCase):
     def test_direct_project_backup_restores_without_creating_or_linking_prompts(self):
         original = create_direct_project(self.payload(status="paused", notes="Keep these notes"))["project"]
         manifest = storage.backup_data()
-        self.assertEqual(manifest["version"], 11)
+        self.assertEqual(manifest["version"], 12)
         self.assertEqual(manifest["prompts"], [])
         backups = validate_project_backups(json.loads(json.dumps(manifest)))
         with patch("storage.DB_PATH", self.directory / "restored.db"):

@@ -137,7 +137,7 @@ class ProjectCoverTests(TestCase):
         photo = self.photo(project["id"], "reference")
         self.choose(project["id"], photo["id"])
         manifest = storage.backup_data()
-        self.assertEqual(manifest["version"], 11)
+        self.assertEqual(manifest["version"], 12)
         self.assertNotIn("artwork_id", manifest["project_covers"][0])
         covers = validate_cover_backups(json.loads(json.dumps(manifest)))
         with patch("storage.DB_PATH", self.directory / "restored.db"):

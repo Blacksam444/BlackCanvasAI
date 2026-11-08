@@ -209,6 +209,24 @@ choice. Failed requests keep your selection for retry. Label changes use a
 required `expected_stage` checked in a write transaction. Unsaved plan fields stay in place during photo review
 and label changes.
 
+**Project journal** in an open project keeps dated entries about sessions,
+experiments, and next steps. Choose **Add entry**, set your session date, and
+write what matters to your practice. Entries appear with the newest session
+date first. Edit or remove an entry from the journal; removal asks for confirmation.
+Journal saves work on archived projects and leave plan fields, progress, photos,
+source ideas, and cover choices in place. Reusing a plan starts an empty journal.
+
+An unfinished entry can be kept for later in the same browser, with **Resume
+unfinished entry** after reopening the project. Save entry makes it available to
+other connected devices. If browser storage is unavailable, keep the page open
+until saving or copy your text. Journal refresh preserves plan edits and the last
+loaded entries on failure. Stable creation IDs and exact request retries prevent
+duplicate entries after a lost response. Independent entry revisions protect
+edits and removals: review the saved entry before choosing your edits or the saved
+version. Text from an entry removed elsewhere can be saved explicitly as a new
+entry. Removed entries retain an ID/revision retry marker with empty text, so a
+delayed request cannot recreate them.
+
 **Print / download plan** opens a project sheet made from the fields currently
 shown on your device, including unsaved edits. Choose whether to include notes,
 the full source idea, and up to 12 linked photos (20 MB combined). Preview the copy,
@@ -218,7 +236,10 @@ a sheet does not save or replace project changes. If another device saved a newe
 plan, the sheet identifies that it uses your device's older fields. Refresh photos
 before reopening the sheet to include photos added from another device.
 
-Backup format 11 includes project covers by filename and revision, project archive
+Backup format 12 adds journal entries and removal retry markers. Journal restore
+only adds entries for newly restored projects, preserving later edits and removals
+in existing projects. Older manifests without a journal remain supported.
+It also includes project covers by filename and revision, project archive
 flags/revisions, creative kits, projects, and photo links. Cover restore remaps
 artwork IDs by filename and only adds choices for newly restored projects, keeping
 later cover choices or resets in existing work. Older backups without covers use
@@ -236,7 +257,7 @@ files; Google Drive folder backups include the actual images.
 
 ```powershell
 python -m unittest discover -v
-python -m py_compile app.py storage.py think_tank.py projects.py project_sheets.py creative_kits.py project_covers.py
+python -m py_compile app.py storage.py think_tank.py projects.py project_sheets.py creative_kits.py project_covers.py project_journal.py
 node --test test_think_tank_state.mjs
 ```
 

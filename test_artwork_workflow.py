@@ -92,7 +92,7 @@ class ArtworkWorkflowTests(unittest.TestCase):
         saved = update_artwork(artwork["id"], ArtworkDetailsPayload(title="Legacy caller", collection="My collection"))
         self.assertEqual(saved["title"], "Legacy caller")
         manifest = storage.backup_data()
-        self.assertEqual(manifest["version"], 11)
+        self.assertEqual(manifest["version"], 12)
         self.assertNotIn("details_version", manifest["artworks"][0])
         delete_artwork(artwork["id"])
         self.assertEqual(list_artworks(), [])

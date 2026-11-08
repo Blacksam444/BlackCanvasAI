@@ -20,6 +20,7 @@ from projects import (
 import storage
 from project_sheets import ProjectSheetPayload, create_project_sheet
 from project_covers import CoverPayload, update_cover
+from project_journal import JournalCreate, JournalRevision, create_journal_entry, delete_journal_entry, list_journal
 from creative_kits import KitPayload, KitUpdatePayload, create_kit, list_kits, update_kit
 
 
@@ -168,7 +169,7 @@ class ProjectTests(unittest.TestCase):
         project = update_project(project["id"], self.payload(project, status="paused", notes="Try a wider surface.",
             checklist=[{**step, "done": True} for step in project["checklist"]]))
         manifest = storage.backup_data()
-        self.assertEqual(manifest["version"], 11)
+        self.assertEqual(manifest["version"], 12)
         self.assertIsInstance(manifest["projects"][0]["checklist"], list)
         backups = validate_project_backups(json.loads(json.dumps(manifest)))
         with patch("storage.DB_PATH", self.directory / "restored.db"):
@@ -340,7 +341,7 @@ class ProjectTests(unittest.TestCase):
             update_project_artwork_stage(project["id"], photo["id"], ProjectArtworkStagePayload(
                 expected_stage="reference", stage=stage))
         manifest = storage.backup_data()
-        self.assertEqual(manifest["version"], 11)
+        self.assertEqual(manifest["version"], 12)
         links = validate_project_artwork_backups(manifest)
         self.assertEqual(links[0].stage, "finished")
         with storage.connect() as db:
@@ -464,6 +465,8 @@ class ProjectTests(unittest.TestCase):
         project = self.project()
         chosen_photo = self.photo(project["id"], "finished")
         update_cover(project["id"], CoverPayload(artwork_id=chosen_photo["id"], cover_revision=1))
+        journal = create_journal_entry(project["id"], JournalCreate(id="journal_" + "a" * 32,
+            entry_date="2026-11-08", body="A session to restore"))["entry"]
         kit = create_kit(KitPayload(name="My restored kit", preferences={"palette": "Blue gray"}))["kit"]
         manifest = storage.backup_data()
         filename = manifest["artworks"][0]["filename"]
@@ -494,6 +497,9 @@ class ProjectTests(unittest.TestCase):
             self.assertEqual((restored["projects"], restored["project_photos"], restored["images"]), (1, 1, 1))
             self.assertEqual(restored["creative_kits"], 1)
             self.assertEqual(restored["project_covers"], 1)
+            self.assertEqual(restored["journal_entries"], 1)
+            self.assertEqual(list_journal(project["id"]), [journal])
+            delete_journal_entry(project["id"], journal["id"], JournalRevision(revision=journal["revision"]))
             self.assertEqual(list_kits()[0]["id"], kit["id"])
             update_kit(kit["id"], KitUpdatePayload(name=kit["name"], revision=kit["revision"], preferences={"palette": "My newer palette"}))
             photo = get_project(project["id"])["artworks"][0]
@@ -506,6 +512,8 @@ class ProjectTests(unittest.TestCase):
             self.assertEqual((repeated["projects"], repeated["project_photos"]), (0, 0))
             self.assertEqual(repeated["creative_kits"], 0)
             self.assertEqual(repeated["project_covers"], 0)
+            self.assertEqual(repeated["journal_entries"], 0)
+            self.assertEqual(list_journal(project["id"]), [])
             self.assertIsNone(get_project(project["id"])["cover_artwork_id"])
             self.assertEqual(list_kits()[0]["preferences"]["palette"], "My newer palette")
             self.assertEqual(get_project(project["id"])["artworks"], [])

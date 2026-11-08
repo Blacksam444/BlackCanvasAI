@@ -130,6 +130,7 @@ async function loadProject(id, recover = true, savedProject = null) {
   photos = project.artworks;
   renderProjectCover();
   renderPhotos();
+  projectJournalUI.load(project.id);
   $("#saveStatus").textContent = `Saved ${new Date(project.updated_at).toLocaleString()}.`;
   if (recover) {
     let draft;

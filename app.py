@@ -28,6 +28,7 @@ from projects import (
 )
 from project_sheets import router as project_sheet_router
 from project_covers import router as project_cover_router, clear_artwork_cover, cover_state, restore_covers, validate_cover_backups
+from project_journal import router as project_journal_router, restore_journal, validate_journal_backups
 from creative_kits import CreativePreferences, router as creative_kit_router, restore_kits, validate_kit_backups
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -194,6 +195,7 @@ app = FastAPI(title="Black Canvas AI")
 app.include_router(project_router)
 app.include_router(project_sheet_router)
 app.include_router(project_cover_router)
+app.include_router(project_journal_router)
 app.include_router(creative_kit_router)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
@@ -1435,7 +1437,7 @@ def backup_to_google_drive() -> dict:
         fields="id,name,webViewLink",
     ).execute()
     manifest = backup_data()
-    manifest.update({"backup_format": 9, "created_at": created_at.isoformat(), "artwork_file_count": 0})
+    manifest.update({"backup_format": manifest["version"], "created_at": created_at.isoformat(), "artwork_file_count": 0})
     uploaded_images = 0
     mime_types = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif"}
     for artwork in manifest.get("artworks", []):
@@ -1535,6 +1537,7 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
     project_backups = validate_project_backups(manifest)
     project_photo_backups = validate_project_artwork_backups(manifest)
     project_cover_backups = validate_cover_backups(manifest)
+    journal_backups = validate_journal_backups(manifest)
     kit_backups = validate_kit_backups(manifest)
 
     snapshot_root = UPLOAD_DIR.parent / "restore-snapshots"
@@ -1595,6 +1598,7 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
         new_project_ids = {row["id"] for row in db.execute("SELECT id FROM projects")} - previous_project_ids
         restored_photo_links = restore_project_artworks(db, project_photo_backups, new_project_ids)
         restored_cover_count = restore_covers(db, project_cover_backups, new_project_ids)
+        restored_journal_count = restore_journal(db, journal_backups, new_project_ids)
         restored_kit_count = restore_kits(db, kit_backups)
     restored_rules = restore_midjourney_rules_from_manifest(manifest)
     return {
@@ -1605,6 +1609,7 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
         "projects": restored_project_count,
         "project_photos": restored_photo_links,
         "project_covers": restored_cover_count,
+        "journal_entries": restored_journal_count,
         "creative_kits": restored_kit_count,
         "midjourney_rules": int(restored_rules),
         "safety_snapshot": snapshot_dir.name,

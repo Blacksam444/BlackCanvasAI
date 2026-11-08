@@ -1,0 +1,27 @@
+.project-journal { margin: 28px 0; padding: 22px; border: 1px solid var(--border, #303036); border-radius: 16px; background: var(--card, #151519); }
+.project-journal summary { cursor: pointer; font: 700 1.15rem Manrope, sans-serif; padding: 6px 0; }
+#journalCount { color: var(--muted, #a5a5b0); font: 400 .9rem "DM Sans", sans-serif; }
+#journalEntries { padding: 0; list-style: none; display: grid; gap: 16px; }
+.journal-entry { padding: 18px; border: 1px solid var(--border, #303036); border-radius: 12px; min-width: 0; }
+.journal-entry header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.journal-entry time { font-weight: 700; }
+.journal-entry p, #journalSavedBody { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; }
+.journal-entry small { color: var(--muted, #a5a5b0); }
+#journalDialog { width: min(680px, calc(100% - 24px)); max-height: 90dvh; box-sizing: border-box; padding: 24px; border: 1px solid #34343d; border-radius: 18px; color: #eeeef3; background: #17171d; }
+#journalDialog::backdrop { background: #000b; }
+#journalDialog [hidden] { display: none; }
+#journalForm { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+#journalForm label { display: grid; gap: 8px; font-weight: 600; }
+#journalForm input, #journalForm textarea { min-width: 0; width: 100%; box-sizing: border-box; font: inherit; border: 1px solid #45394d; border-radius: 9px; background: #0b0a0e; color: #eeeef3; padding: 12px; color-scheme: dark; }
+#journalForm :focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; }
+#journalStatus, #journalDialogStatus { color: #ccbce9; font-size: 13px; line-height: 1.6; }
+#journalForm textarea { resize: vertical; line-height: 1.6; }
+#journalForm button { min-height: 44px; white-space: normal; }
+#journalConflict { border: 1px solid #62617b; border-radius: 12px; padding: 16px; }
+#journalConflict h3 { margin-top: 0; }
+@media (max-width: 750px) {
+  .project-journal, #journalDialog { padding: 16px; }
+  .journal-entry { padding: 14px; }
+  #journalForm .project-actions { flex-direction: column; flex-wrap: nowrap; align-items: stretch; }
+  #journalForm .project-actions > button { flex: none; }
+}

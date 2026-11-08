@@ -93,7 +93,7 @@ class CreativeKitTests(unittest.TestCase):
     def test_backup_round_trip_restores_kits_and_keeps_existing_edits_or_names(self):
         kit = self.kit()["kit"]
         manifest = storage.backup_data()
-        self.assertEqual(manifest["version"], 11)
+        self.assertEqual(manifest["version"], 12)
         self.assertIsInstance(manifest["creative_kits"][0]["preferences"], dict)
         backups = validate_kit_backups(json.loads(json.dumps(manifest)))
         with patch("storage.DB_PATH", self.directory / "kits-restored.db"):
