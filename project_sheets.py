@@ -1,7 +1,8 @@
-"""Portable, read-only snapshots of a studio plan and selected project photos."""
+"""Portable, read-only snapshots of a plan, selected photos, and saved journal entries."""
 
 import base64
 import re
+from contextlib import closing
 from datetime import datetime, timezone
 from html import escape
 from typing import Annotated
@@ -10,7 +11,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator
 
 import storage
-from projects import ProjectUpdatePayload, get_project
+from projects import ProjectUpdatePayload, read_project
 
 router = APIRouter()
 MAX_PHOTO_BYTES = 20 * 1024 * 1024
@@ -19,11 +20,24 @@ STAGE_LABELS = {"reference": "Reference", "progress": "Work in progress", "finis
 IMAGE_TYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif"}
 
 
+class JournalSheetSelection(BaseModel):
+    id: str = Field(pattern=r"^journal_[a-f0-9]{32}$")
+    revision: int = Field(ge=1, strict=True)
+
+
 class ProjectSheetPayload(BaseModel):
     plan: ProjectUpdatePayload
     include_notes: bool = True
     include_source: bool = False
     photo_ids: list[Annotated[int, Field(ge=1)]] = Field(default_factory=list, max_length=12)
+    journal_entries: list[JournalSheetSelection] = Field(default_factory=list, max_length=30)
+
+    @field_validator("journal_entries")
+    @classmethod
+    def unique_entries(cls, values):
+        if len({value.id for value in values}) != len(values):
+            raise ValueError("Choose each journal entry once")
+        return values
 
     @field_validator("photo_ids")
     @classmethod
@@ -58,7 +72,17 @@ def embed_photos(photos: list[dict]) -> list[dict]:
 
 @router.post("/api/projects/{project_id}/sheet")
 def create_project_sheet(project_id: str, payload: ProjectSheetPayload) -> dict:
-    project = get_project(project_id)
+    with closing(storage.connect()) as db:
+        db.execute("BEGIN")
+        project = read_project(db, project_id)
+        selected = {entry.id: entry.revision for entry in payload.journal_entries}
+        journal = [dict(row) for row in db.execute(
+            "SELECT id, entry_date, body, revision FROM project_journal WHERE project_id = ? AND deleted = 0 "
+            f"AND id IN ({','.join('?' for _ in selected)}) ORDER BY entry_date DESC, created_at DESC, id DESC",
+            (project_id, *selected),
+        )] if selected else []
+        if len(journal) != len(selected) or any(entry["revision"] != selected[entry["id"]] for entry in journal):
+            raise HTTPException(status_code=409, detail="A selected journal entry changed or was removed. Refresh saved entries, review and select it again, then make another preview.")
     plan = payload.plan.model_dump()
     if plan["revision"] > project["revision"]:
         raise HTTPException(status_code=409, detail="The saved project has changed. Reload it before making another sheet; your edits are still here.")
@@ -92,6 +116,10 @@ def create_project_sheet(project_id: str, payload: ProjectSheetPayload) -> dict:
             if source["trashed"]:
                 lines.append("Original idea is in Trash.")
             lines.append(source["text"])
+    if journal:
+        lines.extend(["", "PROJECT JOURNAL", "Selected saved entries · newest session date first."])
+        for entry in journal:
+            lines.extend(["", entry["entry_date"], entry["body"]])
     if photos:
         lines.extend(["", "PROJECT PHOTOS", "Images are embedded in the HTML copy; this text copy keeps their titles and notes."])
         for photo in photos:
@@ -114,6 +142,13 @@ def create_project_sheet(project_id: str, payload: ProjectSheetPayload) -> dict:
                        + f'<p class="preserve">{escape(source["text"])}</p>') if source else f"<p>{missing_source}</p>"
         source_html = f'<section class="source-idea"><h2>Source idea</h2>{source_body}</section>'
     photo_html = ""
+    journal_html = ""
+    if journal:
+        journal_html = '<section class="journal"><h2>Project journal</h2><p class="muted">Selected saved entries · newest session date first.</p>'
+        for entry in journal:
+            journal_html += (f'<article><h3><time datetime="{escape(entry["entry_date"])}">{escape(entry["entry_date"])}</time></h3>'
+                             f'<p class="preserve">{escape(entry["body"])}</p></article>')
+        journal_html += '</section>'
     for photo in photos:
         picture = f'<img src="{photo["image"]}" alt="{escape(photo["title"])}">' if photo["image"] else '<p class="missing-photo">Image unavailable in this copy.</p>'
         photo_notes = f'<p class="preserve">{escape(photo["notes"])}</p>' if payload.include_notes and photo["notes"] else ""
@@ -135,8 +170,8 @@ def create_project_sheet(project_id: str, payload: ProjectSheetPayload) -> dict:
         + f'<h2>Working surface</h2><p>{escape(plan["surface"] or "No surface added.")}</p></section>'
         + '<section><h2>Studio checklist</h2>'
         + (f'<ol class="checklist">{checklist}</ol>' if checklist else '<p>No studio steps added.</p>')
-        + f'</section>{notes}{source_html}{photo_html}<footer>Project sheet · {snapshot}. Making this copy does not save project changes.</footer></main></body></html>'
+        + f'</section>{notes}{source_html}{journal_html}{photo_html}<footer>Project sheet · {snapshot}. Making this copy does not save project changes.</footer></main></body></html>'
     )
     slug = re.sub(r"[^a-zA-Z0-9_-]+", "-", plan["title"]).strip("-")[:80] or "studio-project"
     return {"html": html, "text": "\n".join(lines) + "\n", "filename": f"black-canvas-{slug.lower()}",
-            "snapshot": snapshot, "warning": warning}
+            "snapshot": snapshot, "warning": warning, "journal_count": len(journal)}

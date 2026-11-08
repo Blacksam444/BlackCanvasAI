@@ -712,17 +712,22 @@ $("#openProjectSheet").onclick = () => {
   $("#sheetDraftNotice").textContent = dirty ? "This copy uses your current edits on this device. Making a copy does not save those changes." : "This copy uses the plan shown on this device. Making a copy does not change the saved project.";
   clearSheet();
   $("#projectSheetDialog").showModal();
+  projectSheetJournal.open(current.id);
   buildSheet();
 };
 
 async function buildSheet() {
   const photoIds = [...document.querySelectorAll("#sheetPhotoChoices input:checked")].map((input) => Number(input.value));
   clearSheet();
+  const journalEntries = projectSheetJournal.selection();
+  if (journalEntries === null) { $("#sheetStatus").textContent = "Wait for the saved journal entries to finish refreshing, then make the preview."; return; }
+  if (journalEntries.length > 30) { $("#sheetStatus").textContent = "Choose up to 30 journal entries for one project sheet."; return; }
   if (photoIds.length > 12) { $("#sheetStatus").textContent = "Choose up to 12 photos for one project sheet."; return; }
   const requestId = ++sheetRequest;
   sheetController = new AbortController();
-  const payload = { plan: readForm(), include_notes: $("#sheetNotes").checked, include_source: $("#sheetSource").checked, photo_ids: photoIds };
+  const payload = { plan: readForm(), include_notes: $("#sheetNotes").checked, include_source: $("#sheetSource").checked, photo_ids: photoIds, journal_entries: journalEntries };
   $("#sheetOptions").querySelectorAll("input,button").forEach((control) => { control.disabled = true; });
+  projectSheetJournal.setBusy(true);
   $("#sheetStatus").textContent = "Preparing your project sheet…";
   try {
     const response = await fetch(`/api/projects/${encodeURIComponent(current.id)}/sheet`, {
@@ -735,13 +740,14 @@ async function buildSheet() {
     sheetCopy = result;
     $("#projectSheetPreview").srcdoc = result.html;
     $("#projectSheetPreview").hidden = false;
-    $("#sheetStatus").textContent = `${result.snapshot}. ${result.warning || "Your copy is ready. Making it does not save plan changes."}`;
+    $("#sheetStatus").textContent = `${result.snapshot}. ${result.warning || "Your copy is ready. Making it does not save plan changes."}${result.journal_count ? ` ${result.journal_count} saved journal ${result.journal_count === 1 ? "entry" : "entries"} included.` : ""}`;
   } catch (error) {
     if (requestId === sheetRequest && error.name !== "AbortError") $("#sheetStatus").textContent = error instanceof TypeError ? "Could not reach the studio. Your plan is still here; try making the preview again." : error.message;
   } finally {
     if (requestId === sheetRequest) {
       sheetController = null;
       $("#sheetOptions").querySelectorAll("input,button").forEach((control) => { control.disabled = false; });
+      projectSheetJournal.setBusy(false);
     }
   }
 }
@@ -756,6 +762,7 @@ $("#projectSheetDialog").addEventListener("close", () => {
   ++sheetRequest;
   sheetController?.abort();
   sheetController = null;
+  projectSheetJournal.close();
   clearSheet();
 });
 $("#printProjectSheet").onclick = () => {

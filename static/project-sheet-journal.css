@@ -1,0 +1,13 @@
+#sheetJournalOptions { padding: 14px 16px; border: 1px solid #42354d; border-radius: 9px; margin-bottom: 18px; }
+#sheetJournalOptions summary { cursor: pointer; font-size: 13px; color: #d5c5ef; }
+#sheetJournalCount { white-space: normal; }
+#sheetJournalStatus { color: #ccbce9; font-size: 12px; line-height: 1.65; }
+#sheetJournalChoices { display: grid; gap: 12px; margin-top: 14px; }
+#sheetJournalChoices article { min-width: 0; padding: 14px; border: 1px solid #39303f; border-radius: 9px; overflow-wrap: anywhere; }
+#sheetJournalChoices label { display: flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 700; cursor: pointer; min-height: 44px; }
+#sheetJournalChoices input { accent-color: var(--purple); width: 20px; height: 20px; flex-shrink: 0; }
+#sheetJournalChoices p { color: #bfb7cc; font-size: 12px; line-height: 1.7; white-space: pre-wrap; }
+#sheetJournalChoices .sheet-entry-changed { color: #e4c8ff; }
+#sheetJournalChoices details { margin-top: 12px; }
+#sheetJournalChoices details summary { padding: 10px 0; }
+@media (max-width: 750px) { #sheetJournalOptions { padding: 12px; } #refreshSheetJournal { width: 100%; min-height: 44px; } }

@@ -236,18 +236,23 @@ def project_overview(db) -> dict:
     return {"counts": counts, "recent": recent}
 
 
+def read_project(db, project_id: str) -> dict:
+    """Read related records using the caller's database snapshot."""
+    row = db.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Project not found")
+    result = project_record(row)
+    source = db.execute("SELECT id, title, category, text, trashed FROM prompts WHERE id = ?", (row["source_prompt_id"],)).fetchone()
+    result["source_prompt"] = dict(source) if source else None
+    result["artworks"] = project_artworks(db, project_id)
+    result.update(cover_state(db, project_id))
+    return result
+
+
 def get_project(project_id: str) -> dict:
     with closing(storage.connect()) as db:
         db.execute("BEGIN")
-        row = db.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="Project not found")
-        result = project_record(row)
-        source = db.execute("SELECT id, title, category, text, trashed FROM prompts WHERE id = ?", (row["source_prompt_id"],)).fetchone()
-        result["source_prompt"] = dict(source) if source else None
-        result["artworks"] = project_artworks(db, project_id)
-        result.update(cover_state(db, project_id))
-    return result
+        return read_project(db, project_id)
 
 
 @router.get("/projects")

@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/projects.css?v=2"><link rel="stylesheet" href="/static/project-sheet-dialog.css?v=1"><link rel="stylesheet" href="/static/project-photo-review.css?v=1"><link rel="stylesheet" href="/static/project-create.css?v=2"><link rel="stylesheet" href="/static/project-archive.css?v=1">
   <link rel="stylesheet" href="/static/project-covers.css?v=1">
   <link rel="stylesheet" href="/static/project-journal.css?v=1">
+  <link rel="stylesheet" href="/static/project-sheet-journal.css?v=1">
 </head>
 <body>
 <div class="app-shell">
@@ -155,13 +156,14 @@
   <form id="sheetOptions">
     <div class="sheet-toggles"><label><input type="checkbox" id="sheetNotes" checked> Include notes (plan and photos)</label><label><input type="checkbox" id="sheetSource"> Include full source idea</label></div>
     <details id="sheetPhotoOptions"><summary>Choose photos for this copy <span id="sheetPhotoCount"></span></summary><p class="project-hint">Choose up to 12 photos, up to 20 MB total. Images stay with the downloaded HTML copy.</p><div id="sheetPhotoChoices"></div><p class="project-hint" id="sheetNoPhotos">No photos linked yet. You can add them to the project later.</p></details>
+    <details id="sheetJournalOptions"><summary>Choose journal entries for this copy <span id="sheetJournalCount"></span></summary><p class="project-hint">Choose up to 30 saved entries. None are included until you select them. Unfinished journal text stays in its browser draft; save it in the journal before choosing it here.</p><button type="button" class="secondary" id="refreshSheetJournal">Refresh saved entries</button><p id="sheetJournalStatus" role="status" aria-live="polite"></p><p class="project-hint" id="sheetNoJournal" hidden>No saved journal entries yet. Add one in Project journal when you are ready.</p><div id="sheetJournalChoices"></div></details>
     <button type="submit" class="secondary" id="buildProjectSheet">Make preview</button>
   </form>
   <p id="sheetStatus" role="status" aria-live="polite"></p>
   <div class="sheet-actions"><button class="primary" type="button" id="printProjectSheet" disabled>Print / Save PDF</button><button class="secondary" type="button" id="downloadProjectSheet" disabled>Download HTML</button><button class="secondary" type="button" id="downloadProjectText" disabled>Download text</button></div>
-  <p class="project-hint">HTML keeps the layout and selected images for offline use. Text keeps the plan and photo captions. PDF is available through your browser’s print options.</p>
+  <p class="project-hint">HTML keeps the layout, selected images, and selected journal entries for offline use. Text keeps the plan, photo captions, and selected entries. PDF is available through your browser’s print options.</p>
   <iframe id="projectSheetPreview" title="Project sheet preview" sandbox="allow-same-origin allow-modals" hidden></iframe>
 </dialog>
-<script src="/static/project-covers.js?v=1"></script><script src="/static/project-journal.js?v=1"></script><script src="/static/projects.js?v=journal-1"></script><script src="/static/project-create.js?v=2"></script>
+<script src="/static/project-covers.js?v=1"></script><script src="/static/project-journal.js?v=1"></script><script src="/static/project-sheet-journal.js?v=1"></script><script src="/static/projects.js?v=journal-sheets-1"></script><script src="/static/project-create.js?v=2"></script>
 </body>
 </html>

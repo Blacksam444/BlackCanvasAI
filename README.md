@@ -236,6 +236,23 @@ a sheet does not save or replace project changes. If another device saved a newe
 plan, the sheet identifies that it uses your device's older fields. Refresh photos
 before reopening the sheet to include photos added from another device.
 
+Under **Choose journal entries for this copy**, select up to 30 saved entries to
+include in HTML, text, or your browser's printed/PDF copy. Each entry shows its
+session date and saved text for review; longer entries can be expanded. Journal
+entries start unselected whenever you open the sheet. Their inclusion is separate
+from the plan/photo notes checkbox. Unfinished journal drafts stay in the browser
+and must be saved in Project journal before they can be selected here.
+
+Selected entries appear with the newest session date first, retain line breaks,
+and work offline in the downloaded copy. **Refresh saved entries** keeps unchanged
+selections and unchecks entries changed or removed elsewhere. Review and select
+changed entries again before making the preview. A conflicting entry revision
+also stops preparation rather than silently substituting different text. A failed
+journal load leaves plan/photo exports available, and failed refresh keeps prior
+choices for retry. Plan, source, photo metadata, and selected journal entries are
+read in one database snapshot; preparing or downloading a copy does not write
+studio records or consume unfinished plan/journal drafts.
+
 Backup format 12 adds journal entries and removal retry markers. Journal restore
 only adds entries for newly restored projects, preserving later edits and removals
 in existing projects. Older manifests without a journal remain supported.
