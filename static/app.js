@@ -111,7 +111,8 @@ function renderTesting(data) {
   $("#versionTestingPanel").hidden = !testing.total && !rules.outdated_prompts;
   const verifiedDate = rules.verified_at
     ? new Date(`${rules.verified_at}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "not recorded";
-  $("#midjourneyRulesStatus").textContent = `MidJourney v${rules.version} · ${rules.verification_label} ${verifiedDate} · ${rules.review_message}`;
+  const verification = rules.verified_at ? `Verified on ${verifiedDate}` : "Verification date not recorded";
+  $("#midjourneyRulesStatus").textContent = `MidJourney v${rules.version} · ${verification} · ${rules.review_message}`;
   $("#midjourneyRulesStatus").dataset.status = rules.verification_status;
   $("#midjourneyRulesStatus").title = rules.next_review ? `Next rules review: ${rules.next_review}` : "Open the Style Bible to verify these rules";
   $("#versionTestProgress").textContent = testing.total ? `${testing.completion_percent}% tested` : "No copies yet";
