@@ -7,7 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/projects.css?v=2"><link rel="stylesheet" href="/static/project-sheet-dialog.css?v=1"><link rel="stylesheet" href="/static/project-photo-review.css?v=1"><link rel="stylesheet" href="/static/project-create.css?v=2"><link rel="stylesheet" href="/static/project-archive.css?v=1">
   <link rel="stylesheet" href="/static/project-covers.css?v=1">
-  <link rel="stylesheet" href="/static/project-journal.css?v=1">
+  <link rel="stylesheet" href="/static/project-journal.css?v=2">
   <link rel="stylesheet" href="/static/project-sheet-journal.css?v=1">
 </head>
 <body>
@@ -60,8 +60,17 @@
           <summary>Project journal <span id="journalCount"></span></summary>
           <p class="project-hint">Keep a dated record of experiments, discoveries, and what you want to try next. Entries save separately from your plan.</p>
           <div class="project-actions"><button type="button" class="primary" id="addJournalEntry">＋ Add entry</button><button type="button" class="secondary" id="resumeJournalDraft" hidden>Resume unfinished entry</button><button type="button" class="secondary" id="refreshJournal">Refresh journal</button></div>
+          <details id="journalFilterOptions"><summary id="journalFilterSummary">Find entries</summary><div class="journal-filters" role="group" aria-label="Find saved journal entries">
+            <label class="journal-search">Search entries<input id="journalSearch" type="search" maxlength="200" placeholder="Words from a saved session"></label>
+            <label>From date<input id="journalFrom" type="date" min="0001-01-01" max="9999-12-31"></label>
+            <label>Through date<input id="journalThrough" type="date" min="0001-01-01" max="9999-12-31"></label>
+            <label>Order<select id="journalOrder"><option value="newest">Newest session first</option><option value="oldest">Oldest session first</option></select></label>
+            <button type="button" class="secondary" id="clearJournalFilters">Clear filters</button>
+          </div></details>
+          <p id="journalFilterStatus" role="status" aria-live="polite"></p>
           <p id="journalStatus" role="status" aria-live="polite"></p>
           <p class="project-hint" id="journalEmpty" hidden>No entries yet. Record a studio session when you are ready.</p>
+          <p class="project-hint" id="journalNoMatches" hidden>No saved entries match these filters. Change your search or dates, or choose Clear filters.</p>
           <ol id="journalEntries" aria-label="Journal entries, newest date first"></ol>
         </details>
         <section class="project-photos" aria-labelledby="photosHeading">
@@ -164,6 +173,6 @@
   <p class="project-hint">HTML keeps the layout, selected images, and selected journal entries for offline use. Text keeps the plan, photo captions, and selected entries. PDF is available through your browser’s print options.</p>
   <iframe id="projectSheetPreview" title="Project sheet preview" sandbox="allow-same-origin allow-modals" hidden></iframe>
 </dialog>
-<script src="/static/project-covers.js?v=1"></script><script src="/static/project-journal.js?v=1"></script><script src="/static/project-sheet-journal.js?v=1"></script><script src="/static/projects.js?v=journal-sheets-1"></script><script src="/static/project-create.js?v=2"></script>
+<script src="/static/project-covers.js?v=1"></script><script src="/static/project-journal.js?v=2"></script><script src="/static/project-sheet-journal.js?v=1"></script><script src="/static/projects.js?v=journal-sheets-1"></script><script src="/static/project-create.js?v=2"></script>
 </body>
 </html>

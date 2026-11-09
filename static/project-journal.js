@@ -103,8 +103,31 @@ const projectJournalUI = (() => {
     el("removeJournalEntry").disabled = saving || conflict;
     el("journalHeading").textContent = editor?.revision ? "Edit journal entry" : "New journal entry";
   }
+  function filterError() {
+    if (!el("journalFrom").validity.valid) return "Choose a valid start date.";
+    if (!el("journalThrough").validity.valid) return "Choose a valid end date.";
+    if (el("journalFrom").value && el("journalThrough").value && el("journalFrom").value > el("journalThrough").value) {
+      return "The start date must be on or before the end date.";
+    }
+    return "";
+  }
+  function matches(entry) {
+    const query = el("journalSearch").value.trim().toLowerCase();
+    return !filterError() && (!query || entry.body.toLowerCase().includes(query))
+      && (!el("journalFrom").value || entry.entry_date >= el("journalFrom").value)
+      && (!el("journalThrough").value || entry.entry_date <= el("journalThrough").value);
+  }
+  function resetFilters() {
+    el("journalSearch").value = ""; el("journalFrom").value = "";
+    el("journalThrough").value = ""; el("journalOrder").value = "newest";
+  }
   function render() {
-    el("journalEntries").replaceChildren(...entries.map((entry) => {
+    const shown = entries.filter(matches);
+    const filtering = el("journalSearch").value.trim() || el("journalFrom").value || el("journalThrough").value || el("journalOrder").value !== "newest";
+    el("journalFilterSummary").textContent = filtering ? "Find entries · filters active" : "Find entries";
+    if (el("journalOrder").value === "oldest") shown.reverse();
+    el("journalEntries").setAttribute("aria-label", `Journal entries, ${el("journalOrder").value} session first`);
+    el("journalEntries").replaceChildren(...shown.map((entry) => {
       const item = document.createElement("li");
       item.className = "journal-entry";
       const header = document.createElement("header");
@@ -120,7 +143,10 @@ const projectJournalUI = (() => {
       item.append(header, body, updated); return item;
     }));
     el("journalCount").textContent = loaded ? `(${entries.length})` : "";
+    el("journalFilterStatus").textContent = filterError() || (loaded ? `${shown.length} of ${entries.length} saved entries shown.`
+      : entries.length ? `${shown.length} entries shown from the entries loaded here. Refresh journal to load the complete list.` : "");
     el("journalEmpty").hidden = !loaded || entries.length > 0;
+    el("journalNoMatches").hidden = !!filterError() || entries.length === 0 || shown.length > 0;
     el("resumeJournalDraft").hidden = !readDraft();
     controls();
   }
@@ -236,6 +262,9 @@ const projectJournalUI = (() => {
   };
   el("resumeJournalDraft").onclick = resume;
   el("refreshJournal").onclick = refresh;
+  ["journalSearch", "journalFrom", "journalThrough"].forEach((id) => el(id).addEventListener("input", render));
+  el("journalOrder").onchange = render;
+  el("clearJournalFilters").onclick = () => { resetFilters(); render(); el("journalSearch").focus(); };
   [dateInput, bodyInput].forEach((input) => input.addEventListener("input", remember));
   el("reviewJournalEntry").onclick = review;
   el("keepJournalEdits").onclick = () => {
@@ -277,8 +306,9 @@ const projectJournalUI = (() => {
         : await api(entryUrl(), "PUT", { ...payload, revision: editor.revision });
       const entry = result.entry || result;
       accept(entry); clearDraft();
-      el("journalStatus").textContent = loaded ? "Journal entry saved. Your plan edits are kept."
-        : "Entry saved. Refresh journal to load the rest of your saved entries.";
+      el("journalStatus").textContent = (loaded ? "Journal entry saved. Your plan edits are kept."
+        : "Entry saved. Refresh journal to load the rest of your saved entries.")
+        + (matches(entry) ? "" : " Clear the journal filters to see this entry.");
       saving = false; dialog.close();
     } catch (error) { handleConflict(error); }
     finally { saving = false; controls(); }
@@ -302,6 +332,8 @@ const projectJournalUI = (() => {
       if (projectId !== id) {
         projectId = id; entries = []; loaded = false; editor = null; changed = false;
         draftStored = false; draftStamp = null; el("projectJournal").open = false;
+        resetFilters();
+        el("journalFilterOptions").open = false;
       }
       render(); refresh();
     },

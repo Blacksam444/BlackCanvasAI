@@ -17,6 +17,14 @@
 #journalStatus, #journalDialogStatus { color: #ccbce9; font-size: 13px; line-height: 1.6; }
 #journalForm textarea { resize: vertical; line-height: 1.6; }
 #journalForm button { min-height: 44px; white-space: normal; }
+.journal-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: 14px; margin-top: 22px; }
+.journal-filters .journal-search { grid-column: 1 / -1; }
+.journal-filters > * { min-width: 0; }
+.journal-filters input, .journal-filters select, .journal-filters button { min-height: 44px; }
+.journal-filters input[type="date"] { color-scheme: dark; }
+#journalFilterOptions { margin-top: 18px; }
+#journalFilterOptions > summary { font: 600 .9rem "DM Sans", sans-serif; color: #d5c5ef; padding: 12px 0; }
+#journalFilterStatus { color: #bfb7cc; font-size: 12px; line-height: 1.7; }
 #journalConflict { border: 1px solid #62617b; border-radius: 12px; padding: 16px; }
 #journalConflict h3 { margin-top: 0; }
 @media (max-width: 750px) {
@@ -25,3 +33,4 @@
   #journalForm .project-actions { flex-direction: column; flex-wrap: nowrap; align-items: stretch; }
   #journalForm .project-actions > button { flex: none; }
 }
+@media (max-width: 450px) { .journal-filters { grid-template-columns: minmax(0, 1fr); } }

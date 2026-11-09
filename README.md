@@ -227,6 +227,16 @@ version. Text from an entry removed elsewhere can be saved explicitly as a new
 entry. Removed entries retain an ID/revision retry marker with empty text, so a
 delayed request cannot recreate them.
 
+Expand **Find entries** in Project journal to search saved session text, choose an
+inclusive **From date / Through date** range, or read sessions oldest first.
+Matching and total counts distinguish an empty journal from filters with no
+matches. **Clear filters** restores the full list in newest-first order. The
+controls start collapsed so sessions stay easy to reach on a phone; the summary
+identifies active filters. Filters stay in place during refresh and entry edits,
+and each open device can use its own view. If a saved entry moves outside your
+current filters, a message explains how to show it again. Searching and filtering
+keep unfinished plan and journal drafts in place.
+
 **Print / download plan** opens a project sheet made from the fields currently
 shown on your device, including unsaved edits. Choose whether to include notes,
 the full source idea, and up to 12 linked photos (20 MB combined). Preview the copy,
