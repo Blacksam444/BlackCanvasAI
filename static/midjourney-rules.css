@@ -98,6 +98,16 @@
 }
 
 @media (max-width: 700px) {
+  .bible-topbar > .topbar-actions {
+    display: flex;
+    align-items: center;
+  }
+
+  .topbar-actions button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
   .topbar-actions #editMidjourney {
     font-size: 0;
   }

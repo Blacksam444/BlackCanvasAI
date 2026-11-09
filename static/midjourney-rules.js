@@ -8,14 +8,26 @@ async function loadMidjourneyReviewStatus() {
   const button = $("#editMidjourney");
   button.dataset.status = midjourneyReviewStatus.status;
   button.textContent = `⚙ MJ v${midjourneyReviewStatus.version} · ${midjourneyReviewStatus.label}`;
+  if (midjourneyDialog.open) renderMidjourneyMetadata();
 }
 
 function renderMidjourneyMetadata() {
-  const verified = midjourneyRules.verified_at || "Not recorded";
+  const verified = midjourneyRules.verified_at;
   const source = midjourneyRules.verification_source;
-  $("#verificationStatus").innerHTML = source
-    ? `${midjourneyReviewStatus?.label || "Verified"} ${verified} · ${midjourneyReviewStatus?.review_message || "Review schedule unavailable"} · <a href="${source}" target="_blank" rel="noopener">Open source ↗</a>`
-    : `Verified ${verified} · ${midjourneyReviewStatus?.review_message || "Review schedule unavailable"}`;
+  const metadata = $("#verificationStatus");
+  const schedule = midjourneyReviewStatus?.next_review ? ` · Next review: ${midjourneyReviewStatus.next_review}` : "";
+  metadata.textContent = `${verified ? `Verified on ${verified}` : "Verification date not recorded"}${schedule} · ${midjourneyReviewStatus?.review_message || "Review schedule unavailable"}`;
+  if (source) {
+    try {
+      const url = new URL(source);
+      if (url.protocol === "https:") {
+        const link = document.createElement("a");
+        link.href = url.href; link.target = "_blank"; link.rel = "noopener noreferrer";
+        link.textContent = "Open source ↗";
+        metadata.append(" · ", link);
+      }
+    } catch { /* A missing or malformed source must not break the rules editor. */ }
+  }
   const previous = midjourneyRules.previous_rules;
   $("#previousRules").hidden = !previous;
   if (previous) {

@@ -1,13 +1,38 @@
 {
-  "ruleset": "midjourney-v8.2-2026-08",
+  "ruleset": "midjourney-v8.2-custom",
   "version": "8.2",
   "default_aspect_ratio": "4:5",
-  "supported_aspect_ratios": ["1:1", "4:5", "3:2", "16:9", "9:16"],
+  "supported_aspect_ratios": [
+    "1:1",
+    "4:5",
+    "3:2",
+    "16:9",
+    "9:16"
+  ],
   "raw_parameter": "--raw",
-  "verified_at": "2026-08-16",
-  "verification_source": "https://docs.midjourney.com/",
-  "update_note": "Confirmed v8.2 raw-mode syntax uses --raw instead of --style raw.",
+  "verified_at": "2026-11-09",
+  "verification_source": "https://docs.midjourney.com/hc/en-us/articles/32199405667853-Version",
+  "update_note": "Reviewed official Version, Raw, and Aspect Ratio documentation on November 9, 2026. V8.2 and --raw remain current. Existing studio ratio choices and 4:5 default retained. Raw: https://docs.midjourney.com/hc/en-us/articles/32634113811853-Raw ; Aspect ratios: https://docs.midjourney.com/hc/en-us/articles/31894244298125-Aspect-Ratio",
   "deprecated_parameters": {
     "--style raw": "--raw"
+  },
+  "previous_rules": {
+    "ruleset": "midjourney-v8.2-2026-08",
+    "version": "8.2",
+    "default_aspect_ratio": "4:5",
+    "supported_aspect_ratios": [
+      "1:1",
+      "4:5",
+      "3:2",
+      "16:9",
+      "9:16"
+    ],
+    "raw_parameter": "--raw",
+    "verified_at": "2026-08-16",
+    "verification_source": "https://docs.midjourney.com/",
+    "update_note": "Confirmed v8.2 raw-mode syntax uses --raw instead of --style raw.",
+    "deprecated_parameters": {
+      "--style raw": "--raw"
+    }
   }
 }
