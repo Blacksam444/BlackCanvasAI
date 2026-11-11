@@ -151,25 +151,37 @@ document.querySelector("#shuffleBuilder").onclick = () => {
   saveDirection();
   notify("New GraffitiX direction ready.");
 };
-const updateGraffitiXOptions = () => {
-  document.querySelector("#graffitixOptions").hidden = document.querySelector("#builderCollection").value !== "GraffitiX";
+const almostHuman = "Almost Human — The Forgotten Ones";
+const updateBuilderOptions = () => {
+  const collection = document.querySelector("#builderCollection").value;
+  const useAlmostHuman = collection === almostHuman;
+  const mood = document.querySelector("#builderMood");
+  const collectionMood = mood.querySelector('option[value=""]');
+  document.querySelector("#graffitixOptions").hidden = collection !== "GraffitiX";
+  document.querySelector("#builderImageStyle").hidden = useAlmostHuman;
+  collectionMood.hidden = !useAlmostHuman;
+  if (useAlmostHuman) mood.value = "";
+  else if (!mood.value) mood.selectedIndex = 0;
 };
-document.querySelector("#builderCollection").onchange = updateGraffitiXOptions;
-updateGraffitiXOptions();
+document.querySelector("#builderCollection").onchange = updateBuilderOptions;
+updateBuilderOptions();
 document.querySelector("#promptBuilder").onsubmit = (event) => {
   event.preventDefault();
   const subject = document.querySelector("#builderSubject").value.trim();
   const collection = document.querySelector("#builderCollection").value;
   const mood = document.querySelector("#builderMood").value;
   const colors = document.querySelector("#builderColors").value;
-  const imageStyle = document.querySelector("#builderStyle").value;
+  const imageStyle = collection === almostHuman
+    ? "textured mixed-media painting"
+    : document.querySelector("#builderStyle").value;
   const aspectRatio = document.querySelector("#builderAspectRatio").value;
   if (!subject) return document.querySelector("#builderSubject").focus();
   const colorDirection = colors === "Collection colors" ? "the collection color palette" : colors;
   const graffitiDirection = collection === "GraffitiX"
     ? ` Pose: ${document.querySelector("#builderPose").value}; Camera: ${document.querySelector("#builderCamera").value}; Wardrobe: ${document.querySelector("#builderWardrobe").value}; Hero symbol: ${document.querySelector("#builderHero").value}; Supporting symbols: ${document.querySelector("#builderSupporting").value}; Physical media: ${document.querySelector("#builderMedia").value}; Background marks: ${document.querySelector("#builderBackground").value}; Lighting: ${document.querySelector("#builderLighting").value}.`
     : "";
-  send(`Create an image prompt for ${subject} in the ${collection} style, with a ${mood} mood, using ${colorDirection}, as a ${imageStyle}. Aspect ratio: ${aspectRatio}.${graffitiDirection}`);
+  const moodDirection = mood ? ` with a ${mood} mood,` : "";
+  send(`Create an image prompt for ${subject} in the ${collection} style,${moodDirection} using ${colorDirection}, as a ${imageStyle}. Aspect ratio: ${aspectRatio}.${graffitiDirection}`);
 };
 JSON.parse(localStorage.getItem(KEY) || "[]").forEach((message) => addMessage(message.role, message.text, false, message.promptData));
 const openingQuestion = new URLSearchParams(window.location.search).get("q");

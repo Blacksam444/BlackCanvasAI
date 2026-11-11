@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from app import (
+    ChatMessage,
     ChatGPTImportPayload,
     PromptIdsPayload,
     PromptBulkPayload,
@@ -20,6 +21,7 @@ from app import (
     count_outdated_midjourney_prompts,
     bulk_repair_prompt_syntax,
     bulk_copy_prompts_to_active_midjourney_version,
+    chat_reply,
     create_image_prompt,
     create_prompt,
     copy_prompt_to_active_midjourney_version,
@@ -374,6 +376,34 @@ class PromptRuleTests(unittest.TestCase):
         self.assertEqual(collection, "AfroNova")
         self.assertTrue(prompt.endswith("--ar 4:5 --raw --v 8.2"))
         self.assertIn("no text, no watermark, no signature, no logo, no frame", prompt)
+
+    def test_almost_human_builder_uses_the_selected_collection_and_materials(self):
+        collection, prompt = create_image_prompt(
+            "Create an image prompt for a faceless guardian crossing a neon city "
+            "in the Almost Human — The Forgotten Ones style, with a somber mood, "
+            "using warm earth tones, as a textured mixed-media painting. Aspect ratio: 16:9."
+        )
+        self.assertEqual(collection, "Almost Human — The Forgotten Ones")
+        self.assertIn("faceless guardian crossing a neon city", prompt)
+        self.assertIn("scraped paint", prompt)
+        self.assertIn("chalky plaster", prompt)
+        self.assertIn("ghostlike underpainting", prompt)
+        self.assertIn("warm earth tones", prompt)
+        self.assertIn("somber", prompt)
+        self.assertIn("no text, no watermark, no signature, no logo, no frame", prompt)
+        self.assertTrue(prompt.endswith("--ar 16:9 --raw --v 8.2"))
+
+    def test_almost_human_chat_uses_the_collection_when_named_by_itself(self):
+        response = chat_reply(ChatMessage(message="Almost Human — The Forgotten Ones"))
+        self.assertEqual(response["prompt_category"], "Almost Human — The Forgotten Ones")
+        self.assertIn("weary traveler", response["generated_prompt"])
+        self.assertIn("quietly resilient", response["generated_prompt"])
+
+    def test_almost_human_as_subject_description_keeps_the_selected_style(self):
+        collection, _ = create_image_prompt(
+            "Create an image prompt for an almost human traveler in the AfroNova style"
+        )
+        self.assertEqual(collection, "AfroNova")
 
     def test_graffitix_builder_directions_are_used(self):
         collection, prompt = create_image_prompt(

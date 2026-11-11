@@ -22,6 +22,13 @@ MIDJOURNEY_RULES = json.loads(MIDJOURNEY_RULES_PATH.read_text(encoding="utf-8"))
 DEFAULT_ASPECT_RATIO = MIDJOURNEY_RULES["default_aspect_ratio"]
 SUPPORTED_ASPECT_RATIOS = set(MIDJOURNEY_RULES["supported_aspect_ratios"])
 DEFAULT_NEGATIVE_INSTRUCTIONS = "no text, no watermark, no signature, no logo, no frame"
+ALMOST_HUMAN = "Almost Human — The Forgotten Ones"
+ALMOST_HUMAN_TITLE = r"Almost Human\s*[-–—:]\s*The Forgotten Ones"
+ALMOST_HUMAN_STYLE = rf"(?:{ALMOST_HUMAN_TITLE}|Almost Human)"
+IMAGE_STYLE_DIRECTION = re.compile(
+    rf"\s+in\s+the\s+(AfroNova|Quiet Nova|GraffitiX|{ALMOST_HUMAN_STYLE})\s+style\b",
+    re.IGNORECASE,
+)
 GRAFFITIX_NEGATIVE_INSTRUCTIONS = (
     "no digital smoothness, no glossy CGI finish, no polished 3D render, "
     "no clean vector edges, no random decorative symbols, no cluttered focal hierarchy, "
@@ -285,11 +292,21 @@ def clean_image_idea(message: str) -> str:
         idea = "a contemplative Black figure in the Quiet Nova style"
     elif simple_style in ("graffitix", "graffitixstyle"):
         idea = "an expressive Black urban creator in the GraffitiX style"
+    elif re.fullmatch(rf"(?:in\s+the\s+)?{ALMOST_HUMAN_STYLE}(?:\s+style)?", idea, re.IGNORECASE):
+        idea = f"a weary traveler carrying the belongings of a vanished village in the {ALMOST_HUMAN} style"
     return idea or message.strip()
 
 
 def prompt_collection(idea: str) -> tuple[str, str, str, str]:
     lowered = idea.lower()
+    explicit_style = IMAGE_STYLE_DIRECTION.search(idea)
+    if (
+        explicit_style and explicit_style.group(1).lower().startswith("almost human")
+        or not explicit_style and re.search(ALMOST_HUMAN_TITLE, idea, re.IGNORECASE)
+    ):
+        return (ALMOST_HUMAN, "charcoal, weathered umber, ash gray, and muted ochre",
+                "dark narrative fine art with scraped paint and thin mineral washes over chalky plaster",
+                "mysterious, mournful, and quietly resilient")
     if "afro nova" in lowered or "afronova" in lowered:
         return ("AfroNova", "deep violet, midnight blue, luminous gold, and rich earth tones",
                 "Afrofuturist elegance, celestial symbolism, intricate textile detail, and regal visual language",
@@ -319,7 +336,7 @@ def create_image_prompt(message: str) -> tuple[str, str]:
     idea = clean_image_idea(message)
     collection, palette, style, mood = prompt_collection(idea)
     lowered = idea.lower()
-    subject = re.split(r"\s+in\s+the\s+(?:AfroNova|Quiet Nova|GraffitiX)\s+style", idea, maxsplit=1, flags=re.IGNORECASE)[0]
+    subject = IMAGE_STYLE_DIRECTION.split(idea, maxsplit=1)[0]
     requested_mood = re.search(r"with\s+(?:an?\s+)?(.+?)\s+mood", idea, flags=re.IGNORECASE)
     requested_colors = re.search(r"using\s+(.+?),\s+as\s+", idea, flags=re.IGNORECASE)
     if requested_mood:
@@ -335,6 +352,16 @@ def create_image_prompt(message: str) -> tuple[str, str]:
     requested_background = re.search(r"(?:^|[.;])\s*background marks\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     requested_lighting = re.search(r"(?:^|[.;])\s*lighting\s*:\s*([^.;]+)", idea, flags=re.IGNORECASE)
     midjourney_suffix = midjourney_v82_suffix(idea)
+    if collection == ALMOST_HUMAN:
+        prompt = (
+            f"/imagine prompt: {subject}. Render as {style}. "
+            "Let ghostlike underpainting disappear beneath the surface and re-emerge along scraped edges. "
+            "Use a strong silhouette, a strange landscape, and dim atmospheric light. "
+            "Let a gesture, a burden, or a weathered object hint at grief, memory, survival, or transformation. "
+            f"Use {palette}. Keep the mood {mood} and leave the figure’s nature unresolved. "
+            f"no gore, no glossy CGI finish, {DEFAULT_NEGATIVE_INSTRUCTIONS}"
+        )
+        return collection, f"{strip_midjourney_parameters(prompt)} {midjourney_suffix}"
     if "photorealistic" in lowered or "photograph" in lowered:
         medium = "cinematic photorealistic portrait photography"
     elif "acrylic" in lowered:
@@ -453,7 +480,7 @@ def connections() -> FileResponse:
 def chat_reply(payload: ChatMessage) -> dict[str, str]:
     topic = payload.message.strip()
     creative_triggers = ("prompt", "image", "portrait", "painting", "photo", "artwork", "style",
-                         "afronova", "afro nova", "quiet nova", "graffitix", "graffiti x")
+                         "afronova", "afro nova", "quiet nova", "graffitix", "graffiti x", "almost human")
     if any(word in topic.lower() for word in creative_triggers):
         collection, prompt = create_image_prompt(topic)
         idea = clean_image_idea(topic)
