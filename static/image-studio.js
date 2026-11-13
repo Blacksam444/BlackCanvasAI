@@ -103,6 +103,7 @@ function prepare(file) {
 }
 function showDetail(artwork) {
   selectedArtwork = { projects: [], ...artwork };
+  $("#promoteArtwork").href = `/marketing?artwork=${encodeURIComponent(artwork.id)}`;
   $("#detailImage").src = artwork.url; $("#detailImage").alt = artwork.title;
   $("#detailCollection").textContent = artwork.collection; $("#detailTitle").textContent = artwork.title;
   $("#detailNotes").textContent = artwork.notes || "No notes added yet."; $("#detailStatus").textContent = "";

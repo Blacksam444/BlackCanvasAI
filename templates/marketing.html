@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marketing · Black Canvas AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/marketing.css">
+    <script src="/static/marketing.js?v=3" defer></script>
+    <script src="/static/marketing-buffer.js?v=2" defer></script>
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar" id="sidebar">
+            <div class="brand">
+                <div class="brand-mark">BC</div>
+                <div><strong>Black Canvas</strong><span>AI Studio</span></div>
+            </div>
+            <nav class="nav-list" aria-label="Main navigation">
+                <a class="nav-item" href="/"><span aria-hidden="true">⌂</span>Home</a>
+                <a class="nav-item" href="/image-studio"><span aria-hidden="true">✦</span>Image Studio</a>
+                <a class="nav-item" href="/think-tank"><span aria-hidden="true">✺</span>Art Think Tank</a>
+                <a class="nav-item" href="/projects"><span aria-hidden="true">☷</span>Projects</a>
+                <a class="nav-item active" href="/marketing" aria-current="page"><span aria-hidden="true">▦</span>Marketing</a>
+                <a class="nav-item" href="/chat"><span aria-hidden="true">◌</span>Chat</a>
+                <a class="nav-item" href="/prompts"><span aria-hidden="true">▤</span>Prompt Library</a>
+                <a class="nav-item" href="/style-bible"><span aria-hidden="true">◇</span>Style Bible</a>
+            </nav>
+        </aside>
+        <main class="main-content">
+            <div class="marketing">
+                <header>
+                    <a class="studio-link" href="/image-studio">← Image Studio</a>
+                    <h1>Marketing</h1>
+                    <p>Plan a week of posts around one piece of artwork.</p>
+                </header>
+                <div class="marketing-layout">
+                    <div class="marketing-controls">
+                        <form id="planForm" class="panel">
+                            <h2>Plan a week</h2>
+                            <label>Artwork
+                                <select id="artwork" required disabled><option value="">Choose artwork</option></select>
+                            </label>
+                            <p id="noArtwork" hidden><a href="/image-studio">Add artwork in Image Studio</a> to start.</p>
+                            <label>First post date<input id="startDate" type="date" min="1900-01-01" max="9999-12-26" required></label>
+                            <label>Listing link <small>optional</small>
+                                <input id="listing" type="url" maxlength="2083" placeholder="https://…">
+                            </label>
+                            <label>Public story <small>optional</small>
+                                <textarea id="story" maxlength="400" rows="3" placeholder="What inspired this piece?"></textarea>
+                            </label>
+                            <button class="primary" id="createPlan" type="submit" disabled>Create drafts</button>
+                        </form>
+                        <section class="panel">
+                            <h2>Saved weeks</h2>
+                            <div id="savedWeeks" class="saved-weeks"></div>
+                        </section>
+                    </div>
+                    <div>
+                        <p id="marketingStatus" role="status" class="marketing-status"></p>
+                        <section id="planEmpty" class="panel plan-empty">
+                            <h2>Your weekly queue</h2>
+                            <p>Choose a piece to create drafts for Instagram, Pinterest, YouTube Shorts, Facebook, and TikTok.</p>
+                        </section>
+                        <form id="planEditor" hidden>
+                            <section class="panel plan-header">
+                                <img id="featuredArtwork" alt="" hidden>
+                                <div>
+                                    <span id="planState" class="tag"></span>
+                                    <h2 id="planTitle" tabindex="-1"></h2>
+                                    <p>Approve the copy before scheduling it through Buffer.</p>
+                                </div>
+                            </section>
+                            <div class="panel plan-details">
+                                <label>First post date<input id="editDate" type="date" min="1900-01-01" max="9999-12-26" required></label>
+                                <label>Listing link <small>optional</small>
+                                    <input id="editListing" type="url" maxlength="2083" placeholder="https://…">
+                                </label>
+                            </div>
+                            <div id="posts" class="posts"></div>
+                            <div class="plan-actions">
+                                <button type="submit" value="draft">Save as draft</button>
+                                <button type="submit" value="approved" class="primary">Approve week</button>
+                            </div>
+                        </form>
+                        <details id="bufferPanel" class="panel buffer-panel" hidden>
+                            <summary>Schedule with Buffer</summary>
+                            <p id="bufferStatus" role="status"></p>
+                            <p id="bufferSetup" hidden><a href="https://publish.buffer.com/settings/api" target="_blank" rel="noopener noreferrer">Open Buffer API settings</a></p>
+                            <form id="bufferForm" hidden>
+                                <label>Buffer workspace<select id="bufferOrganization" required></select></label>
+                                <p>Choose the posts to schedule. Times use this device’s time zone.</p>
+                                <div id="bufferPosts"></div>
+                                <button type="submit" class="primary">Schedule selected posts</button>
+                            </form>
+                        </details>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+</html>

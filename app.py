@@ -20,6 +20,7 @@ from typing import Literal
 
 from think_tank import COMPOSITIONS, MATERIALS, SURFACES, USER_DIRECTION, build_ideas
 
+from marketing import router as marketing_router
 from storage import UPLOAD_DIR, backup_data, connect, execute, initialize, rows
 from projects import (
     router as project_router, restore_projects, validate_project_backups,
@@ -197,6 +198,7 @@ app.include_router(project_sheet_router)
 app.include_router(project_cover_router)
 app.include_router(project_journal_router)
 app.include_router(creative_kit_router)
+app.include_router(marketing_router)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
@@ -1600,6 +1602,21 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
         restored_cover_count = restore_covers(db, project_cover_backups, new_project_ids)
         restored_journal_count = restore_journal(db, journal_backups, new_project_ids)
         restored_kit_count = restore_kits(db, kit_backups)
+        for plan in manifest.get("marketing_plans", []):
+            db.execute(
+                "INSERT INTO marketing_plans(id, artwork_filename, artwork_title, start_date, listing_url, posts, approved, revision) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
+                (plan["id"], plan["artwork_filename"], plan["artwork_title"], plan["start_date"],
+                 plan["listing_url"], plan["posts"], plan["approved"], plan["revision"]),
+            )
+        for post in manifest.get("marketing_buffer_posts", []):
+            db.execute(
+                "INSERT INTO marketing_buffer_posts(plan_id, platform, channel_name, due_at, state, buffer_id) "
+                "SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM marketing_plans WHERE id = ?) "
+                "ON CONFLICT DO NOTHING",
+                (post["plan_id"], post["platform"], post["channel_name"], post["due_at"],
+                 post["state"], post["buffer_id"], post["plan_id"]),
+            )
     restored_rules = restore_midjourney_rules_from_manifest(manifest)
     return {
         "status": "restored",
