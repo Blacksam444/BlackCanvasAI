@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from pydantic import BaseModel
 
+from marketing import router as marketing_router
 from storage import UPLOAD_DIR, backup_data, connect, execute, initialize, rows
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -184,6 +185,7 @@ def format_prompt_pack(prompts: list[dict]) -> str:
     return "\n\n".join(sections) + "\n"
 initialize()
 app = FastAPI(title="Black Canvas AI")
+app.include_router(marketing_router)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
@@ -1319,7 +1321,7 @@ def backup_to_google_drive() -> dict:
         fields="id,name,webViewLink",
     ).execute()
     manifest = backup_data()
-    manifest.update({"backup_format": 6, "created_at": created_at.isoformat(), "artwork_file_count": 0})
+    manifest.update({"backup_format": manifest["version"], "created_at": created_at.isoformat(), "artwork_file_count": 0})
     uploaded_images = 0
     mime_types = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif"}
     for artwork in manifest.get("artworks", []):
@@ -1468,6 +1470,13 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
                 ),
             )
             restored_artworks += 1
+        for plan in manifest.get("marketing_plans", []):
+            db.execute(
+                "INSERT INTO marketing_plans(id, artwork_filename, artwork_title, start_date, listing_url, posts, approved, revision) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
+                (plan["id"], plan["artwork_filename"], plan["artwork_title"], plan["start_date"],
+                 plan["listing_url"], plan["posts"], plan["approved"], plan["revision"]),
+            )
     restored_rules = restore_midjourney_rules_from_manifest(manifest)
     return {
         "status": "restored",
