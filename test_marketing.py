@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from datetime import date, datetime, timedelta, timezone
@@ -6,7 +7,7 @@ from unittest.mock import patch
 
 from fastapi import HTTPException
 
-from buffer_client import BufferError, BufferRejected
+from buffer_client import BufferClient, BufferError, BufferRejected
 from marketing import BufferSchedule, NewPlan, PlanEdit, create_plan, list_plans, schedule_in_buffer, update_plan
 from storage import backup_data, execute, initialize
 
@@ -33,9 +34,9 @@ class MarketingQueueTests(unittest.TestCase):
         )
         plan = create_plan(payload)
         self.assertEqual([post["platform"] for post in plan["posts"]],
-                         ["instagram", "pinterest", "facebook", "tiktok"])
+                         ["instagram", "pinterest", "youtube", "facebook", "tiktok"])
         self.assertEqual([post["date"] for post in plan["posts"]],
-                         ["2026-11-16", "2026-11-17", "2026-11-19", "2026-11-21"])
+                         ["2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19", "2026-11-21"])
         self.assertEqual(plan["artwork_url"], "/uploads/sample.png")
         self.assertIn(payload.story, plan["posts"][2]["caption"])
         self.assertNotIn("Private notes", str(plan))
@@ -53,7 +54,8 @@ class MarketingQueueTests(unittest.TestCase):
         updated = update_plan(plan["id"], edit)
         self.assertTrue(updated["approved"])
         self.assertEqual(updated["posts"][0]["date"], "2026-11-17")
-        self.assertEqual(list_plans()[0]["posts"][2]["caption"], captions["facebook"])
+        self.assertEqual(next(post["caption"] for post in list_plans()[0]["posts"]
+                              if post["platform"] == "facebook"), captions["facebook"])
         with self.assertRaises(HTTPException) as stale:
             update_plan(plan["id"], edit)
         self.assertEqual(stale.exception.status_code, 409)
@@ -79,6 +81,7 @@ class MarketingQueueTests(unittest.TestCase):
                 "platform": post["platform"], "channel_id": post["platform"],
                 "due_at": f"{post['date']}T19:00:00-06:00", "media_url": "https://cdn.example.com/art",
                 "board_id": "board" if post["platform"] == "pinterest" else "",
+                "youtube_privacy": "unlisted" if post["platform"] == "youtube" else "public",
             }
             for post in plan["posts"]
         ])
@@ -91,6 +94,7 @@ class MarketingQueueTests(unittest.TestCase):
             buffer = factory.return_value
             buffer.schedule.side_effect = [
                 {"id": "reel", "status": "buffer"}, {"id": "pin", "status": "buffer"},
+                {"id": "short", "status": "buffer"},
                 BufferRejected("Check photo format."), BufferError("Timeout"),
             ]
             result = schedule_in_buffer(plan["id"], payload)
@@ -100,7 +104,11 @@ class MarketingQueueTests(unittest.TestCase):
             calls = [call.args[0] for call in buffer.schedule.call_args_list]
             self.assertEqual(calls[0]["metadata"]["instagram"]["type"], "reel")
             self.assertEqual(calls[1]["metadata"]["pinterest"]["url"], plan["listing_url"])
-            self.assertIn(plan["listing_url"], calls[2]["text"])
+            self.assertEqual(calls[2]["metadata"]["youtube"]["categoryId"], "26")
+            self.assertEqual(calls[2]["metadata"]["youtube"]["privacy"], "unlisted")
+            self.assertFalse(calls[2]["metadata"]["youtube"]["notifySubscribers"])
+            self.assertEqual(calls[2]["assets"], [{"video": {"url": "https://cdn.example.com/art"}}])
+            self.assertIn(plan["listing_url"], calls[3]["text"])
             self.assertTrue(calls[0]["dueAt"].endswith("01:00:00Z"))
 
             buffer.schedule.reset_mock()
@@ -109,8 +117,33 @@ class MarketingQueueTests(unittest.TestCase):
             result = schedule_in_buffer(plan["id"], payload)
             buffer.schedule.assert_called_once()
             self.assertEqual(buffer.schedule.call_args.args[0]["channelId"], "facebook")
-            self.assertEqual(len(result["plan"]["buffer_posts"]), 4)
-            self.assertEqual(len(backup_data()["marketing_buffer_posts"]), 4)
+            self.assertEqual(len(result["plan"]["buffer_posts"]), 5)
+            self.assertEqual(len(backup_data()["marketing_buffer_posts"]), 5)
+
+    def test_existing_weeks_get_a_short_without_changing_saved_captions(self):
+        plan = create_plan(NewPlan(artwork_id=self.artwork_id, start_date=date(2026, 11, 16)))
+        existing = {
+            "instagram": "Instagram caption", "pinterest": "Pin caption", "pinterest_title": "Pin title",
+            "facebook": "Facebook caption", "tiktok": "TikTok caption",
+        }
+        execute("UPDATE marketing_plans SET posts = ? WHERE id = ?", (json.dumps(existing), plan["id"]))
+        updated = update_plan(plan["id"], PlanEdit(start_date=date(2026, 11, 16), revision=1,
+                                                  captions=existing, approved=True))
+        posts = {post["platform"]: post for post in updated["posts"]}
+        self.assertEqual(posts["facebook"]["caption"], existing["facebook"])
+        self.assertIn("The Burden", posts["youtube"]["title"])
+        self.assertTrue(posts["youtube"]["caption"])
+
+    def test_buffer_discovers_instagram_pinterest_and_youtube_together(self):
+        channels = [{
+            "id": service, "name": service, "displayName": service, "service": service, "type": "account",
+            "isDisconnected": False, "isLocked": False, "isQueuePaused": False,
+            "metadata": {"boards": [{"serviceId": "art", "name": "Art"}]} if service == "pinterest" else None,
+        } for service in ("instagram", "pinterest", "youtube")]
+        with patch.object(BufferClient, "request", return_value={"channels": channels}):
+            connected = BufferClient().channels("workspace")
+        self.assertEqual([channel["platform"] for channel in connected], ["instagram", "pinterest", "youtube"])
+        self.assertEqual(connected[1]["boards"], [{"serviceId": "art", "name": "Art"}])
 
     def test_buffer_requires_an_approved_week(self):
         plan = create_plan(NewPlan(artwork_id=self.artwork_id, start_date=date(2026, 11, 16)))

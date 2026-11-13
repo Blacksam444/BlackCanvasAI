@@ -73,7 +73,7 @@ class BufferClient:
                 "boards": (channel.get("metadata") or {}).get("boards", []),
             }
             for channel in channels
-            if channel["service"].lower() in {"facebook", "instagram", "pinterest", "tiktok"}
+            if channel["service"].lower() in {"facebook", "instagram", "pinterest", "tiktok", "youtube"}
             and not (channel["isDisconnected"] or channel["isLocked"] or channel["isQueuePaused"])
             and (channel["service"].lower() != "facebook" or channel["type"].lower() == "page")
         ]

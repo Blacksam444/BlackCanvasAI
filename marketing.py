@@ -15,6 +15,7 @@ router = APIRouter()
 PLATFORMS = (
     ("instagram", "Instagram", "Reel", 0),
     ("pinterest", "Pinterest", "Pin", 1),
+    ("youtube", "YouTube", "Short", 2),
     ("facebook", "Facebook", "Photo post", 3),
     ("tiktok", "TikTok", "Video", 5),
 )
@@ -36,6 +37,8 @@ class PostCopy(BaseModel):
     pinterest_title: str = Field(max_length=100)
     facebook: str = Field(max_length=5000)
     tiktok: str = Field(max_length=2200)
+    youtube: str | None = Field(default=None, max_length=5000)
+    youtube_title: str | None = Field(default=None, max_length=100)
 
 
 class PlanEdit(PlanDates):
@@ -45,18 +48,19 @@ class PlanEdit(PlanDates):
 
 
 class BufferPost(BaseModel):
-    platform: Literal["facebook", "instagram", "pinterest", "tiktok"]
+    platform: Literal["facebook", "instagram", "pinterest", "tiktok", "youtube"]
     channel_id: str
     due_at: AwareDatetime
     media_url: HttpUrl
     board_id: str = ""
     ai_generated: bool = False
+    youtube_privacy: Literal["public", "unlisted", "private"] = "public"
 
 
 class BufferSchedule(BaseModel):
     revision: int = Field(ge=1)
     organization_id: str
-    posts: list[BufferPost] = Field(min_length=1, max_length=4)
+    posts: list[BufferPost] = Field(min_length=1, max_length=len(PLATFORMS))
 
 
 def plan_values(payload: PlanDates) -> tuple[str, str]:
@@ -89,11 +93,17 @@ def starter_copy(title: str, collection: str, story: str, has_listing: bool) -> 
             f"I wanted to share {intro} with you.", note, "Let me know what you see in it.",
         ])),
         tiktok=f"Up close with {artwork}. Which detail made you stop scrolling?",
+        youtube="\n\n".join(filter(None, [f"A closer look at {intro}.", note])),
+        youtube_title=f"{title[:81].rstrip()} | A Closer Look",
     )
 
 
 def serialize_plan(plan: dict) -> dict:
     copy = json.loads(plan["posts"])
+    if "youtube" not in copy or "youtube_title" not in copy:
+        defaults = starter_copy(plan["artwork_title"], "", "", False)
+        copy.setdefault("youtube", defaults.youtube)
+        copy.setdefault("youtube_title", defaults.youtube_title)
     start_date = date.fromisoformat(plan["start_date"])
     return {
         "id": plan["id"],
@@ -112,7 +122,7 @@ def serialize_plan(plan: dict) -> dict:
                 "format": post_format,
                 "date": (start_date + timedelta(days=offset)).isoformat(),
                 "caption": copy[key],
-                "title": copy["pinterest_title"] if key == "pinterest" else "",
+                "title": copy.get(f"{key}_title", ""),
             }
             for key, label, post_format, offset in PLATFORMS
         ],
@@ -164,9 +174,7 @@ def create_plan(payload: NewPlan) -> dict:
 @router.put("/api/marketing/plans/{plan_id}")
 def update_plan(plan_id: str, payload: PlanEdit) -> dict:
     start, link = plan_values(payload)
-    copy = {key: value.strip() for key, value in payload.captions.model_dump().items()}
-    if payload.approved and not all(copy.values()):
-        raise HTTPException(status_code=400, detail="Fill in every caption and the Pin title before approval.")
+    copy = {key: value.strip() for key, value in payload.captions.model_dump(exclude_none=True).items()}
     with connect() as db:
         db.execute("BEGIN IMMEDIATE")
         plan = db.execute("SELECT * FROM marketing_plans WHERE id = ?", (plan_id,)).fetchone()
@@ -176,6 +184,12 @@ def update_plan(plan_id: str, payload: PlanEdit) -> dict:
             raise HTTPException(status_code=409, detail="This plan was changed elsewhere. Refresh to review the latest copy.")
         if db.execute("SELECT 1 FROM marketing_buffer_posts WHERE plan_id = ?", (plan_id,)).fetchone():
             raise HTTPException(status_code=409, detail="This week has Buffer submissions. Manage queued posts in Buffer.")
+        existing = json.loads(plan["posts"])
+        for key in ("youtube", "youtube_title"):
+            if key in existing:
+                copy.setdefault(key, existing[key])
+        if payload.approved and not all(copy.values()):
+            raise HTTPException(status_code=400, detail="Fill in every caption and both post titles before approval.")
         conflict = db.execute(
             "SELECT 1 FROM marketing_plans WHERE artwork_filename = ? AND start_date = ? AND id != ?",
             (plan["artwork_filename"], start, plan_id),
@@ -225,7 +239,7 @@ def buffer_input(plan: dict, selection: BufferPost, channel: dict) -> dict:
         raise HTTPException(status_code=400, detail="Use a public HTTPS media link.")
     if selection.due_at.date().isoformat() != post["date"] or selection.due_at <= datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail=f"Choose a future time on the planned date for {post['label']}.")
-    video = selection.platform in {"instagram", "tiktok"}
+    video = selection.platform in {"instagram", "tiktok", "youtube"}
     listing = plan["listing_url"]
     text = post["caption"]
     result = {
@@ -252,6 +266,14 @@ def buffer_input(plan: dict, selection: BufferPost, channel: dict) -> dict:
         }}
     elif selection.platform == "tiktok":
         result["metadata"] = {"tiktok": {"isAiGenerated": selection.ai_generated}}
+    elif selection.platform == "youtube":
+        if not post["title"].strip() or not text.strip():
+            raise HTTPException(status_code=400, detail="Save and approve a title and description for your YouTube Short.")
+        result["metadata"] = {"youtube": {
+            "title": post["title"], "categoryId": "26", "privacy": selection.youtube_privacy,
+            "madeForKids": False, "isAiGenerated": selection.ai_generated,
+            "notifySubscribers": selection.youtube_privacy == "public",
+        }}
     return result
 
 

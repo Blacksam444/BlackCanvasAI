@@ -20,7 +20,7 @@ $env:BUFFER_API_KEY = "<your Buffer API key>"
 python -m uvicorn app:app --reload
 ```
 
-In **Marketing**, approve a week and open **Schedule with Buffer**. Choose the accounts, times, and public HTTPS media links for the posts you want to schedule. Facebook and Pinterest use images, while Instagram Reels and TikTok use videos. Select a board for Pinterest. Buffer needs direct media URLs that it can open without a sign-in.
+In **Marketing**, approve a week and open **Schedule with Buffer**. Choose the accounts, times, and public HTTPS media links for the posts you want to schedule. Facebook and Pinterest use images. Instagram Reels, YouTube Shorts, and TikTok use videos. Select a Pinterest board and choose a visibility setting when scheduling a YouTube Short. Buffer needs direct media URLs that stay accessible without a sign-in until publishing completes.
 
 The key stays on the server. Keep this workspace on loopback or behind authenticated access. If a submission can't be confirmed, check the Buffer queue for that account and time before creating another copy. Manage any changes to submitted posts in Buffer.
 

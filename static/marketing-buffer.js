@@ -1,6 +1,7 @@
 const bufferForm = document.querySelector("#bufferForm");
 const bufferOrganization = document.querySelector("#bufferOrganization");
 const bufferStatus = document.querySelector("#bufferStatus");
+const bufferSetup = document.querySelector("#bufferSetup");
 const bufferPosts = document.querySelector("#bufferPosts");
 let bufferChannels = [];
 let bufferLoaded = false;
@@ -66,7 +67,7 @@ function bufferPostFields(post, channels) {
     const media = document.createElement("input");
     media.type = "url";
     media.required = true;
-    const video = ["instagram", "tiktok"].includes(post.platform);
+    const video = ["instagram", "tiktok", "youtube"].includes(post.platform);
     addBufferField(fields, video ? "Public video URL" : "Public image URL", media);
     const time = document.createElement("input");
     time.type = "time";
@@ -75,6 +76,9 @@ function bufferPostFields(post, channels) {
     const ai = document.createElement("input");
     ai.type = "checkbox";
     if (video) addBufferField(fields, " This video includes AI-generated media", ai);
+    const privacy = bufferSelect("Choose visibility", [["public", "Public"], ["unlisted", "Unlisted"], ["private", "Private"]]);
+    privacy.value = "public";
+    if (post.platform === "youtube") addBufferField(fields, "YouTube visibility", privacy);
     row.append(fields);
     include.onchange = () => {
         fields.hidden = !include.checked;
@@ -92,7 +96,7 @@ function bufferPostFields(post, channels) {
         const zone = `${offset < 0 ? "-" : "+"}${pad(Math.floor(Math.abs(offset) / 60))}:${pad(Math.abs(offset) % 60)}`;
         return {
             platform: post.platform, channel_id: account.value, due_at: `${post.date}T${time.value}:00${zone}`,
-            media_url: media.value, board_id: board.value, ai_generated: ai.checked,
+            media_url: media.value, board_id: board.value, ai_generated: ai.checked, youtube_privacy: privacy.value,
         };
     };
     return row;
@@ -100,9 +104,11 @@ function bufferPostFields(post, channels) {
 
 function renderBufferPosts() {
     if (!activePlan?.approved) return;
-    const fields = activePlan.posts.map(post => bufferPostFields(
-        post, bufferChannels.filter(channel => channel.platform === post.platform)));
+    const fields = activePlan.posts
+        .filter(post => activePlan.buffer_posts[post.platform] || bufferChannels.some(channel => channel.platform === post.platform))
+        .map(post => bufferPostFields(post, bufferChannels.filter(channel => channel.platform === post.platform)));
     bufferPosts.replaceChildren(...fields);
+    if (!fields.length && bufferOrganization.value) bufferPosts.textContent = "Connect an active social account in Buffer to schedule posts.";
     bufferForm.querySelector('button[type="submit"]').hidden = !fields.some(field => field.getSelection);
 }
 
@@ -127,12 +133,14 @@ async function loadBufferChannels() {
 bufferPanel.addEventListener("toggle", async () => {
     if (!bufferPanel.open || bufferLoaded) return;
     bufferStatus.textContent = "Checking Buffer…";
+    bufferSetup.hidden = true;
     try {
         const data = await request("/api/marketing/buffer");
         if (!data.configured || !data.organizations.length) {
             bufferStatus.textContent = data.configured
                 ? "Connect your social accounts to a Buffer workspace."
                 : "Set up a Buffer API key on the Black Canvas AI server to connect your accounts.";
+            bufferSetup.hidden = data.configured;
             return;
         }
         bufferLoaded = true;

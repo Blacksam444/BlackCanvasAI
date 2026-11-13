@@ -9,8 +9,8 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/styles.css">
     <link rel="stylesheet" href="/static/marketing.css">
-    <script src="/static/marketing.js?v=2" defer></script>
-    <script src="/static/marketing-buffer.js" defer></script>
+    <script src="/static/marketing.js?v=3" defer></script>
+    <script src="/static/marketing-buffer.js?v=2" defer></script>
 </head>
 <body>
     <div class="app-shell">
@@ -61,7 +61,7 @@
                         <p id="marketingStatus" role="status" class="marketing-status"></p>
                         <section id="planEmpty" class="panel plan-empty">
                             <h2>Your weekly queue</h2>
-                            <p>Choose a piece to create drafts for Instagram, Pinterest, Facebook, and TikTok.</p>
+                            <p>Choose a piece to create drafts for Instagram, Pinterest, YouTube Shorts, Facebook, and TikTok.</p>
                         </section>
                         <form id="planEditor" hidden>
                             <section class="panel plan-header">
@@ -87,6 +87,7 @@
                         <details id="bufferPanel" class="panel buffer-panel" hidden>
                             <summary>Schedule with Buffer</summary>
                             <p id="bufferStatus" role="status"></p>
+                            <p id="bufferSetup" hidden><a href="https://publish.buffer.com/settings/api" target="_blank" rel="noopener noreferrer">Open Buffer API settings</a></p>
                             <form id="bufferForm" hidden>
                                 <label>Buffer workspace<select id="bufferOrganization" required></select></label>
                                 <p>Choose the posts to schedule. Times use this device’s time zone.</p>

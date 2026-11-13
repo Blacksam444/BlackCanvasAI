@@ -14,10 +14,11 @@ const dateLabel = new Intl.DateTimeFormat(undefined, {
 const postGuidance = {
     instagram: "Use a vertical studio clip or a slow pan across the finished piece.",
     pinterest: "Use a tall crop of the artwork and put the listing URL in the destination field.",
+    youtube: "Use a vertical or square studio clip up to three minutes long.",
     facebook: "Use the finished artwork photo and share the listing link with the post.",
     tiktok: "Start with a close-up, then cut to the full piece.",
 };
-const captionLimits = { instagram: 2200, pinterest: 500, facebook: 5000, tiktok: 2200 };
+const captionLimits = { instagram: 2200, pinterest: 500, youtube: 5000, facebook: 5000, tiktok: 2200 };
 let plans = [];
 let activePlan = null;
 let hasEdits = false;
@@ -84,17 +85,19 @@ function renderPost(post, firstDate) {
     guidance.className = "post-media";
     guidance.textContent = postGuidance[post.platform];
     card.append(heading, guidance);
-    if (post.platform === "pinterest") {
-        card.append(editorField("Pin title", "pinterest_title", post.title, 100));
+    const titleLabel = { pinterest: "Pin title", youtube: "Short title" }[post.platform];
+    if (titleLabel) {
+        card.append(editorField(titleLabel, `${post.platform}_title`, post.title, 100));
     }
-    const caption = editorField(post.platform === "pinterest" ? "Pin description" : "Caption",
+    const captionLabel = { pinterest: "Pin description", youtube: "Short description" }[post.platform] || "Caption";
+    const caption = editorField(captionLabel,
         post.platform, post.caption, captionLimits[post.platform], true);
     const copy = document.createElement("button");
     copy.type = "button";
-    copy.textContent = post.platform === "pinterest" ? "Copy Pin details" : "Copy caption";
+    copy.textContent = { pinterest: "Copy Pin details", youtube: "Copy Short details" }[post.platform] || "Copy caption";
     copy.onclick = async () => {
         const text = [caption.querySelector("textarea").value];
-        if (post.platform === "pinterest") text.unshift(planEditor.elements.pinterest_title.value);
+        if (titleLabel) text.unshift(planEditor.elements[`${post.platform}_title`].value);
         if (["facebook", "pinterest"].includes(post.platform) && editListing.value.trim()) {
             text.push(editListing.value.trim());
         }
