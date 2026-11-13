@@ -20,7 +20,6 @@ from typing import Literal
 
 from think_tank import COMPOSITIONS, MATERIALS, SURFACES, USER_DIRECTION, build_ideas
 
-from marketing import router as marketing_router
 from storage import UPLOAD_DIR, backup_data, connect, execute, initialize, rows
 from projects import (
     router as project_router, restore_projects, validate_project_backups,
@@ -31,6 +30,7 @@ from project_sheets import router as project_sheet_router
 from project_covers import router as project_cover_router, clear_artwork_cover, cover_state, restore_covers, validate_cover_backups
 from project_journal import router as project_journal_router, restore_journal, validate_journal_backups
 from creative_kits import CreativePreferences, router as creative_kit_router, restore_kits, validate_kit_backups
+from marketing import router as marketing_router
 
 BASE_DIR = Path(__file__).resolve().parent
 MIDJOURNEY_RULES_PATH = BASE_DIR / "midjourney_rules.json"

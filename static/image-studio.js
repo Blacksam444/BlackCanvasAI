@@ -103,7 +103,15 @@ function prepare(file) {
 }
 function showDetail(artwork) {
   selectedArtwork = { projects: [], ...artwork };
-  $("#promoteArtwork").href = `/marketing?artwork=${encodeURIComponent(artwork.id)}`;
+  let promoteLink = $("#promoteArtwork");
+  if (!promoteLink) {
+    promoteLink = document.createElement("a");
+    promoteLink.id = "promoteArtwork";
+    promoteLink.className = "edit-art";
+    promoteLink.textContent = "Promote this piece";
+    $("#editArtwork").before(promoteLink);
+  }
+  promoteLink.href = `/marketing?artwork=${encodeURIComponent(artwork.id)}`;
   $("#detailImage").src = artwork.url; $("#detailImage").alt = artwork.title;
   $("#detailCollection").textContent = artwork.collection; $("#detailTitle").textContent = artwork.title;
   $("#detailNotes").textContent = artwork.notes || "No notes added yet."; $("#detailStatus").textContent = "";

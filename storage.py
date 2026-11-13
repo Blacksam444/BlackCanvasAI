@@ -23,6 +23,26 @@ def initialize() -> None:
     UPLOAD_DIR.mkdir(exist_ok=True)
     with connect() as db:
         db.executescript("""
+            CREATE TABLE IF NOT EXISTS marketing_plans (
+                id TEXT PRIMARY KEY NOT NULL,
+                artwork_filename TEXT NOT NULL,
+                artwork_title TEXT NOT NULL,
+                start_date TEXT NOT NULL,
+                listing_url TEXT NOT NULL,
+                posts TEXT NOT NULL,
+                approved INTEGER NOT NULL DEFAULT 0,
+                revision INTEGER NOT NULL DEFAULT 1,
+                UNIQUE(artwork_filename, start_date)
+            );
+            CREATE TABLE IF NOT EXISTS marketing_buffer_posts (
+                plan_id TEXT NOT NULL,
+                platform TEXT NOT NULL,
+                channel_name TEXT NOT NULL,
+                due_at TEXT NOT NULL,
+                state TEXT NOT NULL,
+                buffer_id TEXT,
+                PRIMARY KEY (plan_id, platform)
+            );
             CREATE TABLE IF NOT EXISTS prompts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
@@ -100,26 +120,6 @@ def initialize() -> None:
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
-            CREATE TABLE IF NOT EXISTS marketing_plans (
-                id TEXT PRIMARY KEY NOT NULL,
-                artwork_filename TEXT NOT NULL,
-                artwork_title TEXT NOT NULL,
-                start_date TEXT NOT NULL,
-                listing_url TEXT NOT NULL,
-                posts TEXT NOT NULL,
-                approved INTEGER NOT NULL DEFAULT 0,
-                revision INTEGER NOT NULL DEFAULT 1,
-                UNIQUE(artwork_filename, start_date)
-            );
-            CREATE TABLE IF NOT EXISTS marketing_buffer_posts (
-                plan_id TEXT NOT NULL,
-                platform TEXT NOT NULL,
-                channel_name TEXT NOT NULL,
-                due_at TEXT NOT NULL,
-                state TEXT NOT NULL,
-                buffer_id TEXT,
-                PRIMARY KEY (plan_id, platform)
-            );
         """)
         project_columns = {row[1] for row in db.execute("PRAGMA table_info(projects)")}
         if "archived" not in project_columns:
@@ -168,6 +168,14 @@ def backup_data() -> dict[str, Any]:
         db.execute("BEGIN")
         styles = rows("SELECT name, content FROM styles ORDER BY name", connection=db)
         return {
+            "marketing_plans": rows(
+                "SELECT id, artwork_filename, artwork_title, start_date, listing_url, posts, approved, revision "
+                "FROM marketing_plans ORDER BY start_date, id", connection=db
+            ),
+            "marketing_buffer_posts": rows(
+                "SELECT plan_id, platform, channel_name, due_at, state, buffer_id "
+                "FROM marketing_buffer_posts ORDER BY plan_id, platform", connection=db
+            ),
             "version": 12,
             "prompts": rows("SELECT id, title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result, version_test_notes, version_tested_at FROM prompts ORDER BY id", connection=db),
             "styles": {item["name"]: json.loads(item["content"]) for item in styles},
@@ -188,12 +196,4 @@ def backup_data() -> dict[str, Any]:
                 "ORDER BY j.project_id, j.entry_date, j.id", connection=db)],
             "creative_kits": [{**item, "preferences": json.loads(item["preferences"])} for item in rows(
                 "SELECT id, name, preferences, revision, created_at, updated_at FROM creative_kits ORDER BY name_key, id", connection=db)],
-            "marketing_plans": rows(
-                "SELECT id, artwork_filename, artwork_title, start_date, listing_url, posts, approved, revision "
-                "FROM marketing_plans ORDER BY start_date, id", connection=db
-            ),
-            "marketing_buffer_posts": rows(
-                "SELECT plan_id, platform, channel_name, due_at, state, buffer_id "
-                "FROM marketing_buffer_posts ORDER BY plan_id, platform", connection=db
-            ),
         }
