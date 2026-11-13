@@ -58,6 +58,13 @@
 .post-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; }
 .post-date { font-size: 13px; }
 .plan-actions { display: flex; flex-wrap: wrap; justify-content: end; gap: 8px; margin-top: 14px; }
+.plan-actions[hidden] { display: none; }
+.buffer-panel { margin-top: 14px; }
+.buffer-panel summary { cursor: pointer; font-weight: 700; }
+.buffer-platform { min-width: 0; margin: 12px 0; padding: 12px; border: 1px solid #474350; border-radius: 8px; }
+.buffer-platform label:first-child { margin-bottom: 8px; }
+.buffer-platform input[type="checkbox"] { display: inline-block; width: auto; margin: 0 6px 0 0; }
+.buffer-platform:last-child { margin-bottom: 16px; }
 
 @media (max-width: 850px) {
     .marketing-layout { grid-template-columns: 1fr; }

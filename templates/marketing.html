@@ -9,7 +9,8 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Manrope:wght@600;700;800&amp;display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/styles.css">
     <link rel="stylesheet" href="/static/marketing.css">
-    <script src="/static/marketing.js" defer></script>
+    <script src="/static/marketing.js?v=2" defer></script>
+    <script src="/static/marketing-buffer.js" defer></script>
 </head>
 <body>
     <div class="app-shell">
@@ -68,7 +69,7 @@
                                 <div>
                                     <span id="planState" class="tag"></span>
                                     <h2 id="planTitle" tabindex="-1"></h2>
-                                    <p>Dates are for planning. Publish through your social accounts.</p>
+                                    <p>Approve the copy before scheduling it through Buffer.</p>
                                 </div>
                             </section>
                             <div class="panel plan-details">
@@ -83,6 +84,16 @@
                                 <button type="submit" value="approved" class="primary">Approve week</button>
                             </div>
                         </form>
+                        <details id="bufferPanel" class="panel buffer-panel" hidden>
+                            <summary>Schedule with Buffer</summary>
+                            <p id="bufferStatus" role="status"></p>
+                            <form id="bufferForm" hidden>
+                                <label>Buffer workspace<select id="bufferOrganization" required></select></label>
+                                <p>Choose the posts to schedule. Times use this device’s time zone.</p>
+                                <div id="bufferPosts"></div>
+                                <button type="submit" class="primary">Schedule selected posts</button>
+                            </form>
+                        </details>
                     </div>
                 </div>
             </div>

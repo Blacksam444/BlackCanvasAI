@@ -1477,6 +1477,14 @@ def restore_google_backup(backup_id: str) -> dict[str, int | str]:
                 (plan["id"], plan["artwork_filename"], plan["artwork_title"], plan["start_date"],
                  plan["listing_url"], plan["posts"], plan["approved"], plan["revision"]),
             )
+        for post in manifest.get("marketing_buffer_posts", []):
+            db.execute(
+                "INSERT INTO marketing_buffer_posts(plan_id, platform, channel_name, due_at, state, buffer_id) "
+                "SELECT ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM marketing_plans WHERE id = ?) "
+                "ON CONFLICT DO NOTHING",
+                (post["plan_id"], post["platform"], post["channel_name"], post["due_at"],
+                 post["state"], post["buffer_id"], post["plan_id"]),
+            )
     restored_rules = restore_midjourney_rules_from_manifest(manifest)
     return {
         "status": "restored",

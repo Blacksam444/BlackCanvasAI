@@ -71,6 +71,15 @@ def initialize() -> None:
                 revision INTEGER NOT NULL DEFAULT 1,
                 UNIQUE(artwork_filename, start_date)
             );
+            CREATE TABLE IF NOT EXISTS marketing_buffer_posts (
+                plan_id TEXT NOT NULL,
+                platform TEXT NOT NULL,
+                channel_name TEXT NOT NULL,
+                due_at TEXT NOT NULL,
+                state TEXT NOT NULL,
+                buffer_id TEXT,
+                PRIMARY KEY (plan_id, platform)
+            );
         """)
         prompt_columns = {row[1] for row in db.execute("PRAGMA table_info(prompts)")}
         if "source" not in prompt_columns:
@@ -117,5 +126,9 @@ def backup_data() -> dict[str, Any]:
         "marketing_plans": rows(
             "SELECT id, artwork_filename, artwork_title, start_date, listing_url, posts, approved, revision "
             "FROM marketing_plans ORDER BY start_date, id"
+        ),
+        "marketing_buffer_posts": rows(
+            "SELECT plan_id, platform, channel_name, due_at, state, buffer_id "
+            "FROM marketing_buffer_posts ORDER BY plan_id, platform"
         ),
     }

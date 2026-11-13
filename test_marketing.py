@@ -1,12 +1,13 @@
 import tempfile
 import unittest
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
 from fastapi import HTTPException
 
-from marketing import NewPlan, PlanEdit, create_plan, list_plans, update_plan
+from buffer_client import BufferError, BufferRejected
+from marketing import BufferSchedule, NewPlan, PlanEdit, create_plan, list_plans, schedule_in_buffer, update_plan
 from storage import backup_data, execute, initialize
 
 
@@ -63,3 +64,62 @@ class MarketingQueueTests(unittest.TestCase):
             }))
         self.assertEqual(incomplete.exception.status_code, 400)
         self.assertEqual(list_plans(), [updated])
+
+    def test_buffer_keeps_successes_and_avoids_retrying_unconfirmed_posts(self):
+        start = (datetime.now(timezone.utc) + timedelta(days=7)).date()
+        plan = create_plan(NewPlan(
+            artwork_id=self.artwork_id, start_date=start, listing_url="https://www.etsy.com/listing/123",
+        ))
+        captions = {post["platform"]: post["caption"] for post in plan["posts"]}
+        captions["pinterest_title"] = "The Burden"
+        plan = update_plan(plan["id"], PlanEdit(start_date=start, revision=1, captions=captions, approved=True,
+                                               listing_url=plan["listing_url"]))
+        payload = BufferSchedule(revision=plan["revision"], organization_id="workspace", posts=[
+            {
+                "platform": post["platform"], "channel_id": post["platform"],
+                "due_at": f"{post['date']}T19:00:00-06:00", "media_url": "https://cdn.example.com/art",
+                "board_id": "board" if post["platform"] == "pinterest" else "",
+            }
+            for post in plan["posts"]
+        ])
+        channels = [
+            {"id": post.platform, "platform": post.platform, "name": post.platform,
+             "boards": [{"serviceId": "board", "name": "Art"}]}
+            for post in payload.posts
+        ]
+        with patch("marketing.connected_channels", return_value=channels), patch("marketing.BufferClient") as factory:
+            buffer = factory.return_value
+            buffer.schedule.side_effect = [
+                {"id": "reel", "status": "buffer"}, {"id": "pin", "status": "buffer"},
+                BufferRejected("Check photo format."), BufferError("Timeout"),
+            ]
+            result = schedule_in_buffer(plan["id"], payload)
+            self.assertEqual(set(result["errors"]), {"facebook", "tiktok"})
+            self.assertEqual(result["plan"]["buffer_posts"]["tiktok"]["state"], "unconfirmed")
+            self.assertNotIn("facebook", result["plan"]["buffer_posts"])
+            calls = [call.args[0] for call in buffer.schedule.call_args_list]
+            self.assertEqual(calls[0]["metadata"]["instagram"]["type"], "reel")
+            self.assertEqual(calls[1]["metadata"]["pinterest"]["url"], plan["listing_url"])
+            self.assertIn(plan["listing_url"], calls[2]["text"])
+            self.assertTrue(calls[0]["dueAt"].endswith("01:00:00Z"))
+
+            buffer.schedule.reset_mock()
+            buffer.schedule.side_effect = None
+            buffer.schedule.return_value = {"id": "photo", "status": "buffer"}
+            result = schedule_in_buffer(plan["id"], payload)
+            buffer.schedule.assert_called_once()
+            self.assertEqual(buffer.schedule.call_args.args[0]["channelId"], "facebook")
+            self.assertEqual(len(result["plan"]["buffer_posts"]), 4)
+            self.assertEqual(len(backup_data()["marketing_buffer_posts"]), 4)
+
+    def test_buffer_requires_an_approved_week(self):
+        plan = create_plan(NewPlan(artwork_id=self.artwork_id, start_date=date(2026, 11, 16)))
+        payload = BufferSchedule(revision=1, organization_id="workspace", posts=[{
+            "platform": "facebook", "channel_id": "fb", "due_at": "2026-11-19T19:00:00-06:00",
+            "media_url": "https://cdn.example.com/art.png",
+        }])
+        with patch("marketing.connected_channels", return_value=[]), patch("marketing.BufferClient") as factory:
+            with self.assertRaises(HTTPException) as unapproved:
+                schedule_in_buffer(plan["id"], payload)
+            self.assertEqual(unapproved.exception.status_code, 409)
+            factory.return_value.schedule.assert_not_called()

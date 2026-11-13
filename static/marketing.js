@@ -7,6 +7,7 @@ const statusLine = document.querySelector("#marketingStatus");
 const startDate = document.querySelector("#startDate");
 const editDate = document.querySelector("#editDate");
 const editListing = document.querySelector("#editListing");
+const bufferPanel = document.querySelector("#bufferPanel");
 const dateLabel = new Intl.DateTimeFormat(undefined, {
     weekday: "short", month: "short", day: "numeric", timeZone: "UTC",
 });
@@ -146,6 +147,11 @@ function openPlan(plan) {
     editDate.value = plan.start_date;
     editListing.value = plan.listing_url;
     document.querySelector("#posts").replaceChildren(...plan.posts.map(post => renderPost(post, plan.start_date)));
+    const locked = Object.keys(plan.buffer_posts).length > 0;
+    planEditor.querySelector(".plan-actions").hidden = locked;
+    planEditor.querySelectorAll("textarea, input").forEach(field => { field.readOnly = locked; });
+    bufferPanel.hidden = !plan.approved;
+    bufferPanel.dispatchEvent(new Event("planchange"));
     postDates();
     renderSavedWeeks();
 }
@@ -183,6 +189,7 @@ planForm.addEventListener("submit", async event => {
 
 planEditor.addEventListener("input", () => {
     hasEdits = true;
+    bufferPanel.hidden = true;
     document.querySelector("#planState").textContent = "Unsaved changes";
 });
 editDate.addEventListener("input", postDates);
@@ -201,7 +208,7 @@ planEditor.addEventListener("submit", async event => {
             approved,
             captions,
         }));
-        showStatus(approved ? "Week approved for manual publishing." : "Draft saved.");
+        showStatus(approved ? "Week approved. You can now schedule it through Buffer." : "Draft saved.");
     } catch (error) {
         showStatus(error.message);
     } finally {
