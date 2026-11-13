@@ -60,6 +60,26 @@ def initialize() -> None:
                 filename TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+            CREATE TABLE IF NOT EXISTS marketing_plans (
+                id TEXT PRIMARY KEY NOT NULL,
+                artwork_filename TEXT NOT NULL,
+                artwork_title TEXT NOT NULL,
+                start_date TEXT NOT NULL,
+                listing_url TEXT NOT NULL,
+                posts TEXT NOT NULL,
+                approved INTEGER NOT NULL DEFAULT 0,
+                revision INTEGER NOT NULL DEFAULT 1,
+                UNIQUE(artwork_filename, start_date)
+            );
+            CREATE TABLE IF NOT EXISTS marketing_buffer_posts (
+                plan_id TEXT NOT NULL,
+                platform TEXT NOT NULL,
+                channel_name TEXT NOT NULL,
+                due_at TEXT NOT NULL,
+                state TEXT NOT NULL,
+                buffer_id TEXT,
+                PRIMARY KEY (plan_id, platform)
+            );
         """)
         prompt_columns = {row[1] for row in db.execute("PRAGMA table_info(prompts)")}
         if "source" not in prompt_columns:
@@ -98,9 +118,17 @@ def execute(query: str, values: tuple[Any, ...] = ()) -> int:
 def backup_data() -> dict[str, Any]:
     styles = rows("SELECT name, content FROM styles ORDER BY name")
     return {
-        "version": 6,
+        "version": 7,
         "prompts": rows("SELECT id, title, category, text, favorite, source, reviewed, trashed, parent_prompt_id, migrated_from_version, version_test_result, version_test_notes, version_tested_at FROM prompts ORDER BY id"),
         "styles": {item["name"]: json.loads(item["content"]) for item in styles},
         "midjourney_rules": json.loads(MIDJOURNEY_RULES_PATH.read_text(encoding="utf-8")),
         "artworks": rows("SELECT id, title, collection, tags, notes, favorite, filename, created_at FROM artworks ORDER BY id"),
+        "marketing_plans": rows(
+            "SELECT id, artwork_filename, artwork_title, start_date, listing_url, posts, approved, revision "
+            "FROM marketing_plans ORDER BY start_date, id"
+        ),
+        "marketing_buffer_posts": rows(
+            "SELECT plan_id, platform, channel_name, due_at, state, buffer_id "
+            "FROM marketing_buffer_posts ORDER BY plan_id, platform"
+        ),
     }

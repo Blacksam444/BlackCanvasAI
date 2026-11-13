@@ -82,6 +82,7 @@ function prepare(file) {
 
 function showDetail(artwork) {
   selectedId = artwork.id;
+  document.querySelector("#promoteArtwork").href = `/marketing?artwork=${artwork.id}`;
   document.querySelector("#detailImage").src = artwork.url;
   document.querySelector("#detailCollection").textContent = artwork.collection;
   document.querySelector("#detailTitle").textContent = artwork.title;
