@@ -23,7 +23,7 @@ class PromptIntegrationTests(unittest.TestCase):
         _, prompt = create_image_prompt("a crowned portrait in the AfroNova style", True, "legacy")
         self.assertIn("OPTIONAL CULTURAL CONTEXT", prompt)
         self.assertIn(CULTURAL_THEMES["legacy"], prompt)
-        self.assertRegex(prompt, r"--v\\s+[0-9.]+$")
+        self.assertRegex(prompt, r"--v\s+[0-9.]+$")
 
     def test_unknown_theme_rejected(self):
         from app import create_image_prompt
