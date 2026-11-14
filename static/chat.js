@@ -98,7 +98,7 @@ async function send(text) {
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, cultural_context: !!document.getElementById("culturalContext")?.checked, cultural_theme: document.getElementById("culturalTheme")?.value || "identity" }),
     });
     if (!response.ok) throw new Error();
     const data = await response.json();
@@ -186,3 +186,7 @@ document.querySelector("#promptBuilder").onsubmit = (event) => {
 JSON.parse(localStorage.getItem(KEY) || "[]").forEach((message) => addMessage(message.role, message.text, false, message.promptData));
 const openingQuestion = new URLSearchParams(window.location.search).get("q");
 if (openingQuestion) { history.replaceState({}, "", "/chat"); send(openingQuestion); }
+
+const culturalToggle = document.getElementById("culturalContext");
+const culturalThemeSelect = document.getElementById("culturalTheme");
+if (culturalToggle && culturalThemeSelect) culturalToggle.addEventListener("change", () => { culturalThemeSelect.disabled = !culturalToggle.checked; });
