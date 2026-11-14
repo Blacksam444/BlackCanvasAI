@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from pydantic import BaseModel
 
+from cultural_intelligence import CulturalContext, CULTURAL_THEMES, guidance
 from marketing import router as marketing_router
 from storage import UPLOAD_DIR, backup_data, connect, execute, initialize, rows
 
@@ -196,6 +197,8 @@ def dashboard_file() -> FileResponse:
 
 class ChatMessage(BaseModel):
     message: str
+    cultural_context: bool = False
+    cultural_theme: str = "identity"
 
 
 class PromptPayload(BaseModel):
@@ -334,7 +337,7 @@ def prompt_collection(idea: str) -> tuple[str, str, str, str]:
             "powerful, visionary, dignified")
 
 
-def create_image_prompt(message: str) -> tuple[str, str]:
+def _create_image_prompt_base(message: str) -> tuple[str, str]:
     idea = clean_image_idea(message)
     collection, palette, style, mood = prompt_collection(idea)
     lowered = idea.lower()
@@ -440,6 +443,27 @@ def create_image_prompt(message: str) -> tuple[str, str]:
     return collection, f"{strip_midjourney_parameters(prompt)} {midjourney_suffix}"
 
 
+
+def create_image_prompt(message: str, cultural_context: bool = False,
+                        cultural_theme: str = "identity") -> tuple[str, str]:
+    collection, prompt = _create_image_prompt_base(message)
+    if not cultural_context:
+        return collection, prompt
+    context = guidance(CulturalContext(enabled=True, theme=cultural_theme))
+    # Preserve the final MidJourney parameter suffix and existing style choices.
+    suffix = midjourney_v82_suffix(clean_image_idea(message))
+    if prompt.endswith(suffix):
+        prompt = prompt[:-len(suffix)].rstrip() + " " + context + " " + suffix
+    else:
+        prompt = prompt + " " + context
+    return collection, prompt
+
+
+@app.get("/api/cultural-themes")
+def cultural_themes() -> dict:
+    return {"themes": CULTURAL_THEMES, "default_enabled": False}
+
+
 @app.get("/")
 def home() -> FileResponse:
     return dashboard_file()
@@ -484,7 +508,7 @@ def chat_reply(payload: ChatMessage) -> dict[str, str]:
     creative_triggers = ("prompt", "image", "portrait", "painting", "photo", "artwork", "style",
                          "afronova", "afro nova", "quiet nova", "graffitix", "graffiti x", "almost human")
     if any(word in topic.lower() for word in creative_triggers):
-        collection, prompt = create_image_prompt(topic)
+        collection, prompt = create_image_prompt(topic, payload.cultural_context, payload.cultural_theme)
         idea = clean_image_idea(topic)
         title = re.sub(r"\s+", " ", idea).strip().title()[:70] or "Generated Image Prompt"
         return {
