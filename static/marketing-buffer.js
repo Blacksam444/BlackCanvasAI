@@ -69,6 +69,20 @@ function bufferPostFields(post, channels) {
     media.required = true;
     const video = ["instagram", "tiktok", "youtube"].includes(post.platform);
     addBufferField(fields, video ? "Public video URL" : "Public image URL", media);
+    if (!video) {
+        const artworkUrl = activePlan?.artwork_url || "";
+        if (/^https:\/\/[^\s]+$/i.test(artworkUrl)) {
+            media.value = artworkUrl;
+        } else {
+            const help = document.createElement("p");
+            help.textContent = "This artwork needs a direct, publicly accessible HTTPS image link for Buffer. A local Black Canvas image address or page link will not work.";
+            fields.append(help);
+        }
+    } else {
+        const help = document.createElement("p");
+        help.textContent = "This platform is configured for video posts. A still image cannot be used as a Reel, Short, or TikTok video; create a video with audio first, or uncheck this platform.";
+        fields.append(help);
+    }
     const time = document.createElement("input");
     time.type = "time";
     time.required = true;
