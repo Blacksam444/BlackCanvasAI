@@ -33,7 +33,9 @@ const collectionExhibitions = {
 const requestedCollection = new URLSearchParams(window.location.search).get('collection');
 let selected = Object.prototype.hasOwnProperty.call(collectionExhibitions, requestedCollection) ? requestedCollection : 'all';
 let gallerySettings = {};
+let dialogItems = [];
 let dialogIndex = 0;
+const galleryEditorRequested = new URLSearchParams(window.location.search).get('edit') === '1';
 const PAGE_SIZE = 12;
 let shownArtworkCount = PAGE_SIZE;
 const savedArtworkStorageKey = 'blackCanvasSavedArtworkIds';
@@ -45,6 +47,10 @@ try {
 const escapeHtml = (value = '') => String(value).replace(/[&<>'\"]/g, (character) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[character]));
 const frameClass = (collection = '') => `frame-${collection.toLowerCase().replace(/[^a-z0-9]+/g, '-') || 'black-canvas'}`;
 const money = (value) => new Intl.NumberFormat('en-US', {style:'currency', currency:'USD', maximumFractionDigits:0}).format(value);
+const artworkMedium = (value) => {
+  const medium = (value || '').trim();
+  return /^(digital|digtial)$/i.test(medium) ? 'Digital' : medium;
+};
 
 function applyExhibition() {
   const exhibition = collectionExhibitions[selected];
@@ -108,7 +114,7 @@ function render() {
     ? `${items.length} ${items.length === 1 ? 'work' : 'works'} on view`
     : `${displayedItems.length} of ${items.length} works on view`;
   grid.innerHTML = displayedItems.map((item, index) => {
-    const extra = [item.medium, item.dimensions].filter(Boolean).join(' · ') || item.collection;
+    const extra = [artworkMedium(item.medium), item.dimensions].filter(Boolean).join(' · ') || item.collection;
     const status = publicArtworkStatus(item);
     const responsiveImage = `${item.url}?width=480 480w, ${item.url}?width=800 800w, ${item.url}?width=1200 1200w`;
     const saved = savedArtworkIds.has(Number(item.id));
@@ -143,21 +149,27 @@ function setFeatured(item) {
   document.getElementById('featuredImage').src = `${item.url}?width=1200`;
   document.getElementById('featuredImage').alt = item.title || 'Featured Black Canvas artwork';
   document.getElementById('featuredTitle').textContent = item.title || 'Untitled work';
-  document.getElementById('featuredMeta').textContent = [item.collection, item.medium, item.dimensions].filter(Boolean).join(' · ');
+  document.getElementById('featuredMeta').textContent = [item.collection, artworkMedium(item.medium), item.dimensions].filter(Boolean).join(' · ');
 }
 
-function showArtwork(id) {
-  const item = artwork.find((artworkItem) => artworkItem.id === Number(id));
+function showArtwork(id, items = visibleArtwork()) {
+  id = Number(id);
+  if (!items.some((item) => item.id === id)) items = artwork;
+  const index = items.findIndex((item) => item.id === id);
+  const item = items[index];
   if (!item) return;
-  dialogIndex = artwork.indexOf(item);
+  dialogItems = items;
+  dialogIndex = index;
   document.getElementById('dialogImage').src = `${item.url}?width=1600`;
   document.getElementById('dialogImage').alt = item.title || 'Black Canvas artwork';
   document.getElementById('dialogCollection').textContent = item.collection || 'Black Canvas';
   document.getElementById('dialogTitle').textContent = item.title || 'Untitled work';
   document.getElementById('dialogDescription').textContent = item.notes || 'A selected work from the Black Canvas collection.';
-  document.getElementById('dialogPosition').textContent = `${String(dialogIndex + 1).padStart(2, '0')} / ${String(artwork.length).padStart(2, '0')}`;
+  document.getElementById('dialogPosition').textContent = `${String(dialogIndex + 1).padStart(2, '0')} / ${String(items.length).padStart(2, '0')}`;
+  document.getElementById('previousArtwork').hidden = items.length < 2;
+  document.getElementById('nextArtwork').hidden = items.length < 2;
   document.getElementById('dialogTags').innerHTML = String(item.tags || '').split(',').map((tag) => tag.trim()).filter(Boolean).slice(0, 7).map((tag) => `<span>${escapeHtml(tag)}</span>`).join('');
-  document.getElementById('dialogMedium').textContent = item.medium || 'Original artwork';
+  document.getElementById('dialogMedium').textContent = artworkMedium(item.medium) || 'Original artwork';
   document.getElementById('dialogDimensions').textContent = item.dimensions || 'Details available soon';
   document.getElementById('dialogAvailability').textContent = publicArtworkStatus(item);
   const priceRow = document.getElementById('dialogPriceRow');
@@ -173,9 +185,9 @@ function showArtwork(id) {
 }
 
 function stepArtwork(direction) {
-  if (!artwork.length) return;
-  dialogIndex = (dialogIndex + direction + artwork.length) % artwork.length;
-  showArtwork(artwork[dialogIndex].id);
+  if (dialogItems.length < 2) return;
+  const index = (dialogIndex + direction + dialogItems.length) % dialogItems.length;
+  showArtwork(dialogItems[index].id, dialogItems);
 }
 
 function openSurpriseArtwork() {
@@ -269,11 +281,12 @@ function setExternalLink(element, url) {
 }
 function applyGallerySettings(settings) {
   gallerySettings = settings;
-  const publicMode = settings.public_mode === true;
+  const publicMode = settings.public_mode !== false;
   document.getElementById('privateStudioLink').hidden = publicMode;
   document.getElementById('manageGalleryLink').hidden = publicMode;
   document.getElementById('dialogStudioLink').hidden = publicMode;
   document.getElementById('emptyStudioLink').hidden = publicMode;
+  document.getElementById('openGalleryEditor').hidden = publicMode || !galleryEditorRequested;
   const artistName = settings.artist_name || 'Jeffrey McKay';
   document.getElementById('artistName').textContent = artistName;
   document.getElementById('footerArtist').textContent = artistName;
@@ -290,9 +303,8 @@ function applyGallerySettings(settings) {
 }
 fetch('/api/gallery-settings').then((response) => response.ok ? response.json() : null).then((settings) => { if (settings) applyGallerySettings(settings); });
 
-if (new URLSearchParams(window.location.search).get('edit') === '1') {
+if (galleryEditorRequested) {
   const openButton = document.getElementById('openGalleryEditor');
-  openButton.hidden = false;
   openButton.addEventListener('click', () => {
     document.getElementById('settingArtistName').value = gallerySettings.artist_name || '';
     document.getElementById('settingIntro').value = gallerySettings.intro || '';

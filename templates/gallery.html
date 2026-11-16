@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Manrope:wght@600;700;800&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
   <link rel="icon" href="/static/black-canvas-favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="/static/gallery.css?v=7">
+  <link rel="stylesheet" href="/static/gallery.css?v=8">
 </head>
 <body>
   <header class="site-header">
@@ -21,7 +21,7 @@
       <a href="/artist">Artist</a>
       <a id="shopNav" href="#collection" hidden>Collect</a>
     </nav>
-    <a class="studio-link" id="privateStudioLink" href="/">Private studio <span>↗</span></a>
+    <a class="studio-link" id="privateStudioLink" href="/" hidden>Private studio <span>↗</span></a>
   </header>
 
   <main>
@@ -76,7 +76,7 @@
       <div class="gallery-more"><button id="loadMoreArt" type="button" hidden>Show more artwork</button></div>
       <div class="empty-state" id="emptyState" hidden>
         <p>Your selected artwork will appear here.</p>
-        <a id="emptyStudioLink" href="/image-studio">Open Image Studio</a>
+        <a id="emptyStudioLink" href="/image-studio" hidden>Open Image Studio</a>
       </div>
     </section>
 
@@ -97,14 +97,14 @@
         <a class="outline" id="instagramLink" href="#collection" hidden>Follow on Instagram <span>↗</span></a>
         <a class="outline" id="contactLink" href="#collection" hidden>Contact the artist <span>↗</span></a>
         <a class="outline" href="/inquire">Inquire or commission <span>↗</span></a>
-        <a class="outline quiet" id="manageGalleryLink" href="/image-studio">Manage gallery</a>
+        <a class="outline quiet" id="manageGalleryLink" href="/image-studio" hidden>Manage gallery</a>
       </div>
     </section>
   </main>
 
   <footer><span>© <span id="footerYear"></span> Black Canvas</span><span>Contemporary art by <b id="footerArtist">Jeffrey McKay</b></span><a href="#exhibition">Back to top ↑</a></footer>
 
-  <dialog class="art-dialog" id="artDialog">
+  <dialog class="art-dialog" id="artDialog" aria-labelledby="dialogTitle">
     <button class="dialog-close" id="closeDialog" aria-label="Close artwork details">×</button>
     <button class="dialog-step dialog-previous" id="previousArtwork" aria-label="Previous artwork">←</button>
     <button class="dialog-step dialog-next" id="nextArtwork" aria-label="Next artwork">→</button>
@@ -120,7 +120,7 @@
         <div><dt>Status</dt><dd id="dialogAvailability">Available</dd></div>
         <div id="dialogPriceRow" hidden><dt>Price</dt><dd id="dialogPrice">—</dd></div>
       </dl>
-      <div class="dialog-links"><a class="outline" id="dialogShopLink" href="#" hidden>View store <span>↗</span></a><a class="text-link" id="dialogInquiryLink" href="/inquire">Inquire about this work →</a><a class="text-link" id="dialogStudioLink" href="/image-studio">View in private studio</a></div>
+      <div class="dialog-links"><a class="outline" id="dialogShopLink" href="#" hidden>View store <span>↗</span></a><a class="text-link" id="dialogInquiryLink" href="/inquire">Inquire about this work →</a><a class="text-link" id="dialogStudioLink" href="/image-studio" hidden>View in private studio</a></div>
     </div>
   </dialog>
 
@@ -138,6 +138,6 @@
       <div class="editor-actions"><button class="cancel" value="cancel">Cancel</button><button class="save-settings" id="saveGallerySettings" value="default">Save changes</button></div>
     </form>
   </dialog>
-  <script src="/static/gallery.js?v=11"></script>
+  <script src="/static/gallery.js?v=12"></script>
 </body>
 </html>
